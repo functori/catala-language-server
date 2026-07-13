@@ -17,6 +17,86 @@ open Shared_ast
 module I = Desugared.Ast
 module O = Catala_types_t
 module J = Catala_types_j
+module S = Surface.Ast
+
+(* Custom [#[testcase.*]] attributes and their registration. *)
+
+type Pos.attr += TestUi
+type Pos.attr += Uid of string
+type Pos.attr += TestDescription of string
+type Pos.attr += TestTitle of string
+type Pos.attr += ArrayItemLabel of string
+
+(* An expected value for a scope variable, given as [#[testcase.variable =
+   <var> = <literal>]]. The literal can be turned into a typed value with
+   [Desugared.From_surface.translate_literal]. *)
+type Pos.attr += ExpectedVariable of (string * S.literal)
+
+let register_attributes () =
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["uid"]
+    ~contexts:(function
+      | Desugared.Name_resolution.Expression _ -> true | _ -> false)
+    (fun ~pos:_ value ->
+      match value with
+      | Shared_ast.String (s, _pos) -> Some (Uid s)
+      | _ -> failwith "unexpected UID value");
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["testui"]
+    ~contexts:(function
+      | Desugared.Name_resolution.ScopeDecl -> true | _ -> false)
+    (fun ~pos:_ _value -> Some TestUi);
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["test_description"]
+    ~contexts:(function
+      | Desugared.Name_resolution.ScopeDecl -> true | _ -> false)
+    (fun ~pos:_ value ->
+      match value with
+      | Shared_ast.String (s, _pos) -> Some (TestDescription s)
+      | _ -> failwith "unexpected test description");
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["test_title"]
+    ~contexts:(function
+      | Desugared.Name_resolution.ScopeDecl -> true | _ -> false)
+    (fun ~pos:_ value ->
+      match value with
+      | Shared_ast.String (s, _pos) -> Some (TestTitle s)
+      | _ -> failwith "unexpected test title");
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["array_item_label"]
+    ~contexts:(function
+      | Desugared.Name_resolution.Expression _ -> true | _ -> false)
+    (fun ~pos:_ value ->
+      match value with
+      | Shared_ast.String (s, _pos) -> Some (ArrayItemLabel s)
+      | _ -> failwith "unexpected array item label");
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["variable"]
+    ~contexts:(function
+      | Desugared.Name_resolution.ScopeDecl -> true | _ -> false)
+    (fun ~pos value ->
+      let rec unparen e =
+        match Mark.remove e with S.Paren e -> unparen e | _ -> e
+      in
+      (* The left-hand side may be a dotted path (e.g. [a.b.c]); flatten it into
+         a dotted name string. *)
+      let rec dotted_name e =
+        match Mark.remove (unparen e) with
+        | S.Ident ([], (n, _), None) -> Some n
+        | S.Dotted (e, dm) ->
+          let _path, field = Mark.remove dm in
+          Option.map (fun p -> p ^ "." ^ Mark.remove field) (dotted_name e)
+        | _ -> None
+      in
+      match value with
+      | S.Expression e -> (
+        match Mark.remove e with
+        | S.Binop ((S.Eq, _), lhs, rhs) -> (
+          match dotted_name lhs, Mark.remove (unparen rhs) with
+          | Some name, S.Literal lit -> Some (ExpectedVariable (name, lit))
+          | _ ->
+            Message.delayed_error None ~pos
+              "Expected @{<magenta>#[testcase.variable = <var> = <value>]@}")
+        | _ ->
+          Message.delayed_error None ~pos
+            "Expected an equality @{<magenta><var> = <value>@}")
+      | _ ->
+        Message.delayed_error None ~pos
+          "@{<magenta>#[testcase.variable]@} expects an expression value")
 
 let to_relative (p : File.t) = File.make_relative_to ~dir:(Sys.getcwd ()) p
 
@@ -307,12 +387,6 @@ and get_enum (lang : Global.backend_lang) (decl_ctx : decl_ctx) enum_name =
     in
     { O.enum_name; constructors; ctor_attrs }
 
-type Pos.attr += TestUi
-type Pos.attr += Uid of string
-type Pos.attr += TestDescription of string
-type Pos.attr += TestTitle of string
-type Pos.attr += ArrayItemLabel of string
-
 let rec get_value : type a.
     Global.backend_lang -> decl_ctx -> (a, 'm) gexpr -> O.runtime_value =
  fun lang decl_ctx e ->
@@ -565,6 +639,7 @@ let get_scope_test
     tested_scope;
     test_outputs;
     test_inputs;
+    variables = [];
     description;
     title;
   }
@@ -787,6 +862,23 @@ let get_test_scopes prg =
       && Pos.has_attr (Mark.get (ScopeName.get_info scope_name)) TestUi)
   |> ScopeName.Map.keys
 
+let lit_to_runtime_value (lit : lit) : O.runtime_value =
+  let value =
+    match lit with
+    | LBool b -> O.Bool b
+    | LInt i -> O.Integer (Z.to_int i)
+    | LRat r -> O.Decimal (Q.to_float r)
+    | LMoney m -> O.Money (Z.to_int m)
+    | LDate t ->
+      let year, month, day = Dates_calc.date_to_ymd t in
+      O.Date { year; month; day }
+    | LDuration dt ->
+      let years, months, days = Dates_calc.period_to_ymds dt in
+      O.Duration { years; months; days }
+    | LUnit -> raise (Unsupported "unit value in expected variable")
+  in
+  { O.value; attrs = [] }
+
 let get_catala_test (prg, naming_ctx) testing_scope_name =
   let testing_scope =
     ScopeName.Map.find testing_scope_name prg.I.program_root.module_scopes
@@ -938,18 +1030,33 @@ let get_catala_test (prg, naming_ctx) testing_scope_name =
         var_str, { test_out with O.value })
       base_test.test_outputs
   in
-  { base_test with O.test_inputs; test_outputs; description; title }
+  let variables =
+    Pos.get_attrs info (function
+      | ExpectedVariable (name, lit) -> Some (name, lit)
+      | _ -> None)
+    |> List.map (fun (name, slit) ->
+           ( name,
+             lit_to_runtime_value
+               (Desugared.From_surface.translate_literal slit info) ))
+  in
+  { base_test with O.test_inputs; test_outputs; variables; description; title }
 
 let import_catala_tests (prg, naming_ctx) =
   List.map (get_catala_test (prg, naming_ctx)) (get_test_scopes prg)
 
-let read_test include_dirs (options : Global.options) buffer_path =
+let read_test include_dirs (options : Global.options) buffer_path scope_filter =
   let path_to_build, include_dirs =
     if include_dirs = [] then lookup_include_dirs ?buffer_path options
     else ".", include_dirs
   in
   let prg = read_program include_dirs path_to_build options in
   let tests = import_catala_tests prg in
+  let tests =
+    match scope_filter with
+    | None -> tests
+    | Some scope ->
+      List.filter (fun (t : O.test) -> t.O.testing_scope = scope) tests
+  in
   write_stdout J.write_test_list tests
 
 type duration_units = { day : string; month : string; year : string }
@@ -1122,6 +1229,12 @@ let write_catala_test ppf t lang =
   fprintf ppf "#[testcase.test_description = %s]@\n"
     (String.quote t.description);
   fprintf ppf "#[testcase.test_title = %s]@\n" (String.quote t.title);
+  List.iter
+    (fun (var, value) ->
+      fprintf ppf "#[testcase.variable = %s = %a]@\n" var
+        (print_catala_value ~typ:None ~lang)
+        value)
+    t.variables;
   fprintf ppf "@[<v 2>%s %s:@," strings.declaration_scope t.testing_scope;
   fprintf ppf "%s %s %s %s.%s@," strings.output_scope sscope_var strings.scope
     t.tested_scope.module_name t.tested_scope.name;

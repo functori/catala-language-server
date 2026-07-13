@@ -120,6 +120,8 @@ type test = {
   tested_scope: scope_def;
   test_inputs: test_inputs;
   test_outputs: test_outputs;
+  ~variables: (string * runtime_value) list <json repr="object"> <ts repr="map">;
+    (* Expected variable values declared via #[testcase.variable = <var> = <lit>] *)
   description: string;
   title: string;
 }

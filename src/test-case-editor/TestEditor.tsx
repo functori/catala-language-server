@@ -9,8 +9,17 @@ import {
 } from '../generated/catala_types';
 import TestInputsEditor from './TestInputsEditor';
 import TestOutputsEditor from './TestOutputsEditor';
+import ExpectedVariablesEditor from './ExpectedVariablesEditor';
 import { type TestRunStatus } from './TestFileEditor';
+import {
+  type TraceElement,
+  type TraceValue,
+  scopeVariables,
+  traceValueFromRuntime,
+  traceValueToRuntime,
+} from '../trace-editor/traceUtils';
 import { confirm } from '../messaging/confirm';
+import { getVsCodeApi } from '../shared/webviewApi';
 import {
   hasUnsetInTest,
   scrollToFirstInvalidOrUnset,
@@ -27,6 +36,12 @@ type Props = {
     results?: TestRunResults;
     stale?: boolean;
   };
+  /**
+   * Trace computed by running this test's scope with tracing (`undefined` if
+   * not computed yet). Used both to propose expected variables and to open the
+   * trace editor.
+   */
+  trace?: TraceElement[];
   onDiffResolved(scope: string, path: PathSegment[]): void;
   onInvalidateDiffs(scope: string, pathPrefix: PathSegment[]): void;
 };
@@ -65,6 +80,17 @@ export default function TestEditor(props: Props): ReactElement {
     );
   }
 
+  function onVariablesChange(next: Map<string, TraceValue>): void {
+    const variables = [...next.entries()].reduce((acc, [name, value]) => {
+      const rv = traceValueToRuntime(value);
+      if (rv !== undefined) {
+        acc.set(name, { value: rv, attrs: [] });
+      }
+      return acc;
+    }, new Map());
+    props.onTestChange({ ...props.test, variables }, false);
+  }
+
   const expectedSectionRef = useRef<HTMLDivElement>(null);
   // Scope for searching the first '.value-editor.invalid' or '.value-editor.unset' before running; used to scroll into view
   const unsetElementRef = useRef<HTMLDivElement>(null);
@@ -101,6 +127,14 @@ export default function TestEditor(props: Props): ReactElement {
     props.onTestRun(props.test.testing_scope);
   };
 
+  const openTraceEditor = (): void => {
+    getVsCodeApi().postMessage({
+      kind: 'openTraceEditor',
+      scope: props.test.testing_scope,
+      trace: props.trace,
+    });
+  };
+
   const resetWithUnsetCheck = async (): Promise<void> => {
     if (hasUnsetInTest(props.test)) {
       scrollToFirstUnset();
@@ -109,6 +143,14 @@ export default function TestEditor(props: Props): ReactElement {
     }
     props.onTestOutputsReset(props.test.testing_scope);
   };
+
+  const arr = [...props.test.variables.entries()]
+    .map(([name, rv]) => {
+      const value = traceValueFromRuntime(rv.value);
+      return [name, value];
+    })
+    .filter(([, value]) => value !== undefined) as [string, TraceValue][];
+  const variables = new Map(arr);
 
   return (
     <div className="test-editor" ref={unsetElementRef}>
@@ -166,6 +208,11 @@ export default function TestEditor(props: Props): ReactElement {
             onTestInputsChange={onTestInputsChange}
           />
         </div>
+        <ExpectedVariablesEditor
+          variables={variables}
+          scopeVariables={props.trace ? scopeVariables(props.trace) : undefined}
+          onChange={onVariablesChange}
+        />
         <div
           className="test-section"
           id={expectedAnchorId}
@@ -195,6 +242,13 @@ export default function TestEditor(props: Props): ReactElement {
                   className={`codicon ${props.runState?.status === 'running' ? 'codicon-loading codicon-modifier-spin' : 'codicon-play'}`}
                 ></span>{' '}
                 {intl.formatMessage({ id: 'testEditor.runTest' })}
+              </button>
+              <button
+                className="button-action-dvp body-b3"
+                title="Open the trace editor for this test"
+                onClick={openTraceEditor}
+              >
+                <span className="codicon codicon-graph"></span> Trace
               </button>
             </div>
             <div className="test-result">

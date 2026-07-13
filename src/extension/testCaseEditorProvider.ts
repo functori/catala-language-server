@@ -22,6 +22,9 @@ import {
 } from '../test-case-editor/testCaseCompilerInterop';
 import { renameIfNeeded } from '../test-case-editor/testCaseUtils';
 import { CatalaTestCaseDocument } from '../shared/CatalaTestCaseDocument';
+import { TraceEditorProvider } from './traceEditorProvider';
+import { runTrace } from '../trace-editor/traceRunner';
+import type { TraceElement } from '../trace-editor/traceUtils';
 
 export function parseContents(
   content: Uint8Array,
@@ -29,7 +32,7 @@ export function parseContents(
   language: string
 ): ParseResults {
   const documentText = new TextDecoder('utf-8').decode(content);
-  return parseTestFile(documentText, language, uri.fsPath);
+  return parseTestFile(documentText, uri.fsPath, language);
 }
 
 // This class contains the 'backend' part of the test case editor that
@@ -46,7 +49,11 @@ export class TestCaseEditorProvider
   public readonly onDidChangeCustomDocument =
     this._onDidChangeCustomDocument.event;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    /** dist-relative path to the emitted `codicon.css`. */
+    private readonly codiconsCssPath: string
+  ) {
     this.testQueue = new PQueue({ concurrency: 1 });
   }
 
@@ -101,8 +108,11 @@ export class TestCaseEditorProvider
     return document;
   }
 
-  public static register(context: vscode.ExtensionContext): vscode.Disposable {
-    const provider = new TestCaseEditorProvider(context);
+  public static register(
+    context: vscode.ExtensionContext,
+    codiconsCssPath: string
+  ): vscode.Disposable {
+    const provider = new TestCaseEditorProvider(context, codiconsCssPath);
     logger.log(`Registering ${TestCaseEditorProvider.viewType}`);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
       TestCaseEditorProvider.viewType,
@@ -163,7 +173,56 @@ export class TestCaseEditorProvider
       document.scheduleChange(typed_msg.value[0], typed_msg.value[1]);
     }
 
+    // For each test, run its scope with tracing and send the trace to the
+    // webview (hand-written message, not part of the ATD DownMessage protocol).
+    // The webview holds it and passes it back when opening the trace editor.
+    async function sendTrace(): Promise<void> {
+      const parsed = document.parseResults;
+      if (parsed.kind !== 'Results') {
+        return;
+      }
+      for (const test of parsed.value) {
+        const result = await runTrace(document.uri.fsPath, test.testing_scope);
+        if (!result.ok) {
+          logger.log(
+            `Could not compute trace for scope ${test.testing_scope}: ${result.error}`
+          );
+          continue;
+        }
+        webviewPanel.webview.postMessage({
+          kind: 'trace',
+          scope: test.testing_scope,
+          trace: result.trace,
+        });
+      }
+    }
+
     webviewPanel.webview.onDidReceiveMessage(async (message: unknown) => {
+      // Hand-written message (not part of the ATD UpMessage protocol): open the
+      // trace editor for a given test scope in a new tab beside this one.
+      if (
+        message !== null &&
+        typeof message === 'object' &&
+        (message as { kind?: unknown }).kind === 'openTraceEditor'
+      ) {
+        const scope = (message as { scope?: unknown }).scope;
+        const scopeStr = typeof scope === 'string' ? scope : undefined;
+        // The webview passes back the trace it holds for this scope, if any.
+        const trace = (message as { trace?: TraceElement[] }).trace;
+        // The document is already parsed here, so pass the matching test
+        // directly: the trace editor can then infer the scope and skip parsing.
+        const parsed = document.parseResults;
+        const test =
+          scopeStr !== undefined && parsed.kind === 'Results'
+            ? parsed.value.find((t) => t.testing_scope === scopeStr)
+            : undefined;
+        await TraceEditorProvider.openWith(document.uri, {
+          scope: scopeStr,
+          test,
+          trace,
+        });
+        return;
+      }
       const typed_msg = readUpMessage(message);
       switch (typed_msg.kind) {
         // listen for a 'ready' message from the web view, then send the initial
@@ -175,6 +234,9 @@ export class TestCaseEditorProvider
             value: document.parseResults,
           });
           TestCaseEditorProvider.markReady(document.uri);
+          // Compute and push the trace in the background; it runs the scope so
+          // we don't want to block the initial render on it.
+          void sendTrace();
           break;
         }
         case 'GuiEdit': {
@@ -583,6 +645,15 @@ export class TestCaseEditorProvider
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'ui.js')
     );
+    // vscode-elements' components look up this stylesheet by id to load the
+    // Codicons font into their shadow DOM.
+    const codiconsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.context.extensionUri,
+        'dist',
+        this.codiconsCssPath
+      )
+    );
 
     const language = vscode.env.language;
 
@@ -593,6 +664,7 @@ export class TestCaseEditorProvider
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <title>Test Case Editor</title>
+              <link href="${codiconsUri}" id="vscode-codicon-stylesheet" rel="stylesheet" />
               <style>
                   body {
                       padding: 10px;
