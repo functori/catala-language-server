@@ -180,13 +180,22 @@ export function runRebuiltTest(
 
 export function parseTestFile(
   content: string,
-  lang: string,
-  bufferPath: string
+  bufferPath: string,
+  lang?: string,
+  scope?: string
 ): ParseResults {
   const cwd = getCwd(bufferPath);
   const execResult = execBinary(
     catalaPath,
-    ['testcase', 'read', '-l', lang, '--buffer-path', bufferPath, '-'],
+    [
+      'testcase',
+      'read',
+      ...(lang ? ['-l', lang] : []),
+      '--buffer-path',
+      bufferPath,
+      ...(scope ? ['--scope', scope] : []),
+      '-',
+    ],
     { input: content, ...(cwd && { cwd }) }
   );
   return decideOpen({
