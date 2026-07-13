@@ -90,6 +90,11 @@
         "icon": "$(debug-alt)"
       },
       {
+        "command": "catala.openWithTraceEditor",
+        "icon": "$(graph)",
+        "title": "Open with Trace Editor"
+      },
+      {
         "command": "catala.openWithTestEditor",
         "title": "%command.catala.openWithTestEditor.title%",
         "category": "%category.catala%",
@@ -149,6 +154,11 @@
           "command": "catala.openWithTestEditor",
           "when": "config.catala.enableCustomTestCaseEditor && resourceFilename =~ /.*test.*\\.catala_(en|fr|pl)$/",
           "group": "navigation@2"
+        },
+        {
+          "command": "catala.openWithTraceEditor",
+          "when": "resourceFilename =~ /\\.catala_(en|fr)$/",
+          "group": "navigation@3"
         }
       ],
       "editor/context": [
@@ -178,6 +188,11 @@
           "command": "catala.openWithTestEditor",
           "when": "config.catala.enableCustomTestCaseEditor && (editorLangId == catala_en || editorLangId == catala_fr || editorLangId == catala_pl) && resourceFilename =~ /.*test.*\\.catala_(en|fr|pl)$/",
           "group": "navigation@2"
+        },
+        {
+          "command": "catala.openWithTraceEditor",
+          "when": "editorLangId == catala_fr || editorLangId == catala_en",
+          "group": "navigation@13"
         }
       ]
     },
@@ -312,6 +327,16 @@
         "selector": [
           {
             "filenamePattern": "*test*.catala_*"
+          }
+        ],
+        "priority": "option"
+      },
+      {
+        "viewType": "catala.traceEditor",
+        "displayName": "Catala Trace Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.catala_*"
           }
         ],
         "priority": "option"
