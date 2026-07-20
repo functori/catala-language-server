@@ -1,5 +1,6 @@
 {
   "command.catala.openWithTestEditor.title": "Open with Catala Test Editor",
+  "command.catala.debugAllTests.title": "Debug Catala tests",
   "command.catala.showExceptions.title": "Show definition tree",
   "command.catala.rescanProjects.title": "Scan all files of every project",
   "command.catala.showExceptionsAtCursor.title": "Show definition tree",
@@ -7,5 +8,6 @@
   "category.catala": "Catala",
   "customEditor.testCaseEditor.displayName": "Catala Test Case Editor",
   "view.catala.help.title": "Help and feedback",
-  "view.catala.switches.title": "Catala switches"
+  "view.catala.switches.title": "Catala switches",
+  "view.catala.openAllTests.title": "Catala Tests"
 }
