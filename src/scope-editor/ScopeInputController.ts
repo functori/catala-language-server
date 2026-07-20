@@ -16,6 +16,7 @@ import {
   generate,
   serializeInputs,
 } from '../test-case-editor/testCaseCompilerInterop';
+import { logger } from '../extension/logger';
 
 // This class contains the 'backend' part of the test case editor that
 // sets up the UI, provide initial data and exchanges messages with the
@@ -131,6 +132,16 @@ export class ScopeInputController {
           throw new Error(`Trying to select scope while in input scope mode`);
         case 'TestGenerateRequest':
           throw new Error(`Trying to generate scope while in input scope mode`);
+        case 'SpecificTestRequest':
+          throw new Error(
+            `Trying to start a specific test while in input scope mode`
+          );
+        case 'OpenInTestEditor':
+          throw new Error(
+            `Trying to open test editor while in input scope mode`
+          );
+        case 'Reload':
+          throw new Error('Unexpected Reload');
         default:
           assertUnreachable(typed_msg);
       }
