@@ -3,10 +3,12 @@ import type {
   ScopeDefList,
   TestGenerateResults,
   TestInputs,
+  TestScopeResult,
 } from '../generated/catala_types';
 import {
   readScopeDefList,
   readTestList,
+  readTestResult,
   readTestRun,
   writeTestInputs,
   writeTestList,
@@ -15,13 +17,9 @@ import {
   type TestRunResults,
 } from '../generated/catala_types';
 import { logger } from '../extension/logger';
-import { Uri, window, workspace } from 'vscode';
+import { window } from 'vscode';
 import path from 'path';
-import { clerkPath, catalaPath } from '../shared/util_client';
-
-function getCwd(bufferPath: string): string | undefined {
-  return workspace.getWorkspaceFolder(Uri.parse(bufferPath))?.uri?.fsPath;
-}
+import { clerkPath, catalaPath, getCwd } from '../shared/util_client';
 
 type ExecOptions = { input?: string; cwd?: string };
 type ExecResult = { ok: true; output: string } | { ok: false; stderr: string };
@@ -103,6 +101,54 @@ export function atdToCatala(tests: TestList, lang: string): string {
     throw new Error(result.stderr);
   }
   return result.output;
+}
+
+// Calls clerk test on a test that is not a GUI test
+export function clerkRunScope(
+  filename: string,
+  testScope: string
+): TestScopeResult {
+  const cwd = getCwd(filename) ?? '';
+  const relFilename = path.relative(cwd, filename);
+  const configToml = path.join(cwd, 'clerk.toml');
+
+  const clerkResult = execBinary(
+    clerkPath,
+    ['test', '--config', configToml, '--json', '--quiet', relFilename],
+    { cwd }
+  );
+
+  if (!clerkResult.ok) {
+    const msg = `Clerk error: ${clerkResult.stderr}`;
+    window.showErrorMessage(msg);
+    return { kind: 'Error', value: msg };
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(clerkResult.output);
+  } catch (error) {
+    const msg = `JSON parse error: ${String(error)}`;
+    return { kind: 'Error', value: msg };
+  }
+
+  const { test_results: testResults } = readTestResult(parsed);
+
+  let result = testResults[0].tests;
+
+  // Retrieve the test result that matters for us
+  let res = result.scopes.find((scopeTestResult) => {
+    return scopeTestResult.scope_name == testScope;
+  });
+
+  if (res) {
+    return { kind: 'ScopeTest', value: res };
+  } else {
+    return {
+      kind: 'Error',
+      value: `Can't find the test related to scope ${testScope}`,
+    };
+  }
 }
 
 export function runTestScope(

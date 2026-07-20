@@ -101,9 +101,6 @@ export const clerkPath: string =
   resolveBinaryPath('clerk', undefined, undefined, getConfig('clerkPath')) ??
   'clerk';
 
-logger.log(`catala command: ${catalaPath}`);
-logger.log(`clerk command: ${clerkPath}`);
-
 export function getCwd(bufferPath: string): string | undefined {
   return vscode.workspace.getWorkspaceFolder(vscode.Uri.parse(bufferPath))?.uri
     ?.fsPath;

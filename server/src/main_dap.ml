@@ -260,6 +260,7 @@ let handle_evaluate logger rpc :
           preserve_focus_hint = None;
           text = Some text;
           all_threads_stopped = Some true;
+          hit_breakpoint_ids = None;
         }
   in
   function
@@ -370,6 +371,7 @@ let set_handlers rpc =
           preserve_focus_hint = None;
           text = None;
           all_threads_stopped = Some true;
+          hit_breakpoint_ids = None;
         });
   Debug_rpc.set_command_handler rpc
     (module Custom_launch)
@@ -413,6 +415,7 @@ let set_handlers rpc =
                   preserve_focus_hint = None;
                   text = None;
                   all_threads_stopped = Some true;
+                  hit_breakpoint_ids = None;
                 }
         in
         Lwt.return_unit);
@@ -469,6 +472,7 @@ let set_handlers rpc =
           instruction_pointer_reference = None;
           module_id = None;
           presentation_hint = Some Normal;
+          can_restart = None;
         }
       in
       Lwt.return
@@ -587,7 +591,8 @@ let set_handlers rpc =
           { breakpoints = DE.possible_breakpoints s (Doc_id.of_file file) line });
   Debug_rpc.set_command_handler rpc
     (module Set_exception_breakpoints_command)
-    (fun _ -> Lwt.return_unit);
+    (fun _ ->
+      Lwt.return Set_exception_breakpoints_command.Result.{ breakpoints = None });
   Debug_rpc.set_command_handler rpc
     (module Threads_command)
     (fun () ->
@@ -755,11 +760,11 @@ let () =
     ~contexts:(function
       | Desugared.Name_resolution.ScopeDecl -> true | _ -> false)
     (fun ~pos:_ _ -> Some Nil);
-  (Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["array_item_label"]
-     ~contexts:(function
-     | Desugared.Name_resolution.Expression _ -> true
-     | _ -> false)
-  @@ fun ~pos:_ _ -> Some Nil)
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["array_item_label"]
+    ~contexts:(function
+    | Desugared.Name_resolution.Expression _ -> true
+    | _ -> false)
+  @@ fun ~pos:_ _ -> Some Nil
 
 let main () =
   let rpc = Debug_rpc.create ~in_:Lwt_io.stdin ~out:Lwt_io.stdout () in

@@ -532,7 +532,7 @@ let find_file_in_project doc_id (project : project) =
 
 let reload_project ~on_error project projects =
   let project = project_of_dir ~on_error project.project_dir in
-  project, Projects.add project projects
+  project, Projects.add project (Projects.remove project projects)
 
 exception Project_not_found
 
@@ -863,7 +863,9 @@ let typ_to_json (decl_ctx : Shared_ast.decl_ctx) (typ : Shared_ast.typ) :
                 let ty = loop ty in
                 let ty = if ty = O.TUnit then None else Some ty in
                 EnumConstructor.to_string cstr, ty);
-          ctor_attrs = []; (* not populated: no current consumer on this path; see Test_case_parser_lib.enum_ctor_attrs for the testcase path *)
+          ctor_attrs = [];
+          (* not populated: no current consumer on this path; see
+             Test_case_parser_lib.enum_ctor_attrs for the testcase path *)
         }
     | TArray ty -> O.TArray (loop ty)
     | TOption ty -> O.TOption (loop ty)

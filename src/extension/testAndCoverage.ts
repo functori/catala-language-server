@@ -83,7 +83,7 @@ type TestScope = {
   range: vscode.Range;
 };
 
-type TestScopeMap = Array<{
+export type TestScopeMap = Array<{
   path: string;
   scopes: TestScope[];
 }>;
@@ -464,9 +464,9 @@ function testEntrypointsToTestScopeMap(
 
 export async function initTests(
   context: vscode.ExtensionContext,
-  client: LanguageClient
+  client: LanguageClient,
+  ctrl: vscode.TestController
 ): Promise<void> {
-  const ctrl = vscode.tests.createTestController('catalaTests', 'Catala Tests');
   context.subscriptions.push(ctrl);
   let cwd: string | undefined;
   let test_map: TestMap = new TestMap();

@@ -349,6 +349,7 @@ let expr_to_breakpoint ?l e : Breakpoint.t =
     end_column = Some (Pos.get_end_column pos);
     instruction_reference = None;
     offset = Option.map (( - ) (Pos.get_start_line pos)) l;
+    reason = None;
   }
 
 let possible_breakpoints runner doc_id line : Breakpoint_location.t list =

@@ -95,6 +95,7 @@ export type AttrDef =
 | { kind: 'Uid'; value: string }
 | { kind: 'ArrayItemLabel'; value: string }
 | { kind: 'Description'; value: string }
+| { kind: 'TestDate'; value: string }
 
 export type RuntimeValue = {
   value: RuntimeValueRaw;
@@ -122,7 +123,34 @@ export type Test = {
   test_outputs: TestOutputs;
   variables: Map<string, RuntimeValue>;
   description: string;
+  test_date?: string;
+  test_success?: boolean;
   title: string;
+}
+
+export type TestState =
+| { kind: 'Success' }
+| { kind: 'Loading' }
+| { kind: 'Failed' }
+| { kind: 'JustFailed' }
+| { kind: 'Unknown' }
+
+export type TestSum = {
+  testing_scope: string;
+  scope_tested?: ScopeDef;
+  description: string;
+  title: string;
+  test_date?: string;
+}
+
+export type TestMacro =
+| { kind: 'GUI'; value: Test }
+| { kind: 'Test'; value: TestSum }
+
+export type TestDebugger = {
+  success: TestState;
+  filename: string;
+  test: TestMacro;
 }
 
 export type TestRun = {
@@ -130,6 +158,51 @@ export type TestRun = {
   assert_failures: boolean;
   diffs: Diff[];
 }
+
+export type FileTest = {
+  file: string;
+  tests: string;
+}
+
+export type ScopeTestResult = {
+  scope_name: string;
+  success: boolean;
+  errors: string[];
+  time: number;
+}
+
+export type InlineTest = {
+  cmd: string;
+  success: boolean;
+}
+
+export type FileTests = {
+  scopes: ScopeTestResult[];
+  inline_tests: InlineTest[];
+}
+
+export type FileTestResult = {
+  file: string;
+  tests: FileTests;
+}
+
+export type Coverage = {
+  scopes: string[];
+  locations: string[];
+}
+
+export type TestResult = {
+  test_results: FileTestResult[];
+  coverage: Coverage;
+}
+
+export type TestScopeResult =
+| { kind: 'Error'; value: string }
+| { kind: 'ScopeTest'; value: ScopeTestResult }
+| { kind: 'GuiTest'; value: [Test, boolean] }
+| { kind: 'Cancelled' }
+
+export type TestDebuggerList = TestDebugger[]
 
 export type TestList = Test[]
 
@@ -204,16 +277,20 @@ export type ConfirmResult = {
 export type UpMessage =
 | { kind: 'Ready' }
 | { kind: 'GuiEdit'; value: [TestList, boolean] }
-| { kind: 'OpenInTextEditor' }
+| { kind: 'OpenInTextEditor'; value: Option<string> }
 | { kind: 'TestRunRequest'; value: TestRunRequest }
+| { kind: 'SpecificTestRequest'; value: number /*int*/ }
 | { kind: 'TestGenerateRequest'; value: TestGenerateRequest }
 | { kind: 'OpenTestScopePicker' }
 | { kind: 'ConfirmRequest'; value: ConfirmRequest }
+| { kind: 'OpenInTestEditor'; value: string }
 
 export type DownMessage =
 | { kind: 'Update'; value: ParseResults }
 | { kind: 'TestRunResults'; value: TestRunResultsMsg }
+| { kind: 'TestScopeResult'; value: [TestScopeResult, number /*int*/] }
 | { kind: 'ConfirmResult'; value: ConfirmResult }
+| { kind: 'AllTests'; value: TestDebuggerList }
 
 export type GuiEntrypoint = {
   scope: string;
@@ -556,6 +633,8 @@ export function writeAttrDef(x: AttrDef, context: any = x): any {
       return ['ArrayItemLabel', _atd_write_string(x.value, x)]
     case 'Description':
       return ['Description', _atd_write_string(x.value, x)]
+    case 'TestDate':
+      return ['TestDate', _atd_write_string(x.value, x)]
   }
 }
 
@@ -572,6 +651,8 @@ export function readAttrDef(x: any, context: any = x): AttrDef {
       return { kind: 'ArrayItemLabel', value: _atd_read_string(x[1], x) }
     case 'Description':
       return { kind: 'Description', value: _atd_read_string(x[1], x) }
+    case 'TestDate':
+      return { kind: 'TestDate', value: _atd_read_string(x[1], x) }
     default:
       _atd_bad_json('AttrDef', x, context)
       throw new Error('impossible')
@@ -644,6 +725,8 @@ export function writeTest(x: Test, context: any = x): any {
     'test_outputs': _atd_write_required_field('Test', 'test_outputs', writeTestOutputs, x.test_outputs, x),
     'variables': _atd_write_field_with_default(_atd_write_assoc_map_to_object(writeRuntimeValue), [], x.variables, x),
     'description': _atd_write_required_field('Test', 'description', _atd_write_string, x.description, x),
+    'test_date': _atd_write_optional_field(_atd_write_string, x.test_date, x),
+    'test_success': _atd_write_optional_field(_atd_write_bool, x.test_success, x),
     'title': _atd_write_required_field('Test', 'title', _atd_write_string, x.title, x),
   };
 }
@@ -656,7 +739,100 @@ export function readTest(x: any, context: any = x): Test {
     test_outputs: _atd_read_required_field('Test', 'test_outputs', readTestOutputs, x['test_outputs'], x),
     variables: _atd_read_field_with_default(_atd_read_assoc_object_into_map(readRuntimeValue), [], x['variables'], x),
     description: _atd_read_required_field('Test', 'description', _atd_read_string, x['description'], x),
+    test_date: _atd_read_optional_field(_atd_read_string, x['test_date'], x),
+    test_success: _atd_read_optional_field(_atd_read_bool, x['test_success'], x),
     title: _atd_read_required_field('Test', 'title', _atd_read_string, x['title'], x),
+  };
+}
+
+export function writeTestState(x: TestState, context: any = x): any {
+  switch (x.kind) {
+    case 'Success':
+      return 'Success'
+    case 'Loading':
+      return 'Loading'
+    case 'Failed':
+      return 'Failed'
+    case 'JustFailed':
+      return 'JustFailed'
+    case 'Unknown':
+      return 'Unknown'
+  }
+}
+
+export function readTestState(x: any, context: any = x): TestState {
+  switch (x) {
+    case 'Success':
+      return { kind: 'Success' }
+    case 'Loading':
+      return { kind: 'Loading' }
+    case 'Failed':
+      return { kind: 'Failed' }
+    case 'JustFailed':
+      return { kind: 'JustFailed' }
+    case 'Unknown':
+      return { kind: 'Unknown' }
+    default:
+      _atd_bad_json('TestState', x, context)
+      throw new Error('impossible')
+  }
+}
+
+export function writeTestSum(x: TestSum, context: any = x): any {
+  return {
+    'testing_scope': _atd_write_required_field('TestSum', 'testing_scope', _atd_write_string, x.testing_scope, x),
+    'scope_tested': _atd_write_optional_field(writeScopeDef, x.scope_tested, x),
+    'description': _atd_write_required_field('TestSum', 'description', _atd_write_string, x.description, x),
+    'title': _atd_write_required_field('TestSum', 'title', _atd_write_string, x.title, x),
+    'test_date': _atd_write_optional_field(_atd_write_string, x.test_date, x),
+  };
+}
+
+export function readTestSum(x: any, context: any = x): TestSum {
+  return {
+    testing_scope: _atd_read_required_field('TestSum', 'testing_scope', _atd_read_string, x['testing_scope'], x),
+    scope_tested: _atd_read_optional_field(readScopeDef, x['scope_tested'], x),
+    description: _atd_read_required_field('TestSum', 'description', _atd_read_string, x['description'], x),
+    title: _atd_read_required_field('TestSum', 'title', _atd_read_string, x['title'], x),
+    test_date: _atd_read_optional_field(_atd_read_string, x['test_date'], x),
+  };
+}
+
+export function writeTestMacro(x: TestMacro, context: any = x): any {
+  switch (x.kind) {
+    case 'GUI':
+      return ['GUI', writeTest(x.value, x)]
+    case 'Test':
+      return ['Test', writeTestSum(x.value, x)]
+  }
+}
+
+export function readTestMacro(x: any, context: any = x): TestMacro {
+  _atd_check_json_tuple(2, x, context)
+  switch (x[0]) {
+    case 'GUI':
+      return { kind: 'GUI', value: readTest(x[1], x) }
+    case 'Test':
+      return { kind: 'Test', value: readTestSum(x[1], x) }
+    default:
+      _atd_bad_json('TestMacro', x, context)
+      throw new Error('impossible')
+  }
+}
+
+export function writeTestDebugger(x: TestDebugger, context: any = x): any {
+  return {
+    'success': _atd_write_required_field('TestDebugger', 'success', writeTestState, x.success, x),
+    'filename': _atd_write_required_field('TestDebugger', 'filename', _atd_write_string, x.filename, x),
+    'test': _atd_write_required_field('TestDebugger', 'test', writeTestMacro, x.test, x),
+  };
+}
+
+export function readTestDebugger(x: any, context: any = x): TestDebugger {
+  return {
+    success: _atd_read_required_field('TestDebugger', 'success', readTestState, x['success'], x),
+    filename: _atd_read_required_field('TestDebugger', 'filename', _atd_read_string, x['filename'], x),
+    test: _atd_read_required_field('TestDebugger', 'test', readTestMacro, x['test'], x),
   };
 }
 
@@ -674,6 +850,155 @@ export function readTestRun(x: any, context: any = x): TestRun {
     assert_failures: _atd_read_required_field('TestRun', 'assert_failures', _atd_read_bool, x['assert_failures'], x),
     diffs: _atd_read_required_field('TestRun', 'diffs', _atd_read_array(readDiff), x['diffs'], x),
   };
+}
+
+export function writeFileTest(x: FileTest, context: any = x): any {
+  return {
+    'file': _atd_write_required_field('FileTest', 'file', _atd_write_string, x.file, x),
+    'tests': _atd_write_required_field('FileTest', 'tests', _atd_write_string, x.tests, x),
+  };
+}
+
+export function readFileTest(x: any, context: any = x): FileTest {
+  return {
+    file: _atd_read_required_field('FileTest', 'file', _atd_read_string, x['file'], x),
+    tests: _atd_read_required_field('FileTest', 'tests', _atd_read_string, x['tests'], x),
+  };
+}
+
+export function writeScopeTestResult(x: ScopeTestResult, context: any = x): any {
+  return {
+    'scope_name': _atd_write_required_field('ScopeTestResult', 'scope_name', _atd_write_string, x.scope_name, x),
+    'success': _atd_write_required_field('ScopeTestResult', 'success', _atd_write_bool, x.success, x),
+    'errors': _atd_write_required_field('ScopeTestResult', 'errors', _atd_write_array(_atd_write_string), x.errors, x),
+    'time': _atd_write_required_field('ScopeTestResult', 'time', _atd_write_float, x.time, x),
+  };
+}
+
+export function readScopeTestResult(x: any, context: any = x): ScopeTestResult {
+  return {
+    scope_name: _atd_read_required_field('ScopeTestResult', 'scope_name', _atd_read_string, x['scope_name'], x),
+    success: _atd_read_required_field('ScopeTestResult', 'success', _atd_read_bool, x['success'], x),
+    errors: _atd_read_required_field('ScopeTestResult', 'errors', _atd_read_array(_atd_read_string), x['errors'], x),
+    time: _atd_read_required_field('ScopeTestResult', 'time', _atd_read_float, x['time'], x),
+  };
+}
+
+export function writeInlineTest(x: InlineTest, context: any = x): any {
+  return {
+    'cmd': _atd_write_required_field('InlineTest', 'cmd', _atd_write_string, x.cmd, x),
+    'success': _atd_write_required_field('InlineTest', 'success', _atd_write_bool, x.success, x),
+  };
+}
+
+export function readInlineTest(x: any, context: any = x): InlineTest {
+  return {
+    cmd: _atd_read_required_field('InlineTest', 'cmd', _atd_read_string, x['cmd'], x),
+    success: _atd_read_required_field('InlineTest', 'success', _atd_read_bool, x['success'], x),
+  };
+}
+
+export function writeFileTests(x: FileTests, context: any = x): any {
+  return {
+    'scopes': _atd_write_required_field('FileTests', 'scopes', _atd_write_array(writeScopeTestResult), x.scopes, x),
+    'inline-tests': _atd_write_required_field('FileTests', 'inline_tests', _atd_write_array(writeInlineTest), x.inline_tests, x),
+  };
+}
+
+export function readFileTests(x: any, context: any = x): FileTests {
+  return {
+    scopes: _atd_read_required_field('FileTests', 'scopes', _atd_read_array(readScopeTestResult), x['scopes'], x),
+    inline_tests: _atd_read_required_field('FileTests', 'inline-tests', _atd_read_array(readInlineTest), x['inline-tests'], x),
+  };
+}
+
+export function writeFileTestResult(x: FileTestResult, context: any = x): any {
+  return {
+    'file': _atd_write_required_field('FileTestResult', 'file', _atd_write_string, x.file, x),
+    'tests': _atd_write_required_field('FileTestResult', 'tests', writeFileTests, x.tests, x),
+  };
+}
+
+export function readFileTestResult(x: any, context: any = x): FileTestResult {
+  return {
+    file: _atd_read_required_field('FileTestResult', 'file', _atd_read_string, x['file'], x),
+    tests: _atd_read_required_field('FileTestResult', 'tests', readFileTests, x['tests'], x),
+  };
+}
+
+export function writeCoverage(x: Coverage, context: any = x): any {
+  return {
+    'scopes': _atd_write_required_field('Coverage', 'scopes', _atd_write_array(_atd_write_string), x.scopes, x),
+    'locations': _atd_write_required_field('Coverage', 'locations', _atd_write_array(_atd_write_string), x.locations, x),
+  };
+}
+
+export function readCoverage(x: any, context: any = x): Coverage {
+  return {
+    scopes: _atd_read_required_field('Coverage', 'scopes', _atd_read_array(_atd_read_string), x['scopes'], x),
+    locations: _atd_read_required_field('Coverage', 'locations', _atd_read_array(_atd_read_string), x['locations'], x),
+  };
+}
+
+export function writeTestResult(x: TestResult, context: any = x): any {
+  return {
+    'test-results': _atd_write_required_field('TestResult', 'test_results', _atd_write_array(writeFileTestResult), x.test_results, x),
+    'coverage': _atd_write_required_field('TestResult', 'coverage', writeCoverage, x.coverage, x),
+  };
+}
+
+export function readTestResult(x: any, context: any = x): TestResult {
+  return {
+    test_results: _atd_read_required_field('TestResult', 'test-results', _atd_read_array(readFileTestResult), x['test-results'], x),
+    coverage: _atd_read_required_field('TestResult', 'coverage', readCoverage, x['coverage'], x),
+  };
+}
+
+export function writeTestScopeResult(x: TestScopeResult, context: any = x): any {
+  switch (x.kind) {
+    case 'Error':
+      return ['Error', _atd_write_string(x.value, x)]
+    case 'ScopeTest':
+      return ['ScopeTest', writeScopeTestResult(x.value, x)]
+    case 'GuiTest':
+      return ['GuiTest', ((x, context) => [writeTest(x[0], x), _atd_write_bool(x[1], x)])(x.value, x)]
+    case 'Cancelled':
+      return 'Cancelled'
+  }
+}
+
+export function readTestScopeResult(x: any, context: any = x): TestScopeResult {
+  if (typeof x === 'string') {
+    switch (x) {
+      case 'Cancelled':
+        return { kind: 'Cancelled' }
+      default:
+        _atd_bad_json('TestScopeResult', x, context)
+        throw new Error('impossible')
+    }
+  }
+  else {
+    _atd_check_json_tuple(2, x, context)
+    switch (x[0]) {
+      case 'Error':
+        return { kind: 'Error', value: _atd_read_string(x[1], x) }
+      case 'ScopeTest':
+        return { kind: 'ScopeTest', value: readScopeTestResult(x[1], x) }
+      case 'GuiTest':
+        return { kind: 'GuiTest', value: ((x, context): [Test, boolean] => { _atd_check_json_tuple(2, x, context); return [readTest(x[0], x), _atd_read_bool(x[1], x)] })(x[1], x) }
+      default:
+        _atd_bad_json('TestScopeResult', x, context)
+        throw new Error('impossible')
+    }
+  }
+}
+
+export function writeTestDebuggerList(x: TestDebuggerList, context: any = x): any {
+  return _atd_write_array(writeTestDebugger)(x, context);
+}
+
+export function readTestDebuggerList(x: any, context: any = x): TestDebuggerList {
+  return _atd_read_array(readTestDebugger)(x, context);
 }
 
 export function writeTestList(x: TestList, context: any = x): any {
@@ -958,15 +1283,19 @@ export function writeUpMessage(x: UpMessage, context: any = x): any {
     case 'GuiEdit':
       return ['GuiEdit', ((x, context) => [writeTestList(x[0], x), _atd_write_bool(x[1], x)])(x.value, x)]
     case 'OpenInTextEditor':
-      return 'OpenInTextEditor'
+      return ['OpenInTextEditor', _atd_write_option(_atd_write_string)(x.value, x)]
     case 'TestRunRequest':
       return ['TestRunRequest', writeTestRunRequest(x.value, x)]
+    case 'SpecificTestRequest':
+      return ['SpecificTestRequest', _atd_write_int(x.value, x)]
     case 'TestGenerateRequest':
       return ['TestGenerateRequest', writeTestGenerateRequest(x.value, x)]
     case 'OpenTestScopePicker':
       return 'OpenTestScopePicker'
     case 'ConfirmRequest':
       return ['ConfirmRequest', writeConfirmRequest(x.value, x)]
+    case 'OpenInTestEditor':
+      return ['OpenInTestEditor', _atd_write_string(x.value, x)]
   }
 }
 
@@ -975,8 +1304,6 @@ export function readUpMessage(x: any, context: any = x): UpMessage {
     switch (x) {
       case 'Ready':
         return { kind: 'Ready' }
-      case 'OpenInTextEditor':
-        return { kind: 'OpenInTextEditor' }
       case 'OpenTestScopePicker':
         return { kind: 'OpenTestScopePicker' }
       default:
@@ -989,12 +1316,18 @@ export function readUpMessage(x: any, context: any = x): UpMessage {
     switch (x[0]) {
       case 'GuiEdit':
         return { kind: 'GuiEdit', value: ((x, context): [TestList, boolean] => { _atd_check_json_tuple(2, x, context); return [readTestList(x[0], x), _atd_read_bool(x[1], x)] })(x[1], x) }
+      case 'OpenInTextEditor':
+        return { kind: 'OpenInTextEditor', value: _atd_read_option(_atd_read_string)(x[1], x) }
       case 'TestRunRequest':
         return { kind: 'TestRunRequest', value: readTestRunRequest(x[1], x) }
+      case 'SpecificTestRequest':
+        return { kind: 'SpecificTestRequest', value: _atd_read_int(x[1], x) }
       case 'TestGenerateRequest':
         return { kind: 'TestGenerateRequest', value: readTestGenerateRequest(x[1], x) }
       case 'ConfirmRequest':
         return { kind: 'ConfirmRequest', value: readConfirmRequest(x[1], x) }
+      case 'OpenInTestEditor':
+        return { kind: 'OpenInTestEditor', value: _atd_read_string(x[1], x) }
       default:
         _atd_bad_json('UpMessage', x, context)
         throw new Error('impossible')
@@ -1008,8 +1341,12 @@ export function writeDownMessage(x: DownMessage, context: any = x): any {
       return ['Update', writeParseResults(x.value, x)]
     case 'TestRunResults':
       return ['TestRunResults', writeTestRunResultsMsg(x.value, x)]
+    case 'TestScopeResult':
+      return ['TestScopeResult', ((x, context) => [writeTestScopeResult(x[0], x), _atd_write_int(x[1], x)])(x.value, x)]
     case 'ConfirmResult':
       return ['ConfirmResult', writeConfirmResult(x.value, x)]
+    case 'AllTests':
+      return ['AllTests', writeTestDebuggerList(x.value, x)]
   }
 }
 
@@ -1020,8 +1357,12 @@ export function readDownMessage(x: any, context: any = x): DownMessage {
       return { kind: 'Update', value: readParseResults(x[1], x) }
     case 'TestRunResults':
       return { kind: 'TestRunResults', value: readTestRunResultsMsg(x[1], x) }
+    case 'TestScopeResult':
+      return { kind: 'TestScopeResult', value: ((x, context): [TestScopeResult, number /*int*/] => { _atd_check_json_tuple(2, x, context); return [readTestScopeResult(x[0], x), _atd_read_int(x[1], x)] })(x[1], x) }
     case 'ConfirmResult':
       return { kind: 'ConfirmResult', value: readConfirmResult(x[1], x) }
+    case 'AllTests':
+      return { kind: 'AllTests', value: readTestDebuggerList(x[1], x) }
     default:
       _atd_bad_json('DownMessage', x, context)
       throw new Error('impossible')

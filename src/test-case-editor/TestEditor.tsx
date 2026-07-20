@@ -124,6 +124,14 @@ export default function TestEditor(props: Props): ReactElement {
       const confirmed = await confirm('RunTestWithUnsetValues');
       if (!confirmed) return;
     }
+    let date = new Date();
+    props.onTestChange(
+      {
+        ...props.test,
+        test_date: `${date.getDate()}/${date.getMonth()}/${date.getFullYear()}`,
+      },
+      false
+    );
     props.onTestRun(props.test.testing_scope);
   };
 
@@ -141,6 +149,14 @@ export default function TestEditor(props: Props): ReactElement {
       const confirmed = await confirm('RunTestWithUnsetValues');
       if (!confirmed) return;
     }
+    let date = new Date();
+    props.onTestChange(
+      {
+        ...props.test,
+        test_date: `${date.getDate()}/${date.getMonth()}/${date.getFullYear()}`,
+      },
+      false
+    );
     props.onTestOutputsReset(props.test.testing_scope);
   };
 
@@ -151,6 +167,24 @@ export default function TestEditor(props: Props): ReactElement {
     })
     .filter(([, value]) => value !== undefined) as [string, TraceValue][];
   const variables = new Map(arr);
+  
+  useEffect(() => {
+    if (
+      props.runState?.status === 'success' &&
+      props.runState?.results?.kind === 'Ok' &&
+      !props.runState.results.value.assert_failures
+    ) {
+      props.onTestChange({ ...props.test, test_success: true }, false);
+    }
+
+    if (
+      props.runState?.status === 'error' ||
+      (props.runState?.results?.kind === 'Ok' &&
+        props.runState.results.value.assert_failures)
+    ) {
+      props.onTestChange({ ...props.test, test_success: false }, false);
+    }
+  }, [props.runState]);
 
   return (
     <div className="test-editor" ref={unsetElementRef}>
