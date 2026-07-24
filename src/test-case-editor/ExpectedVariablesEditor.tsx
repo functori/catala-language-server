@@ -6,8 +6,6 @@ import {
   VscodeSingleSelect,
   VscodeTextfield,
 } from '@vscode-elements/react-elements';
-import type { RuntimeValue, RuntimeValueRaw } from '../generated/catala_types';
-import type { JsonValue } from '../shared/util_client';
 import {
   type ScopeVariable,
   type TraceValue,
@@ -84,7 +82,7 @@ export default function ExpectedVariablesEditor({
 
   function add(name: string): void {
     const tv = computedOf(name);
-    if (tv !== undefined && tv.value !== undefined) {
+    if (tv?.value !== undefined) {
       setVar(name, tv.value);
     }
   }

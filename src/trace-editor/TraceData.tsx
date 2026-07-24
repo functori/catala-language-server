@@ -96,9 +96,7 @@ export function DataPanel({
       : new Map();
   const traceValue = (match: (name: string) => boolean): string | undefined => {
     const v = scopeVars.find((sv) => match(sv.name));
-    return v?.value !== undefined
-      ? formatTraceValue(v.value)
-      : undefined;
+    return v?.value !== undefined ? formatTraceValue(v.value) : undefined;
   };
 
   const inputRows: VarRow[] = [...test.test_inputs.entries()].flatMap(

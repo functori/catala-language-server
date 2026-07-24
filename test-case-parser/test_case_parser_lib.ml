@@ -26,8 +26,6 @@ type Pos.attr += Uid of string
 type Pos.attr += TestDescription of string
 type Pos.attr += TestTitle of string
 type Pos.attr += ArrayItemLabel of string
-type Pos.attr += TestDate of string
-type Pos.attr += TestSuccess of bool
 
 (* An expected value for a scope variable, given as [#[testcase.variable = <var>
    = <literal>]]. The literal can be turned into a typed value with
@@ -604,8 +602,6 @@ let get_scope_test
     (prg : I.program)
     (testing_scope : string)
     (tested_scope : ScopeName.t)
-    ~test_date
-    ~test_success
     ~tested_module : O.test =
   let tested_module =
     match tested_module with
@@ -648,8 +644,6 @@ let get_scope_test
     variables = [];
     description;
     title;
-    test_date;
-    test_success;
   }
 
 (* --- *)
@@ -808,10 +802,7 @@ let generate_test
       | None -> Some (ModuleName.fresh ("no_module", Pos.void))
       | Some m -> Some m
   in
-  let test =
-    get_scope_test prg testing_scope tested_scope ~test_date:(Some "BU")
-      ~test_success:None ~tested_module
-  in
+  let test = get_scope_test prg testing_scope tested_scope ~tested_module in
   let test =
     (* As our root module is not the test file but the scope's file (which is
        not the case for read), qualified name do not have the expected module
@@ -908,16 +899,6 @@ let get_catala_test (prg, naming_ctx) testing_scope_name =
       | TestTitle s -> Some s
       | _ -> None)
   in
-  let test_date =
-    get_single_attr ~default:None info (function
-      | TestDate s -> Some (Some s)
-      | _ -> None)
-  in
-  let test_success =
-    get_single_attr ~default:None info (function
-      | TestSuccess b -> Some (Some b)
-      | _ -> None)
-  in
   let subscope_var, tested_scope =
     let count = ScopeVar.Map.cardinal testing_scope.I.scope_sub_scopes in
     if count <> 1 then
@@ -936,7 +917,7 @@ let get_catala_test (prg, naming_ctx) testing_scope_name =
   in
   let tested_module = ScopeName.path tested_scope |> List.hd |> Option.some in
   let base_test =
-    get_scope_test ~test_date ~test_success ~tested_module prg
+    get_scope_test ~tested_module prg
       (ScopeName.to_string testing_scope_name)
       tested_scope
   in
@@ -1250,14 +1231,6 @@ let write_catala_test ppf t lang =
   fprintf ppf "#[testcase.testui]@\n";
   fprintf ppf "#[testcase.test_description = %s]@\n"
     (String.quote t.description);
-  Option.iter
-    (fun test_date -> fprintf ppf "#[testcase.test_date = %S]@\n" test_date)
-    t.test_date;
-  Option.iter
-    (fun test_success ->
-      fprintf ppf "#[testcase.test_success = %S]@\n"
-        (string_of_bool test_success))
-    t.test_success;
   fprintf ppf "#[testcase.test_title = %s]@\n" (String.quote t.title);
   List.iter
     (fun (var, value) ->
@@ -1633,8 +1606,7 @@ let run_with_inputs
     retrieve_program include_dirs options tested_scope_name
   in
   let test =
-    get_scope_test ~test_date:(Some "Arnaud") ~test_success:None desugared_prg
-      "<abstract>" scope_name
+    get_scope_test desugared_prg "<abstract>" scope_name
       ~tested_module:(Some (ModuleName.fresh ("abstract", Pos.void)))
   in
   let input_expr =

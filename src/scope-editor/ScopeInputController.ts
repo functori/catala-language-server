@@ -141,6 +141,8 @@ export class ScopeInputController {
           throw new Error(
             `Trying to open test editor while in input scope mode`
           );
+        case 'Reload':
+          throw new Error('Unexpected Reload');
         default:
           assertUnreachable(typed_msg);
       }

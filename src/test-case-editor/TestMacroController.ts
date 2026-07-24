@@ -1,31 +1,25 @@
 import * as vscode from 'vscode';
-import type {
-  TestScopeResult,
-  TestSum,
-  TestDebugger,
-} from '../generated/catala_types';
+import type { TestDebugger } from '../generated/catala_types';
 import {
   readUpMessage,
   writeDownMessage,
   type DownMessage,
-  type TestRunResults,
 } from '../generated/catala_types';
-import type { LanguageClient } from 'vscode-languageclient/node';
+import {
+  CancellationTokenSource,
+  type LanguageClient,
+} from 'vscode-languageclient/node';
+import type { CatalaEntrypoint } from '../extension/lspRequests';
 import { listEntrypoints } from '../extension/lspRequests';
 import { logger } from '../extension/logger';
-import {
-  atdToCatala,
-  clerkRunScope,
-  runTestScope,
-} from './testCaseCompilerInterop';
-import {
-  getLanguageFromUri,
-  parseContents,
-  testScopePicker,
-} from '../extension/testCaseEditorProvider';
+import { atdToCatala } from './testCaseCompilerInterop';
+import { testScopePicker } from '../extension/testCaseEditorProvider';
 import path from 'path';
 import { CatalaTestCaseDocument } from '../shared/CatalaTestCaseDocument';
 import PQueue from 'p-queue';
+import type { ResultController } from '../extension/testAndCoverage';
+import { makeRunHandler, TestId, TestMap } from '../extension/testAndCoverage';
+import { getCwd } from '../shared/util_client';
 
 // This class contains the 'backend' part of the test case editor that
 // sets up the UI, provide initial data and exchanges messages with the
@@ -35,6 +29,7 @@ export class TestMacroController {
   tests: TestDebugger[] = [];
 
   private testQueue: PQueue = new PQueue({ concurrency: 1 });
+  private runAllTests: PQueue = new PQueue({ concurrency: 100 });
 
   // We want to restrict shell -> webview messages to instances
   // of DownMessage
@@ -42,9 +37,48 @@ export class TestMacroController {
     this.panel.webview.postMessage(writeDownMessage(message));
   }
 
+  handleCatalaEntrypoint(
+    entrypoints: CatalaEntrypoint[],
+    resultController: ResultController
+  ): void {
+    for (let index = 0; index < entrypoints.length; index++) {
+      const e = entrypoints[index];
+      const filename = e.path;
+      if (e.entrypoint.kind == 'Test') {
+        let testId = new TestId(
+          vscode.Uri.file(filename),
+          e.entrypoint.value.value.scope
+        );
+        let res = resultController.getResult(testId);
+        if (res != undefined) {
+          let testEntrypoint = {
+            filename: filename,
+            test: e.entrypoint.value,
+            success: res.success,
+            date: res.date,
+          };
+          this.tests.push(testEntrypoint);
+        } else {
+          let testEntrypoint = {
+            filename: filename,
+            test: e.entrypoint.value,
+          };
+          this.tests.push(testEntrypoint);
+        }
+      } else {
+        throw new Error(`Unexpected test from ${path}`);
+      }
+    }
+    logger.log(`Post all tests: ${this.tests.length}`);
+    this.postMessageToWebView({ kind: 'AllTests', value: this.tests });
+  }
+
   public createWebView(
     client: LanguageClient,
-    context: vscode.ExtensionContext
+    context: vscode.ExtensionContext,
+    catala_entry: CatalaEntrypoint[],
+    resultController: ResultController,
+    testController: vscode.TestController
   ): void {
     this.panel = vscode.window.createWebviewPanel(
       'debugAllTests',
@@ -63,134 +97,76 @@ export class TestMacroController {
       switch (typed_msg.kind) {
         case 'Ready': {
           this.tests = [];
+          const entrypoints = catala_entry;
+          this.handleCatalaEntrypoint(entrypoints, resultController);
+          break;
+        }
+        case 'Reload': {
+          this.tests = [];
           const entrypoints = await listEntrypoints(
             client,
-            [{ kind: 'Test' }, { kind: 'GUI' }],
+            [{ kind: 'GUI' }, { kind: 'Test' }],
             undefined,
             false,
             true
           );
-          for (let index = 0; index < entrypoints.length; index++) {
-            const e = entrypoints[index];
-            const filename = e.path;
-            if (e.entrypoint.kind == 'Test') {
-              switch (e.entrypoint.value.kind) {
-                case 'GUI': {
-                  let uri = vscode.Uri.file(filename);
-                  let lang = getLanguageFromUri(uri);
-                  let content = new Uint8Array(
-                    await vscode.workspace.fs.readFile(uri)
-                  );
-                  let res = parseContents(content, uri, lang);
-                  switch (res.kind) {
-                    case 'Results': {
-                      res.value.forEach((test, _) => {
-                        let testGui: TestDebugger = {
-                          filename,
-                          // Reflect the last recorded run outcome: 'Success' /
-                          // 'Failed' when known, 'Unknown' when never run.
-                          success:
-                            test.test_success === undefined
-                              ? { kind: 'Unknown' }
-                              : test.test_success
-                                ? { kind: 'Success' }
-                                : { kind: 'Failed' },
-                          test: { kind: 'GUI', value: test },
-                        };
-                        this.tests.push(testGui);
-                      });
-                      break;
-                    }
-                    case 'ParseError':
-                      vscode.window.showErrorMessage(
-                        `parseTestFile: can't parse the tests from ${filename}`
-                      );
-                      break;
-                    case 'EmptyTestListMismatch':
-                      logger.log(`No test recorder for ${path}`);
-                      break;
-                  }
-                  break;
-                }
-                case 'Test': {
-                  let testing_scope: string = e.entrypoint.value.value.scope;
-                  let descrFilname = path.basename(filename);
-                  let testSum: TestSum = {
-                    testing_scope,
-                    description: `Test of ${testing_scope} at ${descrFilname}`,
-                    title: testing_scope,
-                  };
-                  let test: TestDebugger = {
-                    filename,
-                    success: { kind: 'Unknown' },
-                    test: { kind: 'Test', value: testSum },
-                  };
-                  this.tests.push(test);
-                  break;
-                }
-              }
-            } else {
-              throw new Error(`Unexpected test from ${path}`);
-            }
-          }
-          this.postMessageToWebView({ kind: 'AllTests', value: this.tests });
+          this.handleCatalaEntrypoint(entrypoints, resultController);
           break;
         }
         case 'SpecificTestRequest': {
           let id = typed_msg.value;
           let test = this.tests[id];
-          let uri = vscode.Uri.file(test.filename);
+          const cwd = getCwd(test.filename);
+          let testMap = new TestMap();
+          let runTest = makeRunHandler(
+            testController,
+            testMap,
+            resultController,
+            cwd!
+          );
           await this.testQueue.add(async () => {
-            if (test.test.kind == 'GUI') {
-              let content = new Uint8Array(
-                await vscode.workspace.fs.readFile(uri)
+            const relFilename = path.relative(cwd!, test.filename);
+            let dirs = relFilename.split('/');
+            let items = testController.items;
+            let filename = cwd;
+            for (const dir of dirs) {
+              filename = `${filename}/${dir}`;
+              let testId = new TestId(vscode.Uri.file(filename));
+              let testItem = items.get(testId.id);
+              if (testItem != undefined) {
+                items = testItem.children;
+              }
+            }
+            let testId = new TestId(
+              vscode.Uri.file(test.filename),
+              test.test.value.scope
+            );
+            let testItem = items.get(testId.id);
+            if (testItem != undefined) {
+              let request = new vscode.TestRunRequest([testItem]);
+              await runTest(
+                request,
+                new CancellationTokenSource().token,
+                false
               );
-              let lang = getLanguageFromUri(uri);
-              let res = parseContents(content, uri, lang);
-              if (res.kind === 'Results') {
-                let index = res.value.findIndex(
-                  (t) =>
-                    t.title === test.test.value.title &&
-                    t.testing_scope === test.test.value.testing_scope
-                );
-                let scope = test.test.value.testing_scope;
-                const results: TestRunResults = runTestScope(
-                  test.filename,
-                  scope
-                );
-                let success =
-                  results.kind == 'Ok' && !results.value.assert_failures;
-                let newTest = res.value[index];
-                let date = new Date();
-                let test_date = `${date.getDate()}/${date.getMonth()}/${date.getFullYear()}`;
-                let updatedTest = {
-                  ...newTest,
-                  test_success: success,
-                  test_date,
-                };
-                res.value[index] = updatedTest;
-                let content = atdToCatala(res.value, lang);
-                await vscode.workspace.fs.writeFile(
-                  uri,
-                  Buffer.from(content, 'utf-8')
-                );
-                let result: TestScopeResult = {
-                  kind: 'GuiTest',
-                  value: [updatedTest, success],
-                };
+              let res = resultController.getResult(testId);
+              if (res != undefined) {
                 this.postMessageToWebView({
                   kind: 'TestScopeResult',
-                  value: [result, id],
+                  value: [test.test, res, id],
+                });
+              } else {
+                let date = new Date().toLocaleDateString();
+                this.postMessageToWebView({
+                  kind: 'TestScopeResult',
+                  value: [test.test, { success: false, date }, id],
                 });
               }
             } else {
-              const result: TestScopeResult = clerkRunScope(
-                test.filename,
-                test.test.value.testing_scope
-              );
+              let date = new Date().toLocaleDateString();
               this.postMessageToWebView({
                 kind: 'TestScopeResult',
-                value: [result, id],
+                value: [test.test, { success: false, date }, id],
               });
             }
           });

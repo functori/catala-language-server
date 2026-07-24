@@ -1,14 +1,13 @@
 import { execFileSync, type SpawnSyncReturns } from 'child_process';
 import type {
   ScopeDefList,
+  ScopeTestResult,
   TestGenerateResults,
   TestInputs,
-  TestScopeResult,
 } from '../generated/catala_types';
 import {
   readScopeDefList,
   readTestList,
-  readTestResult,
   readTestRun,
   writeTestInputs,
   writeTestList,
@@ -103,53 +102,11 @@ export function atdToCatala(tests: TestList, lang: string): string {
   return result.output;
 }
 
-// Calls clerk test on a test that is not a GUI test
-export function clerkRunScope(
-  filename: string,
-  testScope: string
-): TestScopeResult {
-  const cwd = getCwd(filename) ?? '';
-  const relFilename = path.relative(cwd, filename);
-  const configToml = path.join(cwd, 'clerk.toml');
-
-  const clerkResult = execBinary(
-    clerkPath,
-    ['test', '--config', configToml, '--json', '--quiet', relFilename],
-    { cwd }
-  );
-
-  if (!clerkResult.ok) {
-    const msg = `Clerk error: ${clerkResult.stderr}`;
-    window.showErrorMessage(msg);
-    return { kind: 'Error', value: msg };
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(clerkResult.output);
-  } catch (error) {
-    const msg = `JSON parse error: ${String(error)}`;
-    return { kind: 'Error', value: msg };
-  }
-
-  const { test_results: testResults } = readTestResult(parsed);
-
-  let result = testResults[0].tests;
-
-  // Retrieve the test result that matters for us
-  let res = result.scopes.find((scopeTestResult) => {
-    return scopeTestResult.scope_name == testScope;
-  });
-
-  if (res) {
-    return { kind: 'ScopeTest', value: res };
-  } else {
-    return {
-      kind: 'Error',
-      value: `Can't find the test related to scope ${testScope}`,
-    };
-  }
-}
+// Outcome of running a scope test: either a successful `ScopeTestResult`,
+// or a failure carrying an error message.
+export type ScopeRunResult =
+  | { kind: 'Success'; value: ScopeTestResult }
+  | { kind: 'Failed'; value: string };
 
 export function runTestScope(
   filename: string,
@@ -183,15 +140,13 @@ export function runTestScope(
   if (cwd) {
     const relFilename = path.relative(cwd, filename);
     //compile dependencies (hack), do not fail on asserts
-    const clerkResult = execBinary(
-      clerkPath,
-      ['run', '-c--no-fail-on-assert', relFilename],
-      { cwd }
-    );
-    if (!clerkResult.ok) {
-      window.showErrorMessage(clerkResult.stderr);
-      return { kind: 'Error', value: clerkResult.stderr };
-    }
+    execBinary(clerkPath, ['run', '-c--no-fail-on-assert', relFilename], {
+      cwd,
+    });
+    // if (!clerkResult.ok) {
+    //   window.showErrorMessage(clerkResult.stderr);
+    //   return { kind: 'Error', value: clerkResult.stderr };
+    // }
   }
   // Here we *do* want to fail on asserts, as we catch failures through
   // the `register_lsp_error_notifier` hook.

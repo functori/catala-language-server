@@ -29,7 +29,7 @@ import {
   resolveBinaryPath,
 } from './shared/util_client';
 import type { RunArgs } from './shared/util_client';
-import { initTests } from './extension/testAndCoverage';
+import { initTests, ResultController } from './extension/testAndCoverage';
 import type { CatalaEntrypoint } from './extension/lspRequests';
 import { listEntrypoints } from './extension/lspRequests';
 import { ScopeInputController } from './scope-editor/ScopeInputController';
@@ -318,75 +318,6 @@ export async function activate(
       }
     },
   });
-  const language = vscode.env.language;
-
-  let command: Command = {
-    title: 'General tests view',
-    command: 'catala.debugAllTests',
-  };
-  let catala_utils = new Item({
-    label: 'Open all tests',
-    icon: new vscode.ThemeIcon('beaker'),
-    command,
-  });
-  context.subscriptions.push(
-    // note: we need to provide the same name here as we added in the package.json file
-    vscode.window.registerTreeDataProvider(
-      'catala.openAllTests',
-      new tree_view([catala_utils])
-    )
-  );
-
-  let switch1 = new Item({
-    label: '/home/arnaud/catala/_opam',
-    descr: '1.2',
-    command,
-  });
-  let switch2 = new Item({
-    label: '/home/arnaud/katala/catala/_opam',
-    descr: '1.1',
-    command,
-  });
-  let tree = new tree_view([switch1, switch2]);
-
-  // Open catala tests
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('catala.selectSwitch', tree)
-  );
-
-  let command_books: Command = {
-    title: 'Open Catala book',
-    command: 'vscode.open',
-    arguments: [
-      vscode.Uri.parse(
-        `https://book.catala-lang.org/${language}/1-0-getting_started.html`
-      ),
-    ],
-  };
-  let catala_books = new Item({
-    label: 'Learn how to do catala',
-    icon: new vscode.ThemeIcon('book'),
-    command: command_books,
-  });
-  catala_books.iconPath;
-
-  let command_github: Command = {
-    title: 'Open Github',
-    command: 'vscode.open',
-    arguments: [vscode.Uri.parse(`https://github.com/CatalaLang/catala`)],
-  };
-  let catala_github = new Item({
-    label: 'Catala Github repository',
-    icon: new vscode.ThemeIcon('github'),
-    command: command_github,
-  });
-  context.subscriptions.push(
-    // note: we need to provide the same name here as we added in the package.json file
-    vscode.window.registerTreeDataProvider(
-      'catala.help',
-      new tree_view([catala_books, catala_github])
-    )
-  );
 
   // Open the current resource with the custom Test Case Editor
   context.subscriptions.push(
@@ -412,6 +343,8 @@ export async function activate(
   );
 
   const ctrl = vscode.tests.createTestController('catalaTests', 'Catala Tests');
+  // Placeholder to display something while tests are retrieved
+  ctrl.items.add(ctrl.createTestItem('loading', 'Loading tests...'));
 
   const lsp_path = resolveBinaryPath(
     'catala-lsp',
@@ -419,6 +352,8 @@ export async function activate(
     'main_lsp.exe',
     getConfig('lspServerPath')
   );
+
+  let resultController = new ResultController(context.workspaceState);
   if (lsp_path) {
     const run: Executable = { command: lsp_path };
     const serverOptions: ServerOptions = { run, debug: run };
@@ -453,8 +388,93 @@ export async function activate(
       serverOptions,
       clientOptions
     );
-    await Promise.all([client.start(), initTests(context, client, ctrl)]);
+
+    await client.start();
+
+    let entrypoints = await listEntrypoints(
+      client,
+      [{ kind: 'GUI' }, { kind: 'Test' }],
+      undefined,
+      false,
+      true
+    ).finally(() => ctrl.items.replace([]));
+
+    await initTests(entrypoints, context, client, ctrl, resultController);
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        'catala.debugAllTests',
+        async (_arg?: vscode.Uri | { resourceUri: vscode.Uri }) => {
+          const macroTestsView = new TestMacroController();
+          macroTestsView.createWebView(
+            client,
+            context,
+            entrypoints,
+            resultController,
+            ctrl
+          );
+        }
+      )
+    );
   }
+
+  const language = vscode.env.language;
+
+  let command: Command = {
+    title: 'General tests view',
+    command: 'catala.debugAllTests',
+  };
+  let catala_utils = new Item({
+    label: 'Open all tests',
+    icon: new vscode.ThemeIcon('beaker'),
+    command,
+  });
+  context.subscriptions.push(
+    // note: we need to provide the same name here as we added in the package.json file
+    vscode.window.registerTreeDataProvider(
+      'catala.openAllTests',
+      new tree_view([catala_utils])
+    )
+  );
+
+  let tree = new tree_view([]);
+
+  // Open catala tests
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('catala.selectSwitch', tree)
+  );
+
+  let command_books: Command = {
+    title: 'Open Catala book',
+    command: 'vscode.open',
+    arguments: [
+      vscode.Uri.parse(`https://book.catala-lang.org/${language}/0-intro.html`),
+    ],
+  };
+  let catala_books = new Item({
+    label: 'Learn how to do catala',
+    icon: new vscode.ThemeIcon('book'),
+    command: command_books,
+  });
+  catala_books.iconPath;
+
+  let command_github: Command = {
+    title: 'Open Github',
+    command: 'vscode.open',
+    arguments: [vscode.Uri.parse(`https://github.com/CatalaLang/catala`)],
+  };
+  let catala_github = new Item({
+    label: 'Catala Github repository',
+    icon: new vscode.ThemeIcon('github'),
+    command: command_github,
+  });
+  context.subscriptions.push(
+    // note: we need to provide the same name here as we added in the package.json file
+    vscode.window.registerTreeDataProvider(
+      'catala.help',
+      new tree_view([catala_books, catala_github])
+    )
+  );
 
   // Always register the custom editor providers
   context.subscriptions.push(
@@ -482,15 +502,6 @@ export async function activate(
           uri,
           TraceEditorProvider.viewType
         );
-      }
-    )
-  );
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      'catala.debugAllTests',
-      async (_arg?: vscode.Uri | { resourceUri: vscode.Uri }) => {
-        const macroTestsView = new TestMacroController();
-        macroTestsView.createWebView(client, context);
       }
     )
   );

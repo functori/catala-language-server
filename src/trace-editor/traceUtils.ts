@@ -58,10 +58,10 @@ export type TraceTest = {
   title: string;
 };
 
-export const OPTIONAL_PRESENT = new Set(['Present', 'Présent', 'Obecny']);
-export const OPTIONAL_ABSENT = new Set(['Absent', 'Nieobecny']);
+const OPTIONAL_PRESENT = new Set(['Present', 'Présent', 'Obecny']);
+const OPTIONAL_ABSENT = new Set(['Absent', 'Nieobecny']);
 
-export function traceValueFromJson(value: JsonValue): TraceValue | undefined {
+function traceValueFromJson(value: JsonValue): TraceValue | undefined {
   if (typeof value === 'boolean') {
     return { kind: 'bool', value };
   }
@@ -170,7 +170,11 @@ export function traceValueFromRuntime(
       if (OPTIONAL_PRESENT.has(ctor)) {
         return traceValueFromRuntime(payload.value.value);
       }
-      return { kind: 'enum', ctor, value: traceValueFromRuntime(payload.value.value) };
+      return {
+        kind: 'enum',
+        ctor,
+        value: traceValueFromRuntime(payload.value.value),
+      };
     }
     case 'Struct': {
       const [, m] = rv.value;
@@ -260,7 +264,9 @@ export function formatTraceValue(
       if (!all) return undefined;
       if (v.fields.length === 0) return '{}';
       return `{\n${v.fields
-        .map(([k, f]) => `${inner}${k}: ${formatTraceValue(f, all, inner) ?? ''}`)
+        .map(
+          ([k, f]) => `${inner}${k}: ${formatTraceValue(f, all, inner) ?? ''}`
+        )
         .join(',\n')}\n${indent}}`;
     case 'array':
       if (!all) return undefined;
@@ -325,7 +331,7 @@ export function traceValueEqual(a: TraceValue, b: TraceValue): boolean {
   }
 }
 
-export function traceElementFromJson(e: JsonValue): TraceElement | null {
+function traceElementFromJson(e: JsonValue): TraceElement | null {
   if (
     e === null ||
     typeof e !== 'object' ||
@@ -364,10 +370,6 @@ export function traceFromJson(trace: JsonValue): TraceElement[] | null {
 
 export function str(v: unknown): string {
   return typeof v === 'string' ? v : '';
-}
-
-export function leafName(name: string): string {
-  return name.slice(name.lastIndexOf('.') + 1);
 }
 
 export function isSubscopeVar(el: TraceElement): boolean {
@@ -438,7 +440,7 @@ export function scopeCallOutputs(
   return out;
 }
 
-export function readTraceTestVariables(x: JsonValue): Map<string, TraceValue> {
+function readTraceTestVariables(x: JsonValue): Map<string, TraceValue> {
   const map = new Map<string, TraceValue>();
   if (x !== null && typeof x === 'object' && !Array.isArray(x)) {
     const o = x as Record<string, JsonValue>;

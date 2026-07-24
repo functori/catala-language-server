@@ -115,20 +115,11 @@ export default function ScopeInputEditor({
           if (results.kind !== 'Cancelled') {
             // Record the run outcome on the test (and reflect it back to the
             // controller through a GuiEdit, like any other test edit).
-            const passed =
-              results.kind === 'Ok' && !results.value.assert_failures;
             setState((prev) => {
               if (prev.state !== 'success') {
                 return prev;
               }
-              const updatedTest: Test = { ...prev.test, test_success: passed };
-              vscode.postMessage(
-                writeUpMessage({
-                  kind: 'GuiEdit',
-                  value: [[updatedTest], false],
-                })
-              );
-              return { state: 'success', test: updatedTest };
+              return { state: 'success', test: prev.test };
             });
           }
           break;

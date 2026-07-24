@@ -460,7 +460,9 @@ export default function TraceTreeView({
 }): ReactElement {
   const intl = useIntl();
 
-  const filteredTrace = trace.filter((elt) => elt.element.kind !== 'function_call');
+  const filteredTrace = trace.filter(
+    (elt) => elt.element.kind !== 'function_call'
+  );
   const roots =
     filteredTrace.length === 1 &&
     filteredTrace[0].element.kind === 'scope_call' &&
@@ -518,7 +520,9 @@ function TraceNode({
   prefix?: string;
 }): ReactElement | null {
   // filter input exceptions
-  if (te.element.kind==='exception' && depth===1) { return null }
+  if (te.element.kind === 'exception' && depth === 1) {
+    return null;
+  }
 
   const f = filter ?? '';
   const filtering = f.length > 0;
@@ -754,10 +758,7 @@ function ContainerValue({ value }: { value: string }): ReactElement {
   const [open, setOpen] = useState(false);
   return (
     <div>
-      <div
-        style={containerValueLabelStyle}
-        onClick={() => setOpen((o) => !o)}
-      >
+      <div style={containerValueLabelStyle} onClick={() => setOpen((o) => !o)}>
         <span
           className={`codicon codicon-chevron-${open ? 'down' : 'right'}`}
           style={chevronStyle}
@@ -807,7 +808,9 @@ function ValueView({
     );
   }
   const fv = formatTraceValue(te.value);
-  if (fv===undefined) { return null }
+  if (fv === undefined) {
+    return null;
+  }
   return <span style={valueStyle}>= {fv}</span>;
 }
 

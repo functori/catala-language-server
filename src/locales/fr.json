@@ -126,7 +126,6 @@
   "generalTests.testNumber": "Test #{num}",
   "generalTests.testedOn": "Testé le {date}",
   "generalTests.header.id": "Id",
-  "generalTests.header.lastModified": "Date dernière modification",
   "generalTests.header.scope": "Champ d'application",
   "generalTests.header.description": "Description",
   "generalTests.header.lastTestDate": "Date du dernier test",

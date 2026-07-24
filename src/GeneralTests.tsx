@@ -3,7 +3,7 @@ import { FormattedMessage, useIntl } from 'react-intl';
 
 import { type WebviewApi } from 'vscode-webview';
 
-import type { TestDebugger, TestState } from './generated/catala_types';
+import type { TestDebugger } from './generated/catala_types';
 import { readDownMessage, writeUpMessage } from './generated/catala_types';
 import { Box, Checkbox, FormControlLabel, Grid } from '@mui/material';
 import { VscodeTextfield } from '@vscode-elements/react-elements';
@@ -12,7 +12,7 @@ import { setVsCodeApi } from './shared/webviewApi';
 
 type TestGridArg = {
   vscode: WebviewApi<unknown>;
-  tests: TestDebugger[];
+  tests: TestMacro[];
   grid: boolean;
   filter: string;
   filterScope: string[];
@@ -24,9 +24,18 @@ type GeneralTestsArg = {
   vscode: WebviewApi<unknown>;
 };
 
+type TestState =
+  | { state: 'Success' }
+  | { state: 'Loading' }
+  | { state: 'Failed' }
+  | { state: 'JustFailed' }
+  | { state: 'Unknown' };
+
+type TestMacro = TestDebugger & TestState;
+
 type TestItemArg = {
   vscode: WebviewApi<unknown>;
-  test: TestDebugger;
+  test: TestMacro;
   num: number;
   onRun: (id: number) => void;
 };
@@ -95,7 +104,7 @@ function SeparationLine(): ReactElement {
 }
 
 function testState(success: TestState): ReactElement {
-  switch (success.kind) {
+  switch (success.state) {
     case 'Success':
       return (
         <span
@@ -158,7 +167,7 @@ function OpenGUI({
   filename: string;
   success: TestState;
 }): ReactElement {
-  let fail = success.kind == 'JustFailed';
+  let fail = success.state == 'JustFailed';
   let [first, setFirst] = useState<boolean>(true);
   return (
     <span
@@ -216,22 +225,18 @@ function TestItem({ vscode, test, num, onRun }: TestItemArg): ReactElement {
       <span className="test-descr">{testDescription(test)}</span>
       <SeparationLine />
       <div className="footer">
-        {testState(test.success)}
+        {testState(test)}
         <span>
           <FormattedMessage
             id="generalTests.testedOn"
             defaultMessage="Testé le {date}"
             values={{
-              date: testDate(test) != undefined ? testDate(test) : `??/??/????`,
+              date: test.date ?? '??/??/????',
             }}
           />
         </span>
         {isGui(test) ? (
-          <OpenGUI
-            vscode={vscode}
-            filename={test.filename}
-            success={test.success}
-          />
+          <OpenGUI vscode={vscode} filename={test.filename} success={test} />
         ) : (
           <OpenTextEditor vscode={vscode} filename={test.filename} />
         )}
@@ -241,15 +246,28 @@ function TestItem({ vscode, test, num, onRun }: TestItemArg): ReactElement {
   );
 }
 
-function TestLine({ vscode, test, num, onRun }: TestItemArg): ReactElement {
+function TestLine({
+  vscode,
+  test,
+  num,
+  onRun,
+}: TestItemArg & { expected: string[] }): ReactElement {
+  console.log(`Log de console.log ${test.success}`);
   return (
-    <tr>
+    <tr className={test.state == 'JustFailed' ? 'justFailed' : ''}>
       <th>{num + 1}</th>
-      <td>10/10/2024</td>
       <td>{testingScope(test)}</td>
-      <td>{testDescription(test)}</td>
-      <td>{testDate(test) ? testDate(test) : `??/??/????`}</td>
-      <td>{testState(test.success)}</td>
+      <td>
+        <span className="test-descr">{testDescription(test)}</span>
+      </td>
+      {/* <>{expected.map((inter) => {
+        if (test.test.kind == "GUI") {
+          let runtimeValue = test.test.value.variables.get(inter);
+          return <td>{runtimeValue ? formatRuntimeValue(runtimeValue) : '_'}</td>;
+        }
+      })}</> */}
+      <td>{test.date ?? '??/??/????'}</td>
+      <td>{testState(test)}</td>
       <td>
         <span
           className="codicon codicon-debug-start run-icon"
@@ -261,11 +279,7 @@ function TestLine({ vscode, test, num, onRun }: TestItemArg): ReactElement {
       </td>
       <td>
         {isGui(test) ? (
-          <OpenGUI
-            vscode={vscode}
-            filename={test.filename}
-            success={test.success}
-          />
+          <OpenGUI vscode={vscode} filename={test.filename} success={test} />
         ) : (
           <OpenTextEditor vscode={vscode} filename={test.filename} />
         )}
@@ -274,19 +288,13 @@ function TestLine({ vscode, test, num, onRun }: TestItemArg): ReactElement {
   );
 }
 
-function HeaderLine(): ReactElement {
+function HeaderLine({ expected }: { expected: string[] }): ReactElement {
   return (
     <thead>
       <tr>
         <th>
           <FormattedMessage id="generalTests.header.id" defaultMessage="Id" />
         </th>
-        <td>
-          <FormattedMessage
-            id="generalTests.header.lastModified"
-            defaultMessage="Date dernière modification"
-          />
-        </td>
         <td>
           <FormattedMessage
             id="generalTests.header.scope"
@@ -299,6 +307,9 @@ function HeaderLine(): ReactElement {
             defaultMessage="Description"
           />
         </td>
+        {expected.map((value) => (
+          <td>{value}</td>
+        ))}
         <td>
           <FormattedMessage
             id="generalTests.header.lastTestDate"
@@ -331,26 +342,28 @@ function isGui(test: TestDebugger): boolean {
 }
 
 function testTitle(test: TestDebugger): string {
-  return test.test.value.title;
+  return test.test.kind === 'GUI'
+    ? (test.test.value.title ?? '')
+    : test.test.value.scope;
 }
 
 function testDescription(test: TestDebugger): string {
-  return test.test.value.description;
+  return test.test.kind == 'GUI'
+    ? (test.test.value.description ?? '')
+    : `Test of ${test.test.value.scope} in ${test.filename}`;
 }
 
 function testingScope(test: TestDebugger): string {
-  return test.test.value.testing_scope;
+  return test.test.kind == 'GUI'
+    ? test.test.value.scope_tested
+    : test.test.value.scope;
 }
 
-function testDate(test: TestDebugger): string | undefined {
-  return test.test.value.test_date;
-}
-
-// A GUI test's scope comes from its `tested_scope`; a regular test uses `testing_scope`.
-function testScope(test: TestDebugger): string {
-  return test.test.kind === 'GUI'
-    ? test.test.value.tested_scope.name
-    : test.test.value.testing_scope;
+function testMacro(test: TestDebugger, previousSuccess: boolean): TestMacro {
+  return {
+    ...test,
+    state: test.success ? 'Success' : previousSuccess ? 'JustFailed' : 'Failed',
+  };
 }
 
 function matchFilter(
@@ -369,12 +382,12 @@ function matchFilter(
   let scopeFilter =
     filterScope.length == 0
       ? true
-      : filterScope.some((value) => testScope(test) == value);
+      : filterScope.some((value) => testingScope(test) == value);
   let guiFilter = filterGui ? isGui(test) : true;
   return searchBarFilter && scopeFilter && guiFilter;
 }
 
-type OriginalTest = { index: number; test: TestDebugger };
+type OriginalTest = { index: number; test: TestMacro };
 
 type CardGridArg = {
   vscode: WebviewApi<unknown>;
@@ -393,7 +406,7 @@ function CardGrid({
   if (filteredScope.length != 0) {
     for (let index = 0; index < tests.length; index++) {
       const elt = tests[index];
-      let scopeFiltered = testScope(elt.test);
+      let scopeFiltered = testingScope(elt.test);
       let scopeTested = gridTests.get(scopeFiltered) ?? [];
       scopeTested.push(elt);
       gridTests.set(scopeFiltered, scopeTested);
@@ -450,6 +463,72 @@ function CardGrid({
   }
 }
 
+function TestList({ vscode, onRun, tests }: CardGridArg): ReactElement {
+  let map = new Map<string, [Set<string>, OriginalTest[]]>();
+  let not_gui: OriginalTest[] = [];
+  for (let index = 0; index < tests.length; index++) {
+    const element = tests[index];
+    if (element.test.test.kind == 'GUI') {
+      let scope = element.test.test.value.scope_tested;
+      let [expected, scopeList] = map.get(scope) ?? [new Set<string>(), []];
+      scopeList.push(element);
+      // for (const key of element.test.test.value.variables.keys()) {
+      //   expected.add(key);
+      // }
+      map.set(scope, [expected, scopeList]);
+    } else {
+      not_gui.push(element);
+    }
+  }
+  return (
+    <>
+      {[...map.entries()].map(([testedScope, [allExpected, tests]]) => {
+        let expected = [...allExpected.keys()];
+        return (
+          <>
+            <h1>{testedScope}</h1>
+            <table className="test-list">
+              <HeaderLine expected={expected} />
+              <tbody>
+                {tests.map(({ test, index }) => (
+                  <TestLine
+                    vscode={vscode}
+                    test={test}
+                    num={index}
+                    onRun={onRun}
+                    expected={expected}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </>
+        );
+      })}
+      {not_gui.length > 0 ? (
+        <>
+          <h1>Autres Tests</h1>
+          <table className="test-list">
+            <HeaderLine expected={[]} />
+            <tbody>
+              {not_gui.map(({ test, index }) => {
+                return (
+                  <TestLine
+                    vscode={vscode}
+                    test={test}
+                    num={index}
+                    onRun={onRun}
+                    expected={[]}
+                  />
+                );
+              })}
+            </tbody>
+          </table>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function TestsGrid({
   vscode,
   tests,
@@ -487,25 +566,17 @@ function TestsGrid({
       onRun={onRun}
     />
   ) : (
-    <table className="test-list">
-      <HeaderLine />
-      <tbody>
-        {filtered.map(({ test, index }) => (
-          <TestLine
-            key={index}
-            vscode={vscode}
-            test={test}
-            num={index}
-            onRun={onRun}
-          />
-        ))}
-      </tbody>
-    </table>
+    <TestList
+      filteredScope={filterScope}
+      vscode={vscode}
+      tests={filtered}
+      onRun={onRun}
+    />
   );
 }
 
 function scopesFromTests(tests: TestDebugger[]): string[] {
-  let allScopes = tests?.map((test, _) => testScope(test)).sort();
+  let allScopes = tests?.map((test, _) => testingScope(test)).sort();
   let scopes = [];
   let prev = '';
   for (let index = 0; index < allScopes!.length; index++) {
@@ -674,7 +745,7 @@ function Loading({
 // Total duration of the `highlight` blink animation (`blink 1s ... 4` = 1s ×
 // 4 iterations), plus a small margin so the timer settles just after the
 // animation has visually finished.
-const HIGHLIGHT_MS = 4100;
+// const HIGHLIGHT_MS = 4100;
 
 export default function GeneralTests({
   vscode,
@@ -683,39 +754,42 @@ export default function GeneralTests({
   const [filterScope, setFilterScope] = useState<string[]>([]);
   const [filterGui, setFilterGui] = useState<boolean>(true);
   const [grid, setGrid] = useState<boolean>(true);
-  const [tests, setTests] = useState<TestDebugger[] | undefined>(undefined);
+  const [tests, setTests] = useState<TestMacro[] | undefined>(undefined);
   const [reload, setReload] = useState<boolean>(false);
 
   useEffect(() => {
     setVsCodeApi(vscode);
   }, [vscode]);
 
-  // Downgrade a 'JustFailed' test to the stable 'Failed' state once its
-  // one-shot highlight animation is done. The `kind === 'JustFailed'` guard
-  // makes this idempotent and safe against stale timers: if the test has
-  // meanwhile been re-run (Loading) or now passes, the timer is a no-op.
-  const settleHighlight = (id: number): void => {
-    setTests((oldTests) =>
-      oldTests?.map((test, index) =>
-        index === id && test.success.kind === 'JustFailed'
-          ? { ...test, success: { kind: 'Failed' } }
-          : test
-      )
-    );
-  };
+  // const settleHighlight = (id: number): void => {
+  //   setTests((oldTests) =>
+  //     oldTests?.map((test, index) =>
+  //       index === id && test.state === 'JustFailed'
+  //         ? { ...test, state: 'Failed' }
+  //         : test
+  //     )
+  //   );
+  // };
 
-  const scheduleSettle = (id: number): void => {
-    setTimeout(() => settleHighlight(id), HIGHLIGHT_MS);
-  };
+  // const scheduleSettle = (id: number): void => {
+  //   setTimeout(() => settleHighlight(id), HIGHLIGHT_MS);
+  // };
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
       const message = readDownMessage(event.data);
       switch (message.kind) {
-        case 'AllTests':
+        case 'AllTests': {
           setReload(false);
-          setTests(message.value);
+          let tests = message.value;
+          let tsTests: TestMacro[] = [];
+          for (let index = 0; index < tests.length; index++) {
+            const test = tests[index];
+            tsTests.push(testMacro(test, false));
+          }
+          setTests(tsTests);
           break;
+        }
         case 'TestRunResults': {
           break;
         }
@@ -724,48 +798,29 @@ export default function GeneralTests({
           break;
         }
         case 'TestScopeResult': {
-          let [result, id] = message.value;
+          let [result, run, id] = message.value;
           setTests((oldTests) =>
             oldTests?.map((test, index) => {
               if (index != id) {
                 return test;
               }
-              switch (result.kind) {
-                case 'ScopeTest':
-                  return {
-                    ...test,
-                    success: result.value.success
-                      ? { kind: 'Success' }
-                      : { kind: 'Failed' },
-                  };
-                case 'GuiTest': {
-                  let [newTest, success] = result.value;
-                  let successObj: TestState = success
-                    ? { kind: 'Success' }
-                    : { kind: 'JustFailed' };
-                  return {
-                    ...test,
-                    test: { kind: 'GUI', value: newTest },
-                    success: successObj,
-                  };
-                }
-                case 'Error':
-                  return { ...test, success: { kind: 'JustFailed' } };
-                case 'Cancelled':
-                  return { ...test, success: { kind: 'Unknown' } };
-              }
+              let updatedTest: TestDebugger = {
+                filename: test.filename,
+                test: result,
+                success: run.success,
+                date: run.date,
+              };
+              let previousSuccess = test.success == undefined || test.success!;
+              return testMacro(updatedTest, previousSuccess);
             })
           );
-          if (result.kind === 'Error') {
-            scheduleSettle(id);
-          }
+          // if (!run.success) {
+          //   scheduleSettle(id);
+          // }
           break;
         }
-        case 'ConfirmResult': {
-          throw Error('Unexpected message');
-        }
         default:
-          assertUnreachable(message);
+          break;
       }
     };
 
@@ -778,26 +833,15 @@ export default function GeneralTests({
   }, []);
 
   const onRun = (id: number): void => {
+    console.log(`Run test ${id} Loading`);
     if (!tests) {
       return;
     }
-    const entry = tests[id];
-    if (entry?.test.kind === 'GUI') {
-      // Running a GUI test stamps it with the current date. Reflect the
-      // new date locally, and ask the controller to update its own list
-      // (which also persists the edited GUI test to its file).
-      setTests((oldTests) =>
-        oldTests?.map((test, index) =>
-          index === id ? { ...test, success: { kind: 'Loading' } } : test
-        )
-      );
-    } else {
-      setTests((oldTests) =>
-        oldTests?.map((test, index) =>
-          index === id ? { ...test, success: { kind: 'Loading' } } : test
-        )
-      );
-    }
+    setTests((oldTests) =>
+      oldTests?.map((test, index) =>
+        index === id ? { ...test, state: 'Loading' } : test
+      )
+    );
     vscode.postMessage(
       writeUpMessage({ kind: 'SpecificTestRequest', value: id })
     );
@@ -878,7 +922,7 @@ export default function GeneralTests({
             onClick={(event) => {
               event.preventDefault();
               setReload(true);
-              vscode.postMessage(writeUpMessage({ kind: 'Ready' }));
+              vscode.postMessage(writeUpMessage({ kind: 'Reload' }));
             }}
           />
         </div>

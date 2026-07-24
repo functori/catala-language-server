@@ -102,6 +102,11 @@ export type RuntimeValue = {
   attrs: AttrDef[];
 }
 
+export type ScopeRealVar = {
+  name: string;
+  real_value?: RuntimeValue;
+}
+
 export type ValueDef = {
   value: RuntimeValue;
   pos?: SourcePosition;
@@ -123,34 +128,14 @@ export type Test = {
   test_outputs: TestOutputs;
   variables: Map<string, RuntimeValue>;
   description: string;
-  test_date?: string;
-  test_success?: boolean;
   title: string;
 }
-
-export type TestState =
-| { kind: 'Success' }
-| { kind: 'Loading' }
-| { kind: 'Failed' }
-| { kind: 'JustFailed' }
-| { kind: 'Unknown' }
-
-export type TestSum = {
-  testing_scope: string;
-  scope_tested?: ScopeDef;
-  description: string;
-  title: string;
-  test_date?: string;
-}
-
-export type TestMacro =
-| { kind: 'GUI'; value: Test }
-| { kind: 'Test'; value: TestSum }
 
 export type TestDebugger = {
-  success: TestState;
   filename: string;
-  test: TestMacro;
+  test: TestEntrypoint;
+  success?: boolean;
+  date?: string;
 }
 
 export type TestRun = {
@@ -196,11 +181,12 @@ export type TestResult = {
   coverage: Coverage;
 }
 
-export type TestScopeResult =
-| { kind: 'Error'; value: string }
-| { kind: 'ScopeTest'; value: ScopeTestResult }
-| { kind: 'GuiTest'; value: [Test, boolean] }
-| { kind: 'Cancelled' }
+export type GuiEntrypoint = {
+  scope_tested: string;
+  scope: string;
+  title?: string;
+  description?: string;
+}
 
 export type TestDebuggerList = TestDebugger[]
 
@@ -274,8 +260,18 @@ export type ConfirmResult = {
   confirmed: boolean;
 }
 
+export type ScopeSuccess = {
+  success: boolean;
+  date: string;
+}
+
+export type TestEntrypoint =
+| { kind: 'GUI'; value: GuiEntrypoint }
+| { kind: 'Test'; value: FoncTestEntrypoint }
+
 export type UpMessage =
 | { kind: 'Ready' }
+| { kind: 'Reload' }
 | { kind: 'GuiEdit'; value: [TestList, boolean] }
 | { kind: 'OpenInTextEditor'; value: Option<string> }
 | { kind: 'TestRunRequest'; value: TestRunRequest }
@@ -288,23 +284,13 @@ export type UpMessage =
 export type DownMessage =
 | { kind: 'Update'; value: ParseResults }
 | { kind: 'TestRunResults'; value: TestRunResultsMsg }
-| { kind: 'TestScopeResult'; value: [TestScopeResult, number /*int*/] }
+| { kind: 'TestScopeResult'; value: [TestEntrypoint, ScopeSuccess, number /*int*/] }
 | { kind: 'ConfirmResult'; value: ConfirmResult }
 | { kind: 'AllTests'; value: TestDebuggerList }
-
-export type GuiEntrypoint = {
-  scope: string;
-  title?: string;
-  description?: string;
-}
 
 export type FoncTestEntrypoint = {
   scope: string;
 }
-
-export type TestEntrypoint =
-| { kind: 'GUI'; value: GuiEntrypoint }
-| { kind: 'Test'; value: FoncTestEntrypoint }
 
 export type NoInputScopeEntrypoint = {
   scope: string;
@@ -673,6 +659,20 @@ export function readRuntimeValue(x: any, context: any = x): RuntimeValue {
   };
 }
 
+export function writeScopeRealVar(x: ScopeRealVar, context: any = x): any {
+  return {
+    'name': _atd_write_required_field('ScopeRealVar', 'name', _atd_write_string, x.name, x),
+    'real_value': _atd_write_optional_field(writeRuntimeValue, x.real_value, x),
+  };
+}
+
+export function readScopeRealVar(x: any, context: any = x): ScopeRealVar {
+  return {
+    name: _atd_read_required_field('ScopeRealVar', 'name', _atd_read_string, x['name'], x),
+    real_value: _atd_read_optional_field(readRuntimeValue, x['real_value'], x),
+  };
+}
+
 export function writeValueDef(x: ValueDef, context: any = x): any {
   return {
     'value': _atd_write_required_field('ValueDef', 'value', writeRuntimeValue, x.value, x),
@@ -725,8 +725,6 @@ export function writeTest(x: Test, context: any = x): any {
     'test_outputs': _atd_write_required_field('Test', 'test_outputs', writeTestOutputs, x.test_outputs, x),
     'variables': _atd_write_field_with_default(_atd_write_assoc_map_to_object(writeRuntimeValue), [], x.variables, x),
     'description': _atd_write_required_field('Test', 'description', _atd_write_string, x.description, x),
-    'test_date': _atd_write_optional_field(_atd_write_string, x.test_date, x),
-    'test_success': _atd_write_optional_field(_atd_write_bool, x.test_success, x),
     'title': _atd_write_required_field('Test', 'title', _atd_write_string, x.title, x),
   };
 }
@@ -739,100 +737,25 @@ export function readTest(x: any, context: any = x): Test {
     test_outputs: _atd_read_required_field('Test', 'test_outputs', readTestOutputs, x['test_outputs'], x),
     variables: _atd_read_field_with_default(_atd_read_assoc_object_into_map(readRuntimeValue), [], x['variables'], x),
     description: _atd_read_required_field('Test', 'description', _atd_read_string, x['description'], x),
-    test_date: _atd_read_optional_field(_atd_read_string, x['test_date'], x),
-    test_success: _atd_read_optional_field(_atd_read_bool, x['test_success'], x),
     title: _atd_read_required_field('Test', 'title', _atd_read_string, x['title'], x),
   };
 }
 
-export function writeTestState(x: TestState, context: any = x): any {
-  switch (x.kind) {
-    case 'Success':
-      return 'Success'
-    case 'Loading':
-      return 'Loading'
-    case 'Failed':
-      return 'Failed'
-    case 'JustFailed':
-      return 'JustFailed'
-    case 'Unknown':
-      return 'Unknown'
-  }
-}
-
-export function readTestState(x: any, context: any = x): TestState {
-  switch (x) {
-    case 'Success':
-      return { kind: 'Success' }
-    case 'Loading':
-      return { kind: 'Loading' }
-    case 'Failed':
-      return { kind: 'Failed' }
-    case 'JustFailed':
-      return { kind: 'JustFailed' }
-    case 'Unknown':
-      return { kind: 'Unknown' }
-    default:
-      _atd_bad_json('TestState', x, context)
-      throw new Error('impossible')
-  }
-}
-
-export function writeTestSum(x: TestSum, context: any = x): any {
-  return {
-    'testing_scope': _atd_write_required_field('TestSum', 'testing_scope', _atd_write_string, x.testing_scope, x),
-    'scope_tested': _atd_write_optional_field(writeScopeDef, x.scope_tested, x),
-    'description': _atd_write_required_field('TestSum', 'description', _atd_write_string, x.description, x),
-    'title': _atd_write_required_field('TestSum', 'title', _atd_write_string, x.title, x),
-    'test_date': _atd_write_optional_field(_atd_write_string, x.test_date, x),
-  };
-}
-
-export function readTestSum(x: any, context: any = x): TestSum {
-  return {
-    testing_scope: _atd_read_required_field('TestSum', 'testing_scope', _atd_read_string, x['testing_scope'], x),
-    scope_tested: _atd_read_optional_field(readScopeDef, x['scope_tested'], x),
-    description: _atd_read_required_field('TestSum', 'description', _atd_read_string, x['description'], x),
-    title: _atd_read_required_field('TestSum', 'title', _atd_read_string, x['title'], x),
-    test_date: _atd_read_optional_field(_atd_read_string, x['test_date'], x),
-  };
-}
-
-export function writeTestMacro(x: TestMacro, context: any = x): any {
-  switch (x.kind) {
-    case 'GUI':
-      return ['GUI', writeTest(x.value, x)]
-    case 'Test':
-      return ['Test', writeTestSum(x.value, x)]
-  }
-}
-
-export function readTestMacro(x: any, context: any = x): TestMacro {
-  _atd_check_json_tuple(2, x, context)
-  switch (x[0]) {
-    case 'GUI':
-      return { kind: 'GUI', value: readTest(x[1], x) }
-    case 'Test':
-      return { kind: 'Test', value: readTestSum(x[1], x) }
-    default:
-      _atd_bad_json('TestMacro', x, context)
-      throw new Error('impossible')
-  }
-}
-
 export function writeTestDebugger(x: TestDebugger, context: any = x): any {
   return {
-    'success': _atd_write_required_field('TestDebugger', 'success', writeTestState, x.success, x),
     'filename': _atd_write_required_field('TestDebugger', 'filename', _atd_write_string, x.filename, x),
-    'test': _atd_write_required_field('TestDebugger', 'test', writeTestMacro, x.test, x),
+    'test': _atd_write_required_field('TestDebugger', 'test', writeTestEntrypoint, x.test, x),
+    'success': _atd_write_optional_field(_atd_write_bool, x.success, x),
+    'date': _atd_write_optional_field(_atd_write_string, x.date, x),
   };
 }
 
 export function readTestDebugger(x: any, context: any = x): TestDebugger {
   return {
-    success: _atd_read_required_field('TestDebugger', 'success', readTestState, x['success'], x),
     filename: _atd_read_required_field('TestDebugger', 'filename', _atd_read_string, x['filename'], x),
-    test: _atd_read_required_field('TestDebugger', 'test', readTestMacro, x['test'], x),
+    test: _atd_read_required_field('TestDebugger', 'test', readTestEntrypoint, x['test'], x),
+    success: _atd_read_optional_field(_atd_read_bool, x['success'], x),
+    date: _atd_read_optional_field(_atd_read_string, x['date'], x),
   };
 }
 
@@ -954,43 +877,22 @@ export function readTestResult(x: any, context: any = x): TestResult {
   };
 }
 
-export function writeTestScopeResult(x: TestScopeResult, context: any = x): any {
-  switch (x.kind) {
-    case 'Error':
-      return ['Error', _atd_write_string(x.value, x)]
-    case 'ScopeTest':
-      return ['ScopeTest', writeScopeTestResult(x.value, x)]
-    case 'GuiTest':
-      return ['GuiTest', ((x, context) => [writeTest(x[0], x), _atd_write_bool(x[1], x)])(x.value, x)]
-    case 'Cancelled':
-      return 'Cancelled'
-  }
+export function writeGuiEntrypoint(x: GuiEntrypoint, context: any = x): any {
+  return {
+    'scope_tested': _atd_write_required_field('GuiEntrypoint', 'scope_tested', _atd_write_string, x.scope_tested, x),
+    'scope': _atd_write_required_field('GuiEntrypoint', 'scope', _atd_write_string, x.scope, x),
+    'title': _atd_write_optional_field(_atd_write_string, x.title, x),
+    'description': _atd_write_optional_field(_atd_write_string, x.description, x),
+  };
 }
 
-export function readTestScopeResult(x: any, context: any = x): TestScopeResult {
-  if (typeof x === 'string') {
-    switch (x) {
-      case 'Cancelled':
-        return { kind: 'Cancelled' }
-      default:
-        _atd_bad_json('TestScopeResult', x, context)
-        throw new Error('impossible')
-    }
-  }
-  else {
-    _atd_check_json_tuple(2, x, context)
-    switch (x[0]) {
-      case 'Error':
-        return { kind: 'Error', value: _atd_read_string(x[1], x) }
-      case 'ScopeTest':
-        return { kind: 'ScopeTest', value: readScopeTestResult(x[1], x) }
-      case 'GuiTest':
-        return { kind: 'GuiTest', value: ((x, context): [Test, boolean] => { _atd_check_json_tuple(2, x, context); return [readTest(x[0], x), _atd_read_bool(x[1], x)] })(x[1], x) }
-      default:
-        _atd_bad_json('TestScopeResult', x, context)
-        throw new Error('impossible')
-    }
-  }
+export function readGuiEntrypoint(x: any, context: any = x): GuiEntrypoint {
+  return {
+    scope_tested: _atd_read_required_field('GuiEntrypoint', 'scope_tested', _atd_read_string, x['scope_tested'], x),
+    scope: _atd_read_required_field('GuiEntrypoint', 'scope', _atd_read_string, x['scope'], x),
+    title: _atd_read_optional_field(_atd_read_string, x['title'], x),
+    description: _atd_read_optional_field(_atd_read_string, x['description'], x),
+  };
 }
 
 export function writeTestDebuggerList(x: TestDebuggerList, context: any = x): any {
@@ -1276,10 +1178,48 @@ export function readConfirmResult(x: any, context: any = x): ConfirmResult {
   };
 }
 
+export function writeScopeSuccess(x: ScopeSuccess, context: any = x): any {
+  return {
+    'success': _atd_write_required_field('ScopeSuccess', 'success', _atd_write_bool, x.success, x),
+    'date': _atd_write_required_field('ScopeSuccess', 'date', _atd_write_string, x.date, x),
+  };
+}
+
+export function readScopeSuccess(x: any, context: any = x): ScopeSuccess {
+  return {
+    success: _atd_read_required_field('ScopeSuccess', 'success', _atd_read_bool, x['success'], x),
+    date: _atd_read_required_field('ScopeSuccess', 'date', _atd_read_string, x['date'], x),
+  };
+}
+
+export function writeTestEntrypoint(x: TestEntrypoint, context: any = x): any {
+  switch (x.kind) {
+    case 'GUI':
+      return ['GUI', writeGuiEntrypoint(x.value, x)]
+    case 'Test':
+      return ['Test', writeFoncTestEntrypoint(x.value, x)]
+  }
+}
+
+export function readTestEntrypoint(x: any, context: any = x): TestEntrypoint {
+  _atd_check_json_tuple(2, x, context)
+  switch (x[0]) {
+    case 'GUI':
+      return { kind: 'GUI', value: readGuiEntrypoint(x[1], x) }
+    case 'Test':
+      return { kind: 'Test', value: readFoncTestEntrypoint(x[1], x) }
+    default:
+      _atd_bad_json('TestEntrypoint', x, context)
+      throw new Error('impossible')
+  }
+}
+
 export function writeUpMessage(x: UpMessage, context: any = x): any {
   switch (x.kind) {
     case 'Ready':
       return 'Ready'
+    case 'Reload':
+      return 'Reload'
     case 'GuiEdit':
       return ['GuiEdit', ((x, context) => [writeTestList(x[0], x), _atd_write_bool(x[1], x)])(x.value, x)]
     case 'OpenInTextEditor':
@@ -1304,6 +1244,8 @@ export function readUpMessage(x: any, context: any = x): UpMessage {
     switch (x) {
       case 'Ready':
         return { kind: 'Ready' }
+      case 'Reload':
+        return { kind: 'Reload' }
       case 'OpenTestScopePicker':
         return { kind: 'OpenTestScopePicker' }
       default:
@@ -1342,7 +1284,7 @@ export function writeDownMessage(x: DownMessage, context: any = x): any {
     case 'TestRunResults':
       return ['TestRunResults', writeTestRunResultsMsg(x.value, x)]
     case 'TestScopeResult':
-      return ['TestScopeResult', ((x, context) => [writeTestScopeResult(x[0], x), _atd_write_int(x[1], x)])(x.value, x)]
+      return ['TestScopeResult', ((x, context) => [writeTestEntrypoint(x[0], x), writeScopeSuccess(x[1], x), _atd_write_int(x[2], x)])(x.value, x)]
     case 'ConfirmResult':
       return ['ConfirmResult', writeConfirmResult(x.value, x)]
     case 'AllTests':
@@ -1358,7 +1300,7 @@ export function readDownMessage(x: any, context: any = x): DownMessage {
     case 'TestRunResults':
       return { kind: 'TestRunResults', value: readTestRunResultsMsg(x[1], x) }
     case 'TestScopeResult':
-      return { kind: 'TestScopeResult', value: ((x, context): [TestScopeResult, number /*int*/] => { _atd_check_json_tuple(2, x, context); return [readTestScopeResult(x[0], x), _atd_read_int(x[1], x)] })(x[1], x) }
+      return { kind: 'TestScopeResult', value: ((x, context): [TestEntrypoint, ScopeSuccess, number /*int*/] => { _atd_check_json_tuple(3, x, context); return [readTestEntrypoint(x[0], x), readScopeSuccess(x[1], x), _atd_read_int(x[2], x)] })(x[1], x) }
     case 'ConfirmResult':
       return { kind: 'ConfirmResult', value: readConfirmResult(x[1], x) }
     case 'AllTests':
@@ -1367,22 +1309,6 @@ export function readDownMessage(x: any, context: any = x): DownMessage {
       _atd_bad_json('DownMessage', x, context)
       throw new Error('impossible')
   }
-}
-
-export function writeGuiEntrypoint(x: GuiEntrypoint, context: any = x): any {
-  return {
-    'scope': _atd_write_required_field('GuiEntrypoint', 'scope', _atd_write_string, x.scope, x),
-    'title': _atd_write_optional_field(_atd_write_string, x.title, x),
-    'description': _atd_write_optional_field(_atd_write_string, x.description, x),
-  };
-}
-
-export function readGuiEntrypoint(x: any, context: any = x): GuiEntrypoint {
-  return {
-    scope: _atd_read_required_field('GuiEntrypoint', 'scope', _atd_read_string, x['scope'], x),
-    title: _atd_read_optional_field(_atd_read_string, x['title'], x),
-    description: _atd_read_optional_field(_atd_read_string, x['description'], x),
-  };
 }
 
 export function writeFoncTestEntrypoint(x: FoncTestEntrypoint, context: any = x): any {
@@ -1395,28 +1321,6 @@ export function readFoncTestEntrypoint(x: any, context: any = x): FoncTestEntryp
   return {
     scope: _atd_read_required_field('FoncTestEntrypoint', 'scope', _atd_read_string, x['scope'], x),
   };
-}
-
-export function writeTestEntrypoint(x: TestEntrypoint, context: any = x): any {
-  switch (x.kind) {
-    case 'GUI':
-      return ['GUI', writeGuiEntrypoint(x.value, x)]
-    case 'Test':
-      return ['Test', writeFoncTestEntrypoint(x.value, x)]
-  }
-}
-
-export function readTestEntrypoint(x: any, context: any = x): TestEntrypoint {
-  _atd_check_json_tuple(2, x, context)
-  switch (x[0]) {
-    case 'GUI':
-      return { kind: 'GUI', value: readGuiEntrypoint(x[1], x) }
-    case 'Test':
-      return { kind: 'Test', value: readFoncTestEntrypoint(x[1], x) }
-    default:
-      _atd_bad_json('TestEntrypoint', x, context)
-      throw new Error('impossible')
-  }
 }
 
 export function writeNoInputScopeEntrypoint(x: NoInputScopeEntrypoint, context: any = x): any {

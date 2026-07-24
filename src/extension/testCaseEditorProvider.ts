@@ -313,6 +313,7 @@ export class TestCaseEditorProvider
           scopeStr !== undefined && parsed.kind === 'Results'
             ? parsed.value.find((t) => t.testing_scope === scopeStr)
             : undefined;
+        logger.log('Use trace provider to open');
         await TraceEditorProvider.openWith(document.uri, {
           scope: scopeStr,
           test,
@@ -524,6 +525,8 @@ export class TestCaseEditorProvider
           throw new Error(`Unexpected SpecificTestRequest`);
         case 'OpenInTestEditor':
           throw new Error(`Unexpected OpenInTestEditor`);
+        case 'Reload':
+          throw new Error('Unexpected Reload');
         default:
           assertUnreachable(typed_msg);
       }

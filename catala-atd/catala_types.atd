@@ -101,6 +101,8 @@ type runtime_value = {
   attrs: attr_def list;
 }
 
+type scope_real_var = { name: string; ?real_value: runtime_value option }
+
 (* Test data *)
 
 type value_def = {
@@ -124,33 +126,17 @@ type test = {
   ~variables: (string * runtime_value) list <json repr="object"> <ts repr="map">;
     (* Expected variable values declared via #[testcase.variable = <var> = <lit>] *)
   description: string;
-  ?test_date: string option;
-  ?test_success: bool option;
   title: string;
 }
-
-type test_state = [ Success | Loading | Failed | JustFailed | Unknown ]
-
-type test_sum = {
-  testing_scope: string;
-  ?scope_tested: scope_def option;
-  description: string;
-  title: string;
-  ?test_date: string option;
-}
-
-type test_macro = [
-  | GUI of test
-  | Test of test_sum
-]
 
 (* A test as displayed in the 'debug all tests' panel: the test itself
    (GUI or plain), along with the run metadata that is not intrinsic to
    the test (which file it lives in and its last run result). *)
 type test_debugger = {
-  success: test_state;
   filename: string;
-  test: test_macro;
+  test: test_entrypoint;
+  ?success: bool option;
+  ?date: string option;
 }
 
 type test_run = {
@@ -196,12 +182,13 @@ type test_result = {
   coverage: coverage;
 }
 
-type test_scope_result = [
-  | Error of string (* System error while attempting to run the test *)
-  | ScopeTest of scope_test_result (* Ok means 'the test was run' -- there could be assertion failures *)
-  | GuiTest of (test * bool)
-  | Cancelled
-]
+
+type gui_entrypoint = {
+   scope_tested : string;
+   scope: string;
+   ?title: string option;
+   ?description : string option;
+}
 
 type test_debugger_list = test_debugger list
 
@@ -284,8 +271,19 @@ type confirm_result = {
   confirmed: bool;
 }
 
+type scope_success = {
+  success: bool;
+  date: string;
+}
+
+type test_entrypoint = [
+  | GUI of gui_entrypoint
+  | Test of fonc_test_entrypoint
+]
+
 type up_message = [
   | Ready
+  | Reload
   | GuiEdit of (test_list * bool) (* bool: 'edit may be batched' *)
   | OpenInTextEditor of string option (* filename *)
   | TestRunRequest of test_run_request
@@ -299,27 +297,16 @@ type up_message = [
 type down_message = [
   | Update of parse_results
   | TestRunResults of test_run_results_msg
-  | TestScopeResult of (test_scope_result * int)
+  | TestScopeResult of (test_entrypoint * scope_success *  int)
   | ConfirmResult of confirm_result
   | AllTests of test_debugger_list
 ]
 
 (* List entrypoints *)
 
-type gui_entrypoint = {
-   scope : string;
-   ?title: string option;
-   ?description : string option;
-}
-
 type fonc_test_entrypoint = {
    scope : string;
 }
-
-type test_entrypoint = [
-  | GUI of gui_entrypoint
-  | Test of fonc_test_entrypoint
-]
 
 type no_input_scope_entrypoint = {
   scope: string;

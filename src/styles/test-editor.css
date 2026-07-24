@@ -365,6 +365,7 @@
 }
 
 .test-item .test-descr {
+  white-space: pre-wrap;
   font-size: 1.7em;
 }
 
@@ -469,10 +470,12 @@
 }
 
 .test-list {
+  display: block;
   border-collapse: collapse;
   font-family: sans-serif;
   font-size: 1em;
   letter-spacing: 1px;
+  overflow-x: auto;
 }
 
 .test-list thead {
@@ -490,6 +493,14 @@
 
 .test-list tbody > tr:nth-of-type(even) {
   background-color: var(--vscode-list-hoverBackground);
+}
+
+.test-list tbody > tr.justFailed {
+  background-color: color-mix(
+    in srgb,
+    var(--vscode-errorForeground) 25%,
+    transparent
+  );
 }
 
 /* Filter */
@@ -521,8 +532,7 @@
   margin-left: auto;
   align-self: center;
   zoom: 1.4;
-  width: 240px;
-  max-width: 100%;
+  min-width: 240px;
 }
 
 .no-tests {
@@ -576,8 +586,7 @@
   /* justify-content: center; */
 }
 
-.highlight {
-  /* un cycle = allumé puis éteint ; répété 4 fois (2 s au total), bascule nette */
+/* .highlight {
   animation: blink 1s step-end 0s 4;
 }
 
@@ -589,7 +598,7 @@
   50% {
     background-color: var(--vscode-list-hoverBackground);
   }
-}
+} */
 
 .tests-button {
   display: flex;
@@ -608,4 +617,15 @@
 
 .vscode-button:hover {
   background-color: var(--vscode-button-hoverBackground);
+}
+
+/* Expected variables section: value + remove button row */
+.expected-variable-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.expected-variable-value {
+  flex: 1;
 }
