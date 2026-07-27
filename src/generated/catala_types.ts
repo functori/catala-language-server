@@ -275,7 +275,7 @@ export type UpMessage =
 | { kind: 'GuiEdit'; value: [TestList, boolean] }
 | { kind: 'OpenInTextEditor'; value: Option<string> }
 | { kind: 'TestRunRequest'; value: TestRunRequest }
-| { kind: 'SpecificTestRequest'; value: number /*int*/ }
+| { kind: 'SpecificTestRequest'; value: number /*int*/[] }
 | { kind: 'TestGenerateRequest'; value: TestGenerateRequest }
 | { kind: 'OpenTestScopePicker' }
 | { kind: 'ConfirmRequest'; value: ConfirmRequest }
@@ -1227,7 +1227,7 @@ export function writeUpMessage(x: UpMessage, context: any = x): any {
     case 'TestRunRequest':
       return ['TestRunRequest', writeTestRunRequest(x.value, x)]
     case 'SpecificTestRequest':
-      return ['SpecificTestRequest', _atd_write_int(x.value, x)]
+      return ['SpecificTestRequest', _atd_write_array(_atd_write_int)(x.value, x)]
     case 'TestGenerateRequest':
       return ['TestGenerateRequest', writeTestGenerateRequest(x.value, x)]
     case 'OpenTestScopePicker':
@@ -1263,7 +1263,7 @@ export function readUpMessage(x: any, context: any = x): UpMessage {
       case 'TestRunRequest':
         return { kind: 'TestRunRequest', value: readTestRunRequest(x[1], x) }
       case 'SpecificTestRequest':
-        return { kind: 'SpecificTestRequest', value: _atd_read_int(x[1], x) }
+        return { kind: 'SpecificTestRequest', value: _atd_read_array(_atd_read_int)(x[1], x) }
       case 'TestGenerateRequest':
         return { kind: 'TestGenerateRequest', value: readTestGenerateRequest(x[1], x) }
       case 'ConfirmRequest':

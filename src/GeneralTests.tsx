@@ -10,13 +10,16 @@ import { VscodeTextfield } from '@vscode-elements/react-elements';
 import { assertUnreachable } from './shared/util';
 import { setVsCodeApi } from './shared/webviewApi';
 
+type FilteredTests = {
+  test: TestMacro;
+  index: number;
+}[];
+
 type TestGridArg = {
   vscode: WebviewApi<unknown>;
-  tests: TestMacro[];
+  filtered: FilteredTests;
   grid: boolean;
-  filter: string;
   filterScope: string[];
-  filterGui: boolean;
   onRun: (id: number) => void;
 };
 
@@ -41,7 +44,7 @@ type TestItemArg = {
 };
 
 type FilterArg = {
-  tests: TestDebugger[] | undefined;
+  tests: FilteredTests | undefined;
   filter: string;
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
@@ -51,7 +54,7 @@ type FilterArg = {
 };
 
 type ScopeFilterArg = {
-  tests: TestDebugger[] | undefined;
+  tests: FilteredTests;
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
 };
@@ -211,7 +214,9 @@ function OpenTextEditor({
 
 function TestItem({ vscode, test, num, onRun }: TestItemArg): ReactElement {
   return (
-    <Box className="test-item">
+    <Box
+      className={`test-item${test.state == 'JustFailed' ? ' justFailed' : ''}`}
+    >
       <div className="test-item-header">
         <b className="test-title">{testTitle(test)}</b>
         <span className="test-number">
@@ -531,20 +536,12 @@ function TestList({ vscode, onRun, tests }: CardGridArg): ReactElement {
 
 function TestsGrid({
   vscode,
-  tests,
+  filtered,
   grid,
-  filter,
   filterScope,
-  filterGui,
   onRun,
 }: TestGridArg): ReactElement {
-  const filtered = Array.from(tests)
-    .map((test, index) => ({ test, index }))
-    .filter(({ test, index }) =>
-      matchFilter(test, index, filter, filterScope, filterGui)
-    );
-
-  if (filtered.length === 0) {
+  if (filtered == undefined || filtered.length == 0) {
     return (
       <div className="no-tests">
         <span>
@@ -575,8 +572,8 @@ function TestsGrid({
   );
 }
 
-function scopesFromTests(tests: TestDebugger[]): string[] {
-  let allScopes = tests?.map((test, _) => testingScope(test)).sort();
+function scopesFromTests(tests: FilteredTests): string[] {
+  let allScopes = tests?.map((test, _) => testingScope(test.test)).sort();
   let scopes = [];
   let prev = '';
   for (let index = 0; index < allScopes!.length; index++) {
@@ -742,6 +739,14 @@ function Loading({
   );
 }
 
+function noFilter(
+  filter: string,
+  filterScope: string[],
+  filterGui: boolean
+): boolean {
+  return filter == '' && filterScope.length == 0 && filterGui == false;
+}
+
 // Total duration of the `highlight` blink animation (`blink 1s ... 4` = 1s ×
 // 4 iterations), plus a small margin so the timer settles just after the
 // animation has visually finished.
@@ -843,9 +848,15 @@ export default function GeneralTests({
       )
     );
     vscode.postMessage(
-      writeUpMessage({ kind: 'SpecificTestRequest', value: id })
+      writeUpMessage({ kind: 'SpecificTestRequest', value: [id] })
     );
   };
+
+  const filteredTest = tests
+    ?.map((test, index) => ({ test, index }))
+    .filter(({ test, index }) =>
+      matchFilter(test, index, filter, filterScope, filterGui)
+    );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
@@ -862,13 +873,31 @@ export default function GeneralTests({
           <RunAllTests
             onRun={() => {
               if (tests) {
-                for (let index = 0; index < tests.length; index++) {
-                  let test = tests[index];
-                  if (
-                    matchFilter(test, index, filter, filterScope, filterGui)
-                  ) {
-                    onRun(index);
-                  }
+                if (noFilter(filter, filterScope, filterGui)) {
+                  setTests((oldTests) =>
+                    oldTests?.map((test) => {
+                      return { ...test, state: 'Loading' };
+                    })
+                  );
+                  vscode.postMessage(
+                    writeUpMessage({ kind: 'SpecificTestRequest', value: [] })
+                  );
+                } else if (filteredTest) {
+                  let indexes = filteredTest.map(({ index }) => index);
+                  setTests((oldTests) => {
+                    if (oldTests) {
+                      for (const index of indexes) {
+                        oldTests[index].state = 'Loading';
+                      }
+                    }
+                    return oldTests;
+                  });
+                  vscode.postMessage(
+                    writeUpMessage({
+                      kind: 'SpecificTestRequest',
+                      value: indexes,
+                    })
+                  );
                 }
               }
             }}
@@ -876,9 +905,7 @@ export default function GeneralTests({
         </div>
       </div>
       <Filter
-        tests={tests?.filter((test, index) =>
-          matchFilter(test, index, filter, [], filterGui)
-        )}
+        tests={filteredTest}
         filter={filter}
         setFilter={setFilter}
         setFilterScope={setFilterScope}
@@ -927,16 +954,14 @@ export default function GeneralTests({
           />
         </div>
       </div>
-      {tests === undefined ? (
+      {filteredTest === undefined ? (
         <Loading size="medium" />
       ) : (
         <TestsGrid
           vscode={vscode}
-          tests={tests}
+          filtered={filteredTest}
           grid={grid}
-          filter={filter}
           filterScope={filterScope}
-          filterGui={filterGui}
           onRun={onRun}
         />
       )}

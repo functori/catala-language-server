@@ -350,6 +350,14 @@
   box-sizing: border-box;
 }
 
+.test-item.justFailed {
+  background-color: color-mix(
+    in srgb,
+    var(--vscode-errorForeground) 25%,
+    transparent
+  );
+}
+
 .test-item .test-item-header {
   position: relative;
   display: flex;
@@ -471,6 +479,7 @@
 
 .test-list {
   display: block;
+  min-width: 100%;
   border-collapse: collapse;
   font-family: sans-serif;
   font-size: 1em;

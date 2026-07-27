@@ -287,7 +287,7 @@ type up_message = [
   | GuiEdit of (test_list * bool) (* bool: 'edit may be batched' *)
   | OpenInTextEditor of string option (* filename *)
   | TestRunRequest of test_run_request
-  | SpecificTestRequest of int
+  | SpecificTestRequest of int list
   | TestGenerateRequest of test_generate_request
   | OpenTestScopePicker
   | ConfirmRequest of confirm_request
