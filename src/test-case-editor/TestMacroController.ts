@@ -157,11 +157,13 @@ export class TestMacroController {
             await this.testQueue.add(async () => {
               for (const [index, test] of testToRun) {
                 const relFilename = path.relative(cwd!, test.filename);
-                let dirs = relFilename.split('/');
+                // Split on both separators: `path.relative` uses the platform
+                // separator (`\` on Windows, `/` elsewhere).
+                let dirs = relFilename.split(/[/\\]/);
                 let items = testController.items;
-                let filename = cwd;
+                let filename = cwd!;
                 for (const dir of dirs) {
-                  filename = `${filename}/${dir}`;
+                  filename = path.join(filename, dir);
                   let testId = new TestId(vscode.Uri.file(filename));
                   let testItem = items.get(testId.id);
                   if (testItem != undefined) {

@@ -372,8 +372,11 @@
   font-size: 2em;
 }
 
-.test-item .test-descr {
+.test-descr {
   white-space: pre-wrap;
+}
+
+.test-item .test-descr {
   font-size: 1.7em;
 }
 
@@ -478,8 +481,6 @@
 }
 
 .test-list {
-  display: block;
-  min-width: 100%;
   border-collapse: collapse;
   font-family: sans-serif;
   font-size: 1em;
