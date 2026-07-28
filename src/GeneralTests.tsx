@@ -43,6 +43,10 @@ type TestItemArg = {
   onRun: (id: number) => void;
 };
 
+/**
+ * Type to build the Filter component with filter on Scope, on description and
+ * wether the test is a Catala Test Case editor generated test
+ */
 type FilterArg = {
   tests: FilteredTests | undefined;
   filter: string;
@@ -59,6 +63,10 @@ type ScopeFilterArg = {
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
 };
 
+/**
+ * Component to run a bunch of tests, the run function is given in argument
+ * so that we can choose the function to give
+ */
 function RunAllTests({
   onRun,
 }: {
@@ -81,6 +89,10 @@ function RunAllTests({
   );
 }
 
+/**
+ * Component that open a new window to create a catala file and generates a test
+ * in it.
+ */
 function AddNewTest({ vscode }: { vscode: WebviewApi<unknown> }): ReactElement {
   return (
     <span
@@ -106,6 +118,10 @@ function SeparationLine(): ReactElement {
   return <div className="separation-line" />;
 }
 
+/**
+ * Return the correct symbol depending on a state, usually the
+ * given state comes from an object TestMacro
+ */
 function testState(success: TestState): ReactElement {
   switch (success.state) {
     case 'Success':
@@ -143,6 +159,11 @@ function testState(success: TestState): ReactElement {
   }
 }
 
+/**
+ * The component RunIcon is a little icon Run to run a test on a Catala file
+ * A className can be given in parameter so that we can reuse the same component
+ * in different case.
+ */
 function RunIcon({
   className,
   onRun,
@@ -161,6 +182,10 @@ function RunIcon({
   );
 }
 
+/**
+ * Component that represents a button to open the Catala Test Case editor
+ * on a Catala file with a test.
+ */
 function OpenGUI({
   vscode,
   filename,
@@ -189,6 +214,11 @@ function OpenGUI({
   );
 }
 
+/**
+ * Component that represents a button to open a Catala file with a test
+ * This button is here for Catala files with test but are not generated with
+ * the Catala test case editor
+ */
 function OpenTextEditor({
   vscode,
   filename,
@@ -212,6 +242,12 @@ function OpenTextEditor({
   );
 }
 
+/**
+ * This is the component used in the Grid representation of the list of tests.
+ * It has some logic on wether the test is a Catala Testcase test or not but it's
+ * mostly items with css to render them poperly
+ *
+ */
 function TestItem({ vscode, test, num, onRun }: TestItemArg): ReactElement {
   return (
     <Box
@@ -251,6 +287,12 @@ function TestItem({ vscode, test, num, onRun }: TestItemArg): ReactElement {
   );
 }
 
+/**
+ * This function tells if the rendered span overflows or not,
+ * it's useful to know if we want to display an icon to expand or not the view
+ * @param event represent the current span
+ * @returns if the span overflow
+ */
 function isOverflowActive(event: HTMLSpanElement): boolean {
   return (
     event.offsetHeight < event.scrollHeight ||
@@ -258,15 +300,25 @@ function isOverflowActive(event: HTMLSpanElement): boolean {
   );
 }
 
+/**
+ * The component to represent a Line in the table representation of the tests,
+ * it has some logic due to the description that can overflow
+ */
 function TestLine({
   vscode,
   test,
   num,
   onRun,
 }: TestItemArg & { expected: string[] }): ReactElement {
+  // This textRef is used on the description span, it will be set when
+  // the span is rendered so that we can know if the span overflows or not
   const textRef = useRef<HTMLSpanElement>(null);
   const [overflowActive, setOverflowActive] = useState(false);
+  // Tells if the description span is expanded or not if it is change some class
+  // and change the icon next to the text
   let [expanded, setExpanded] = useState<boolean>(false);
+
+  // set the overflow active is the current rendered span overflows
   useEffect(() => {
     if (textRef.current != null && isOverflowActive(textRef.current!)) {
       setOverflowActive(true);
@@ -316,12 +368,6 @@ function TestLine({
           />
         )}
       </td>
-      {/* <>{expected.map((inter) => {
-        if (test.test.kind == "GUI") {
-          let runtimeValue = test.test.value.variables.get(inter);
-          return <td>{runtimeValue ? formatRuntimeValue(runtimeValue) : '_'}</td>;
-        }
-      })}</> */}
       <td>{test.date ?? '??/??/????'}</td>
       <td>{testState(test)}</td>
       <td>
@@ -422,6 +468,17 @@ function testMacro(test: TestDebugger, previousSuccess: boolean): TestMacro {
   };
 }
 
+/**
+ * Function to verify if a test passes all the filters
+ * @param test checks the filters on this test
+ * @param index the index of the test so that the user
+ * can also search on the index
+ * @param filterBar the content of the search bar
+ * @param filterScope the different Scopes that are filtered
+ * @param filterGui tells if we want tests that are generated from the
+ * testcase editor
+ * @returns true if the tests matches conditions depending on the filters
+ */
 function matchFilter(
   test: TestDebugger,
   index: number,
@@ -528,9 +585,6 @@ function TestList({ vscode, onRun, tests }: CardGridArg): ReactElement {
       let scope = element.test.test.value.scope_tested;
       let [expected, scopeList] = map.get(scope) ?? [new Set<string>(), []];
       scopeList.push(element);
-      // for (const key of element.test.test.value.variables.keys()) {
-      //   expected.add(key);
-      // }
       map.set(scope, [expected, scopeList]);
     } else {
       not_gui.push(element);
