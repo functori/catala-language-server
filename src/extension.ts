@@ -437,13 +437,6 @@ export async function activate(
     )
   );
 
-  let tree = new tree_view([]);
-
-  // Open catala tests
-  context.subscriptions.push(
-    vscode.window.registerTreeDataProvider('catala.selectSwitch', tree)
-  );
-
   let command_books: Command = {
     title: 'Open Catala book',
     command: 'vscode.open',

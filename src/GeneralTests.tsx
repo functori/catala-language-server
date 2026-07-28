@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import { useEffect, useRef, useState, type ReactElement } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 
 import { type WebviewApi } from 'vscode-webview';
@@ -251,19 +251,70 @@ function TestItem({ vscode, test, num, onRun }: TestItemArg): ReactElement {
   );
 }
 
+function isOverflowActive(event: HTMLSpanElement): boolean {
+  return (
+    event.offsetHeight < event.scrollHeight ||
+    event.offsetWidth < event.scrollWidth
+  );
+}
+
 function TestLine({
   vscode,
   test,
   num,
   onRun,
 }: TestItemArg & { expected: string[] }): ReactElement {
-  console.log(`Log de console.log ${test.success}`);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [overflowActive, setOverflowActive] = useState(false);
+  let [expanded, setExpanded] = useState<boolean>(false);
+  useEffect(() => {
+    if (textRef.current != null && isOverflowActive(textRef.current!)) {
+      setOverflowActive(true);
+      return;
+    }
+
+    setOverflowActive(false);
+  }, [isOverflowActive]);
+
   return (
     <tr className={test.state == 'JustFailed' ? 'justFailed' : ''}>
-      <th>{num + 1}</th>
+      <th>
+        <a
+          href=""
+          onClick={(event) => {
+            event.preventDefault();
+            vscode.postMessage(
+              writeUpMessage({ kind: 'OpenInTestEditor', value: test.filename })
+            );
+          }}
+        >
+          {num + 1}
+        </a>
+      </th>
       <td>{testingScope(test)}</td>
-      <td>
-        <span className="test-descr">{testDescription(test)}</span>
+      <td
+        className={overflowActive ? `descr-column` : ''}
+        onClick={(event) => {
+          if (overflowActive) {
+            let selection = window.getSelection()?.toString();
+            if (selection == undefined || selection.length == 0) {
+              event.preventDefault();
+              setExpanded((oldExpanded) => !oldExpanded);
+            }
+          }
+        }}
+      >
+        <span
+          ref={textRef}
+          className={`test-descr ${expanded ? 'text' : 'test-descr-hidden'}`}
+        >
+          {testDescription(test)}
+        </span>
+        {overflowActive && (
+          <span
+            className={`codicon codicon-fold-${expanded ? 'up' : 'down'}`}
+          />
+        )}
       </td>
       {/* <>{expected.map((inter) => {
         if (test.test.kind == "GUI") {
