@@ -47,7 +47,7 @@ type TestItemArg = {
  * wether the test is a Catala Test Case editor generated test
  */
 type FilterArg = {
-  tests: FilteredTests | undefined;
+  tests: TestMacro[] | undefined;
   filter: string;
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
@@ -57,7 +57,7 @@ type FilterArg = {
 };
 
 type ScopeFilterArg = {
-  tests: FilteredTests;
+  tests: FilteredTests | undefined;
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
 };
@@ -669,7 +669,7 @@ function TestsGrid({
 }
 
 function scopesFromTests(tests: FilteredTests): string[] {
-  let allScopes = tests?.map((test, _) => testingScope(test.test)).sort();
+  let allScopes = tests?.map((test) => testingScope(test.test)).sort();
   let scopes = [];
   let prev = '';
   for (let index = 0; index < allScopes!.length; index++) {
@@ -743,6 +743,13 @@ function Filter({
     setFilterScope([]);
     setFilter('');
   };
+
+  const filteredTests = tests
+    ?.map((test, index) => ({ test, index }))
+    .filter(({ test, index }) =>
+      matchFilter(test, index, filter, [], filterGui)
+    );
+
   return (
     <div className="box-filter">
       <div className="filter-title">
@@ -787,7 +794,7 @@ function Filter({
             sx={{ '.MuiFormControlLabel-label': { color: 'gray' } }}
           />
           <ScopeFilter
-            tests={tests}
+            tests={filteredTests}
             filterScope={filterScope}
             setFilterScope={setFilterScope}
           />
@@ -1001,7 +1008,7 @@ export default function GeneralTests({
         </div>
       </div>
       <Filter
-        tests={filteredTest}
+        tests={tests}
         filter={filter}
         setFilter={setFilter}
         setFilterScope={setFilterScope}
