@@ -181,19 +181,12 @@ function RunIcon({
 function OpenGUI({
   vscode,
   filename,
-  success,
 }: {
   vscode: WebviewApi<unknown>;
   filename: string;
-  success: TestState;
 }): ReactElement {
-  let [first, setFirst] = useState<boolean>(true);
   return (
     <span
-      onAnimationEnd={(event) => {
-        event.preventDefault();
-        setFirst(false);
-      }}
       onClick={(event) => {
         event.preventDefault();
         vscode.postMessage(
@@ -268,7 +261,7 @@ function TestItem({ vscode, test, num, onRun }: TestItemArg): ReactElement {
           />
         </span>
         {isGui(test) ? (
-          <OpenGUI vscode={vscode} filename={test.filename} success={test} />
+          <OpenGUI vscode={vscode} filename={test.filename} />
         ) : (
           <OpenTextEditor vscode={vscode} filename={test.filename} />
         )}
@@ -372,7 +365,7 @@ function TestLine({
       </td>
       <td>
         {isGui(test) ? (
-          <OpenGUI vscode={vscode} filename={test.filename} success={test} />
+          <OpenGUI vscode={vscode} filename={test.filename} />
         ) : (
           <OpenTextEditor vscode={vscode} filename={test.filename} />
         )}
