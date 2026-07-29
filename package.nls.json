@@ -1,6 +1,7 @@
 {
   "command.catala.openWithTestEditor.title": "Open with Catala Test Editor",
   "command.catala.debugAllTests.title": "Debug Catala tests",
+  "command.catala.openWithTraceEditor.title": "Open Catala trace debugger",
   "command.catala.showExceptions.title": "Show definition tree",
   "command.catala.rescanProjects.title": "Scan all files of every project",
   "command.catala.showExceptionsAtCursor.title": "Show definition tree",
