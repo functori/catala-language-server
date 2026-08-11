@@ -16,7 +16,6 @@ import {
   generate,
   serializeInputs,
 } from '../test-case-editor/testCaseCompilerInterop';
-import { logger } from '../extension/logger';
 
 // This class contains the 'backend' part of the test case editor that
 // sets up the UI, provide initial data and exchanges messages with the
