@@ -95,10 +95,11 @@ function parseAs(kind: string, s: string): TraceValue | undefined {
   }
 }
 
+// Only the presence of a name matters here, hence the value being left opaque.
 function filterExpectedVariables(
   variables: TraceVariable[],
   outputs: Record<string, TraceValue>,
-  testVariables: Map<string, TraceValue | null>,
+  testVariables: Map<string, unknown>,
   prefix = ''
 ): TraceVariable[] {
   const out: TraceVariable[] = [];
@@ -327,6 +328,8 @@ function VariableRow({
   );
 }
 
+type AddVariable = (path: string, tv: TraceValue | null) => void;
+
 function filterByName(vars: TraceVariable[], q: string): TraceVariable[] {
   const out: TraceVariable[] = [];
   for (const v of vars) {
@@ -347,7 +350,7 @@ function VariableCatalog({
 }: {
   trVariables: TraceVariable[];
   outputs: Record<string, TraceValue>;
-  onAdd(path: string, tv: TraceValue | null): void;
+  onAdd: AddVariable;
 }): ReactElement {
   const intl = useIntl();
   const [query, setQuery] = useState('');
@@ -458,7 +461,7 @@ function StepRow({
 }: {
   node: Extract<TraceVariable, { kind: 'step' }>;
   crumbs: string[];
-  onAdd(path: string, tv: TraceValue | null): void;
+  onAdd: AddVariable;
   filtering?: boolean;
 }): ReactElement {
   const [open, setOpen] = useState(false);
@@ -539,7 +542,7 @@ function StateRow({
   varName: string;
   nodes: TraceVariable[];
   crumbs: string[];
-  onAdd(path: string, tv: TraceValue | null): void;
+  onAdd: AddVariable;
   filtering?: boolean;
 }): ReactElement {
   const [open, setOpen] = useState(false);
@@ -592,7 +595,7 @@ function ValueRow({
   node: Extract<TraceVariable, { kind: 'value' }>;
   crumbs: string[];
   padding?: boolean | undefined;
-  onAdd(path: string, tv: TraceValue | null): void;
+  onAdd: AddVariable;
 }): ReactElement | null {
   const intl = useIntl();
   const [input, setInput] = useState('');
