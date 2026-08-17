@@ -124,6 +124,11 @@ type test = {
   test_inputs: test_inputs;
   test_outputs: test_outputs;
   variables: (string * runtime_value option) list <json repr="object"> <ts repr="map">;
+  (* Where each auxiliary variable was picked in the trace JSON, e.g.
+     "[0].trace[0].trace[6]". Keyed by the same names as [variables], but
+     independent from it: a variable may have a value and no path, or the
+     reverse. *)
+  ~variable_paths: (string * string) list <json repr="object"> <ts repr="map">;
   description: string;
   title: string;
 }

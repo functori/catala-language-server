@@ -25,6 +25,7 @@ type Pos.attr += TestDescription of string
 type Pos.attr += TestTitle of string
 type Pos.attr += ArrayItemLabel of string
 type Pos.attr += ExpectedVariable of string
+type Pos.attr += ExpectedVariablePath of string
 
 let register_attributes () =
   Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["uid"]
@@ -65,7 +66,14 @@ let register_attributes () =
     (fun ~pos:_ value ->
       match value with
       | Shared_ast.String (s, _pos) -> Some (ExpectedVariable s)
-      | _ -> failwith "unexpected variable label")
+      | _ -> failwith "unexpected variable label");
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["variable"; "path"]
+    ~contexts:(function
+      | Desugared.Name_resolution.ScopeDecl -> true | _ -> false)
+    (fun ~pos:_ value ->
+      match value with
+      | Shared_ast.String (s, _pos) -> Some (ExpectedVariablePath s)
+      | _ -> failwith "unexpected variable path")
 
 let to_relative (p : File.t) = File.make_relative_to ~dir:(Sys.getcwd ()) p
 
@@ -611,6 +619,7 @@ let get_scope_test
     test_outputs;
     test_inputs;
     variables = [];
+    variable_paths = [];
     description;
     title;
   }
@@ -917,6 +926,14 @@ let parse_expected_variable (s : string) :
     if value = "" then Some (name, None)
     else Some (name, Some (runtime_value_of_string value))
 
+let parse_expected_variable_path (s : string) : (string * string) option =
+  match String.split_on_char ':' s with
+  | [expected; path] ->
+    let name = String.trim expected in
+    let value_path = String.trim path in
+    if value_path = "" then None else Some (name, value_path)
+  | _ -> None
+
 let get_catala_test (prg, naming_ctx) testing_scope_name =
   let testing_scope =
     ScopeName.Map.find testing_scope_name prg.I.program_root.module_scopes
@@ -1073,7 +1090,20 @@ let get_catala_test (prg, naming_ctx) testing_scope_name =
       | ExpectedVariable s -> parse_expected_variable s
       | _ -> None)
   in
-  { base_test with O.test_inputs; test_outputs; variables; description; title }
+  let variable_paths =
+    Pos.get_attrs info (function
+      | ExpectedVariablePath s -> parse_expected_variable_path s
+      | _ -> None)
+  in
+  {
+    base_test with
+    O.test_inputs;
+    test_outputs;
+    variables;
+    variable_paths;
+    description;
+    title;
+  }
 
 let import_catala_tests (prg, naming_ctx) =
   List.map (get_catala_test (prg, naming_ctx)) (get_test_scopes prg)
@@ -1274,6 +1304,10 @@ let write_catala_test ppf t lang =
       in
       fprintf ppf "#[testcase.variable = %s]@\n" (String.quote payload))
     t.variables;
+  List.iter
+    (fun (var, value) ->
+      fprintf ppf "#[testcase.variable.path = \"%s: %s\"]@\n" var value)
+    t.variable_paths;
   fprintf ppf "@[<v 2>%s %s:@," strings.declaration_scope t.testing_scope;
   fprintf ppf "%s %s %s %s.%s@," strings.output_scope sscope_var strings.scope
     t.tested_scope.module_name t.tested_scope.name;

@@ -77,19 +77,23 @@ export default function TestEditor(props: Props): ReactElement {
     );
   }
 
-  function onVariablesChange(next: Map<string, TraceValue | null>): void {
+  function onVariablesChange(
+    next: Map<string, [string, TraceValue | null]>
+  ): void {
     const variables: Map<string, Option<RuntimeValue>> = new Map();
-    next.forEach((value, name) => {
+    const variable_paths: Map<string, string> = new Map();
+    next.forEach(([path, value], name) => {
       if (value === null) {
         variables.set(name, null);
       } else {
         const rv = traceValueToRuntime(value);
         if (rv !== undefined) {
           variables.set(name, { value: { value: rv, attrs: [] } });
+          variable_paths.set(name, path);
         }
       }
     });
-    props.onTestChange({ ...props.test, variables }, false);
+    props.onTestChange({ ...props.test, variables, variable_paths }, false);
   }
 
   const expectedSectionRef = useRef<HTMLDivElement>(null);

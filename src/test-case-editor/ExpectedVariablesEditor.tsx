@@ -12,6 +12,8 @@ import {
   traceValueFromRuntime,
   variablePath,
   variableSegment,
+  jsonPathToString,
+  type JsonPath,
 } from '../trace-editor/traceUtils';
 import type { Test } from '../generated/catala_types';
 
@@ -19,7 +21,7 @@ type Props = {
   test: Test;
   trace?: TraceElement[];
   runTrace?: boolean;
-  onChange(next: Map<string, TraceValue | null>): void;
+  onChange(next: Map<string, [string, TraceValue | null]>): void;
 };
 
 function isolateStateVariable(
@@ -95,10 +97,11 @@ function parseAs(kind: string, s: string): TraceValue | undefined {
   }
 }
 
+// Only the presence of a name matters here, hence the value being left opaque.
 function filterExpectedVariables(
   variables: TraceVariable[],
   outputs: Record<string, TraceValue>,
-  testVariables: Map<string, TraceValue | null>,
+  testVariables: Map<string, unknown>,
   prefix = ''
 ): TraceVariable[] {
   const out: TraceVariable[] = [];
@@ -124,11 +127,12 @@ export default function ExpectedVariablesEditor({
   onChange,
 }: Props): ReactElement {
   const [showCatalog, setShowCatalog] = useState(false);
-  const testVariables: Map<string, TraceValue | null> = new Map();
+  const testVariables: Map<string, [string, TraceValue | null]> = new Map();
   test.variables.forEach((rv, name) => {
     const value = rv !== null ? traceValueFromRuntime(rv.value) : null;
-    if (value !== undefined) {
-      testVariables.set(name, value);
+    const jsonPath = test.variable_paths.get(name);
+    if (value !== undefined && jsonPath !== undefined) {
+      testVariables.set(name, [jsonPath, value]);
     }
   });
 
@@ -146,9 +150,20 @@ export default function ExpectedVariablesEditor({
     return findTraceValue(path, trVariablesAux);
   }
 
-  function setVar(path: string, tv: TraceValue | null): void {
+  // `jsonPath` is only known when the variable is picked from the trace
+  // catalog; re-setting the value of a row already in the test keeps the path
+  // it was stored with.
+  function setVar(
+    path: string,
+    tv: TraceValue | null,
+    jsonPath?: JsonPath
+  ): void {
     const next = new Map(testVariables);
-    next.set(path, tv);
+    const jsonPathStr =
+      jsonPath !== undefined
+        ? jsonPathToString(jsonPath)
+        : (testVariables.get(path)?.[0] ?? '');
+    next.set(path, [jsonPathStr, tv]);
     onChange(next);
   }
 
@@ -167,7 +182,7 @@ export default function ExpectedVariablesEditor({
         <div className="composite-editor">
           {testVariables.size > 0 && (
             <div className="simple-items-vertical">
-              {[...testVariables.entries()].map(([path, tv]) => (
+              {[...testVariables.entries()].map(([path, [, tv]]) => (
                 <VariableRow
                   key={path}
                   name={path}
@@ -327,6 +342,14 @@ function VariableRow({
   );
 }
 
+// Adding a variable from the catalog carries the JSON location of the trace
+// node it was read from, so it can be stored alongside the value.
+type AddVariable = (
+  path: string,
+  tv: TraceValue | null,
+  jsonPath?: JsonPath
+) => void;
+
 function filterByName(vars: TraceVariable[], q: string): TraceVariable[] {
   const out: TraceVariable[] = [];
   for (const v of vars) {
@@ -347,7 +370,7 @@ function VariableCatalog({
 }: {
   trVariables: TraceVariable[];
   outputs: Record<string, TraceValue>;
-  onAdd(path: string, tv: TraceValue | null): void;
+  onAdd: AddVariable;
 }): ReactElement {
   const intl = useIntl();
   const [query, setQuery] = useState('');
@@ -458,7 +481,7 @@ function StepRow({
 }: {
   node: Extract<TraceVariable, { kind: 'step' }>;
   crumbs: string[];
-  onAdd(path: string, tv: TraceValue | null): void;
+  onAdd: AddVariable;
   filtering?: boolean;
 }): ReactElement {
   const [open, setOpen] = useState(false);
@@ -539,7 +562,7 @@ function StateRow({
   varName: string;
   nodes: TraceVariable[];
   crumbs: string[];
-  onAdd(path: string, tv: TraceValue | null): void;
+  onAdd: AddVariable;
   filtering?: boolean;
 }): ReactElement {
   const [open, setOpen] = useState(false);
@@ -592,7 +615,7 @@ function ValueRow({
   node: Extract<TraceVariable, { kind: 'value' }>;
   crumbs: string[];
   padding?: boolean | undefined;
-  onAdd(path: string, tv: TraceValue | null): void;
+  onAdd: AddVariable;
 }): ReactElement | null {
   const intl = useIntl();
   const [input, setInput] = useState('');
@@ -606,6 +629,7 @@ function ValueRow({
     return null;
   }
   const path = variablePath(crumbs.join('.'), node);
+  const jsonPath = node.source?.jsonPath;
   const computedStr = formatTraceValue(computed);
   const trimmed = input.trim();
   const addValue = trimmed ? parseAs(computed.kind, trimmed) : null;
@@ -659,7 +683,7 @@ function ValueRow({
           style={{ flexGrow: 1 }}
           onClick={() => {
             if (addValue !== undefined) {
-              onAdd(path, addValue);
+              onAdd(path, addValue, jsonPath);
               setInput('');
             }
           }}

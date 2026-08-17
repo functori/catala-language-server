@@ -40,15 +40,38 @@ export type TraceValue =
   | { kind: 'struct'; fields: Record<string, TraceValue> }
   | { kind: 'array'; values: [TraceValue, string | undefined][] };
 
+// Location of a node inside the raw trace JSON, e.g. `[3, 'trace', 0]` for
+// `json[3].trace[0]`. Building a variable path is lossy — `traceVariablesAux`
+// hoists nodes to their parent's level, `mergeSteps` collapses chains into a
+// single dotted name and `indexDuplicateSteps` numbers homonyms by their rank
+// in the *variable* tree — so the JSON location is carried along instead of
+// being reconstructed from the path afterwards, which is not possible.
+export type JsonPath = (string | number)[];
+
+export function jsonPathToString(path: JsonPath): string {
+  let acc: string = '';
+  for (let elt of path) {
+    if (typeof elt == 'string') {
+      acc += `.${elt}`;
+    } else if (typeof elt == 'number') {
+      acc += `[${elt}]`;
+    } else {
+      new Error('Unexpected type for a json path');
+    }
+  }
+  return acc;
+}
+
 export type TraceElement = {
   element: TraceKind;
   pos?: CodeLocation;
   value?: TraceValue;
   trace?: TraceElement[];
+  jsonPath: JsonPath;
 };
 
 export type TraceVariable =
-  | { kind: 'value'; name: string; value?: TraceValue }
+  | { kind: 'value'; name: string; value?: TraceValue; source?: TraceElement }
   | {
       kind: 'step';
       name: string;
@@ -57,6 +80,15 @@ export type TraceVariable =
       index?: number;
       source?: TraceElement;
     };
+
+// The step a test's variable paths are relative to, as returned by
+// `traceVariablesForTest`.
+export type TestedScope = {
+  variable: Extract<TraceVariable, { kind: 'step' }>;
+  // Path of that step in the whole variable tree: prepend it to a path coming
+  // from `traceVariablesForTest` to get one that is absolute.
+  path: string;
+};
 
 export type TraceTest = {
   testing_scope: string;
@@ -349,7 +381,10 @@ export function traceValueEqual(a: TraceValue, b: TraceValue): boolean {
   }
 }
 
-function traceElementFromJson(e: JsonValue): TraceElement | null {
+function traceElementFromJson(
+  e: JsonValue,
+  jsonPath: JsonPath
+): TraceElement | null {
   if (
     e === null ||
     typeof e !== 'object' ||
@@ -366,7 +401,9 @@ function traceElementFromJson(e: JsonValue): TraceElement | null {
   }
   const trace = Array.isArray(o.trace)
     ? o.trace
-        .map(traceElementFromJson)
+        .map((child, i) =>
+          traceElementFromJson(child, [...jsonPath, 'trace', i])
+        )
         .filter((x): x is TraceElement => x !== null)
     : undefined;
   return {
@@ -374,6 +411,7 @@ function traceElementFromJson(e: JsonValue): TraceElement | null {
     pos: o.pos as unknown as CodeLocation | undefined,
     value: o.value !== undefined ? traceValueFromJson(o.value) : undefined,
     trace,
+    jsonPath,
   };
 }
 
@@ -381,9 +419,29 @@ export function traceFromJson(trace: JsonValue): TraceElement[] | null {
   if (!Array.isArray(trace)) {
     return null;
   }
-  const elements = trace.map(traceElementFromJson);
+  const elements = trace.map((e, i) => traceElementFromJson(e, [i]));
   const looksLikeTrace = elements.every((e) => e !== null);
   return !looksLikeTrace ? null : (elements as TraceElement[]);
+}
+
+// Re-derives `jsonPath` for a tree that was built before the field existed
+// (the on-disk trace cache stores `TraceElement[]` verbatim, so entries written
+// by an older version lack it). The element tree mirrors the JSON one, so the
+// paths can be rebuilt from its shape.
+export function withJsonPaths(trace: TraceElement[]): TraceElement[] {
+  const walk = (elements: TraceElement[], prefix: JsonPath): TraceElement[] =>
+    elements.map((te, i) => {
+      const jsonPath = [...prefix, i];
+      return {
+        ...te,
+        jsonPath,
+        trace:
+          te.trace !== undefined
+            ? walk(te.trace, [...jsonPath, 'trace'])
+            : undefined,
+      };
+    });
+  return walk(trace, []);
 }
 
 function mergeSteps(l: TraceVariable[]): TraceVariable[] {
@@ -392,6 +450,9 @@ function mergeSteps(l: TraceVariable[]): TraceVariable[] {
     if (tv.kind === 'step') {
       const variables = mergeSteps(tv.variables);
       if (variables.length === 1 && variables[0].kind === 'step') {
+        // The merged segment keeps the *innermost* source, i.e. the node the
+        // value belongs to. The collapsed outer nodes are still reachable: they
+        // are the ancestors of `source.jsonPath` in the raw JSON.
         acc.push({ ...variables[0], name: `${tv.name}.${variables[0].name}` });
       } else {
         const vs = variables.filter(
@@ -431,6 +492,7 @@ function traceVariablesAux(
           kind: 'value',
           name: k.name,
           value: te.value,
+          source: te,
         });
       } else if (variables.length !== 0) {
         if (
@@ -440,7 +502,12 @@ function traceVariablesAux(
           te.value.kind !== 'struct' &&
           te.value.kind !== 'array'
         ) {
-          acc.push({ kind: 'value', name: k.name, value: te.value });
+          acc.push({
+            kind: 'value',
+            name: k.name,
+            value: te.value,
+            source: te,
+          });
         }
         acc.push({
           kind: 'step',
@@ -452,7 +519,7 @@ function traceVariablesAux(
       }
     } else {
       if (varCond && typeof k.name === 'string') {
-        acc.push({ kind: 'value', name: k.name, value: te.value });
+        acc.push({ kind: 'value', name: k.name, value: te.value, source: te });
       }
       if (te.trace !== undefined) {
         traceVariablesAux(te.trace, acc);
@@ -528,35 +595,41 @@ export function findTraceValue(
 
 function findScope(
   scope: string,
-  variables: TraceVariable[]
-): Extract<TraceVariable, { kind: 'step' }> | undefined {
+  variables: TraceVariable[],
+  prefix = ''
+): TestedScope | undefined {
   for (const v of variables) {
     if (v.kind === 'step') {
-      if (v.name.split('.').includes(scope)) return v;
-      const sc = findScope(scope, v.variables);
+      const path = variablePath(prefix, v);
+      if (v.name.split('.').includes(scope)) return { variable: v, path };
+      const sc = findScope(scope, v.variables, path);
       if (sc !== undefined) return sc;
     }
   }
 }
 
+// The returned variables are those of the tested scope, so the paths built from
+// them are relative to it; the third element is that anchor.
 export function traceVariablesForTest(
   trace: TraceElement[],
   scope: string
-): [TraceVariable[], Record<string, TraceValue>] {
+): [TraceVariable[], Record<string, TraceValue>, TestedScope?] {
   let variables: TraceVariable[] = [];
   let outputs: Record<string, TraceValue> = {};
+  let testedScope: TestedScope | undefined;
   if (trace !== undefined) {
-    const testedScope = findScope(scope, traceVariables(trace));
+    testedScope = findScope(scope, traceVariables(trace));
     if (testedScope !== undefined) {
-      variables = testedScope.variables;
-      if (testedScope.value?.kind === 'struct') {
-        outputs = testedScope.value.fields;
-      } else if (testedScope.value !== undefined) {
-        outputs = { output: testedScope.value };
+      const value = testedScope.variable.value;
+      variables = testedScope.variable.variables;
+      if (value?.kind === 'struct') {
+        outputs = value.fields;
+      } else if (value !== undefined) {
+        outputs = { output: value };
       }
     }
   }
-  return [variables, outputs];
+  return [variables, outputs, testedScope];
 }
 
 function readTraceTestVariables(x: JsonValue): Map<string, TraceValue | null> {
