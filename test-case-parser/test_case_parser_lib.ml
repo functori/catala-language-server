@@ -1955,7 +1955,7 @@ let run_test include_dirs options testing_scope =
           testing_scope msg;
         [])
   in
-  Format.printf "Bonjour@.";
+  Log.app (fun m -> m "Nomre de failure: %d" (List.length variable_failures));
   let test_run = { O.test; O.assert_failures; O.diffs; O.variable_failures } in
   write_stdout J.write_test_run test_run
 
