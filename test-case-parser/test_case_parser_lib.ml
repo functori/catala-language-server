@@ -1963,14 +1963,6 @@ let run_test include_dirs options testing_scope =
      parses. The failures are also handed over in [variable_failures] below,
      this is only for someone watching the command run. *)
   Message.warning "Nomre de failure: %d" (List.length variable_failures);
-  if variable_failures <> [] then
-    Message.warning "@[<v 2>Expected variables that do not match:@,%a@]"
-      (Format.pp_print_list ~pp_sep:Format.pp_print_cut
-         (fun ppf (f : O.variable_failure) ->
-           Format.fprintf ppf "@[<h>@{<bold>%s@}: expected %s, got %s@]" f.name
-             f.expected
-             (Option.value ~default:"nothing at that path" f.current_value)))
-      variable_failures;
   let test_run = { O.test; O.assert_failures; O.diffs; O.variable_failures } in
   write_stdout J.write_test_run test_run
 
