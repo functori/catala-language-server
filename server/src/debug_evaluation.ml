@@ -378,8 +378,7 @@ let step state : [ `End | `Exn of step | `B of step | `Ok of step ] =
     match state.all_steps.(state.index) with
     | { breakpoint = true; _ } as s -> `B s
     | { value = Exn _; _ } as step -> `Exn step
-    | { breakpoint = false; _ } as s -> `Ok s
-    | _ -> assert false
+    | s -> `Ok s
   end
   else
     match state.all_steps.(state.index) with
