@@ -17,7 +17,6 @@ import {
 } from '../generated/catala_types';
 import { logger } from '../extension/logger';
 import { window } from 'vscode';
-import path from 'path';
 import { clerkPath, catalaPath, getCwd, shellArg } from '../shared/util_client';
 
 type ExecOptions = { input?: string; cwd?: string };
@@ -118,7 +117,8 @@ export type ScopeRunResult =
 export function runTestScope(
   filename: string,
   testScope: string,
-  inputs?: TestInputs
+  inputs?: TestInputs,
+  trace?: boolean
 ): TestRunResults {
   /*
    * Notes:
@@ -144,21 +144,18 @@ export function runTestScope(
     ...inputArgs,
   ];
   const cwd = getCwd(filename);
-  if (cwd) {
-    const relFilename = path.relative(cwd, filename);
-    //compile dependencies (hack), do not fail on asserts
-    execBinary(
-      clerkPath,
-      ['run', '--trace', '-c--no-fail-on-assert', relFilename],
-      {
-        cwd,
-      }
-    );
-    // if (!clerkResult.ok) {
-    //   window.showErrorMessage(clerkResult.stderr);
-    //   return { kind: 'Error', value: clerkResult.stderr };
-    // }
-  }
+  //compile dependencies (hack), do not fail on asserts
+  execBinary(
+    clerkPath,
+    ['run', trace ? '--trace' : '', '-c--no-fail-on-assert', filename],
+    {
+      cwd,
+    }
+  );
+  // if (!clerkResult.ok) {
+  //   window.showErrorMessage(clerkResult.stderr);
+  //   return { kind: 'Error', value: clerkResult.stderr };
+  // }
   // Here we *do* want to fail on asserts, as we catch failures through
   // the `register_lsp_error_notifier` hook.
   const execResult = execBinary(catalaPath, args, {
