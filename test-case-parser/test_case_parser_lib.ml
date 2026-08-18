@@ -1891,6 +1891,10 @@ let run_test include_dirs options testing_scope =
   let result_struct, failed_asserts, trace =
     interpret_program ~collect_trace dcalc_prg testing_scope_name build_term
   in
+  let file =
+    Format.formatter_of_out_channel (open_out "/home/arnaud/inttrace.json")
+  in
+  Option.iter (Format.fprintf file "%s") trace;
   let (actual_results : (StructField.t * (dcalc, typed) gexpr) list), out_struct
       =
     match result_struct with
