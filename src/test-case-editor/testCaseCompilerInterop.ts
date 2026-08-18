@@ -59,6 +59,8 @@ export function parseTestFile(
   scope?: string
 ): ParseResults {
   const cwd = getCwd(bufferPath);
+  const dd = execBinary('which', ['clerk']);
+  logger.log(`${dd.ok ? dd.output : 'Missing'}`);
   const execResult = execBinary(
     catalaPath,
     [
@@ -177,6 +179,7 @@ export function runTestScope(
       test: { test_outputs },
       assert_failures,
       diffs,
+      variable_failures,
     } = readTestRun(parsed);
     return {
       kind: 'Ok',
@@ -185,6 +188,7 @@ export function runTestScope(
         test_outputs,
         assert_failures,
         diffs,
+        variable_failures,
       },
     };
   } catch (error) {

@@ -148,6 +148,9 @@ type test_run = {
   test: test;
   assert_failures: bool;
   diffs: diff list;
+  (* Defaulted rather than required: absent from the JSON emitted by a Catala
+     that does not check expected variables yet. *)
+  ~variable_failures: variable_failure list;
 }
 
 type file_test = {
@@ -215,6 +218,21 @@ type diff = {
   actual: runtime_value;
 }
 
+(* One auxiliary variable whose value in the trace does not match the one
+   declared by its [#[testcase.variable]] attribute, at the location given by
+   [#[testcase.variable.path]].
+
+   Mirrors [Clerk_report.expected]. The values are the rendered strings the
+   checker compares, not [runtime_value]s: the comparison deliberately happens
+   on the trace's own rendering, so that hand-written expected values need not
+   have the runtime's formatting rules replicated. [current_value] is absent
+   when the trace carries no value at the declared path. *)
+type variable_failure = {
+  name: string;
+  expected: string;
+  ?current_value: string option;
+}
+
 (* Message exchange within extension (shell <-> webview) *)
 
 type parse_results = [
@@ -227,6 +245,7 @@ type test_run_output = { (* do we need that type at all when the difference with
   test_outputs: test_outputs;
   assert_failures: bool;
   diffs: diff list;
+  ~variable_failures: variable_failure list;
 }
 
 type test_run_results = [

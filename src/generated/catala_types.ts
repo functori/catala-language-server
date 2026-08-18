@@ -144,6 +144,7 @@ export type TestRun = {
   test: Test;
   assert_failures: boolean;
   diffs: Diff[];
+  variable_failures: VariableFailure[];
 }
 
 export type FileTest = {
@@ -208,6 +209,12 @@ export type Diff = {
   actual: RuntimeValue;
 }
 
+export type VariableFailure = {
+  name: string;
+  expected: string;
+  current_value?: string;
+}
+
 export type ParseResults =
 | { kind: 'ParseError'; value: string }
 | { kind: 'EmptyTestListMismatch' }
@@ -217,6 +224,7 @@ export type TestRunOutput = {
   test_outputs: TestOutputs;
   assert_failures: boolean;
   diffs: Diff[];
+  variable_failures: VariableFailure[];
 }
 
 export type TestRunResults =
@@ -777,6 +785,7 @@ export function writeTestRun(x: TestRun, context: any = x): any {
     'test': _atd_write_required_field('TestRun', 'test', writeTest, x.test, x),
     'assert_failures': _atd_write_required_field('TestRun', 'assert_failures', _atd_write_bool, x.assert_failures, x),
     'diffs': _atd_write_required_field('TestRun', 'diffs', _atd_write_array(writeDiff), x.diffs, x),
+    'variable_failures': _atd_write_field_with_default(_atd_write_array(writeVariableFailure), [], x.variable_failures, x),
   };
 }
 
@@ -785,6 +794,7 @@ export function readTestRun(x: any, context: any = x): TestRun {
     test: _atd_read_required_field('TestRun', 'test', readTest, x['test'], x),
     assert_failures: _atd_read_required_field('TestRun', 'assert_failures', _atd_read_bool, x['assert_failures'], x),
     diffs: _atd_read_required_field('TestRun', 'diffs', _atd_read_array(readDiff), x['diffs'], x),
+    variable_failures: _atd_read_field_with_default(_atd_read_array(readVariableFailure), [], x['variable_failures'], x),
   };
 }
 
@@ -978,6 +988,22 @@ export function readDiff(x: any, context: any = x): Diff {
   };
 }
 
+export function writeVariableFailure(x: VariableFailure, context: any = x): any {
+  return {
+    'name': _atd_write_required_field('VariableFailure', 'name', _atd_write_string, x.name, x),
+    'expected': _atd_write_required_field('VariableFailure', 'expected', _atd_write_string, x.expected, x),
+    'current_value': _atd_write_optional_field(_atd_write_string, x.current_value, x),
+  };
+}
+
+export function readVariableFailure(x: any, context: any = x): VariableFailure {
+  return {
+    name: _atd_read_required_field('VariableFailure', 'name', _atd_read_string, x['name'], x),
+    expected: _atd_read_required_field('VariableFailure', 'expected', _atd_read_string, x['expected'], x),
+    current_value: _atd_read_optional_field(_atd_read_string, x['current_value'], x),
+  };
+}
+
 export function writeParseResults(x: ParseResults, context: any = x): any {
   switch (x.kind) {
     case 'ParseError':
@@ -1018,6 +1044,7 @@ export function writeTestRunOutput(x: TestRunOutput, context: any = x): any {
     'test_outputs': _atd_write_required_field('TestRunOutput', 'test_outputs', writeTestOutputs, x.test_outputs, x),
     'assert_failures': _atd_write_required_field('TestRunOutput', 'assert_failures', _atd_write_bool, x.assert_failures, x),
     'diffs': _atd_write_required_field('TestRunOutput', 'diffs', _atd_write_array(writeDiff), x.diffs, x),
+    'variable_failures': _atd_write_field_with_default(_atd_write_array(writeVariableFailure), [], x.variable_failures, x),
   };
 }
 
@@ -1026,6 +1053,7 @@ export function readTestRunOutput(x: any, context: any = x): TestRunOutput {
     test_outputs: _atd_read_required_field('TestRunOutput', 'test_outputs', readTestOutputs, x['test_outputs'], x),
     assert_failures: _atd_read_required_field('TestRunOutput', 'assert_failures', _atd_read_bool, x['assert_failures'], x),
     diffs: _atd_read_required_field('TestRunOutput', 'diffs', _atd_read_array(readDiff), x['diffs'], x),
+    variable_failures: _atd_read_field_with_default(_atd_read_array(readVariableFailure), [], x['variable_failures'], x),
   };
 }
 
