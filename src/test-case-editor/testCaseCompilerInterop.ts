@@ -29,17 +29,22 @@ function execBinary(
   opts: ExecOptions = {}
 ): ExecResult {
   logger.log(`Running ${bin} ${args.join(' ')}`);
+  const startedAt = Date.now();
+  // Logged on both paths: these two commands (clerk, then catala) are the whole
+  // cost of a test run, so timing them is what tells the two apart.
+  const logElapsed = (): void =>
+    logger.log(`  ↳ ${bin} took ${Date.now() - startedAt} ms`);
   try {
     const useShell = process.platform === 'win32';
-    return {
-      ok: true,
-      output: execFileSync(bin, useShell ? args.map(shellArg) : args, {
-        encoding: 'utf8',
-        shell: useShell,
-        ...opts,
-      }),
-    };
+    const output = execFileSync(bin, useShell ? args.map(shellArg) : args, {
+      encoding: 'utf8',
+      shell: useShell,
+      ...opts,
+    });
+    logElapsed();
+    return { ok: true, output };
   } catch (error) {
+    logElapsed();
     const stderr = (error as SpawnSyncReturns<Buffer | string>).stderr;
     return {
       ok: false,
@@ -157,7 +162,7 @@ export function runTestScope(
     //compile dependencies (hack), do not fail on asserts
     execBinary(
       clerkPath,
-      ['run', trace ? '--trace' : '', '-c--no-fail-on-assert', relFilename],
+      ['run', ...traceArgs, '-c--no-fail-on-assert', relFilename],
       {
         cwd,
       }
