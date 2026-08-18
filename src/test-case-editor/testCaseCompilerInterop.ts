@@ -17,6 +17,7 @@ import {
 } from '../generated/catala_types';
 import { logger } from '../extension/logger';
 import { window } from 'vscode';
+import path from 'path';
 import { clerkPath, catalaPath, getCwd, shellArg } from '../shared/util_client';
 
 type ExecOptions = { input?: string; cwd?: string };
@@ -135,6 +136,12 @@ export function runTestScope(
     ? JSON.stringify(writeTestInputs(inputs))
     : undefined;
   const inputArgs = inputs ? ['--input=-'] : [];
+  // Only instrument the run when the test has expected variables to check:
+  // tracing changes the compiled AST and costs interpretation time.
+  // NB: bare `--trace` defaults to writing the trace on stdout, where the JSON
+  // result is read from; the plugin redirects it away, which is what makes this
+  // safe.
+  const traceArgs = trace ? ['--trace'] : [];
   const args = [
     'testcase',
     'run',
@@ -142,20 +149,24 @@ export function runTestScope(
     testScope,
     filename,
     ...inputArgs,
+    ...traceArgs,
   ];
   const cwd = getCwd(filename);
-  //compile dependencies (hack), do not fail on asserts
-  execBinary(
-    clerkPath,
-    ['run', trace ? '--trace' : '', '-c--no-fail-on-assert', filename],
-    {
-      cwd,
-    }
-  );
-  // if (!clerkResult.ok) {
-  //   window.showErrorMessage(clerkResult.stderr);
-  //   return { kind: 'Error', value: clerkResult.stderr };
-  // }
+  if (cwd) {
+    const relFilename = path.relative(cwd, filename);
+    //compile dependencies (hack), do not fail on asserts
+    execBinary(
+      clerkPath,
+      ['run', trace ? '--trace' : '', '-c--no-fail-on-assert', relFilename],
+      {
+        cwd,
+      }
+    );
+    // if (!clerkResult.ok) {
+    //   window.showErrorMessage(clerkResult.stderr);
+    //   return { kind: 'Error', value: clerkResult.stderr };
+    // }
+  }
   // Here we *do* want to fail on asserts, as we catch failures through
   // the `register_lsp_error_notifier` hook.
   const execResult = execBinary(catalaPath, args, {
