@@ -413,7 +413,6 @@ export class TestCaseEditorProvider
           if (traceFile !== undefined) {
             const trace = readTraceFile(traceFile);
             if (trace.ok) {
-              logger.log('NE PAS COURIR');
               // Hand-written message, like `sendTrace` above: the webview
               // intercepts this kind before the strict ATD `readDownMessage`,
               // so it cannot go through `postMessageToWebView`.
