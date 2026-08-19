@@ -1983,10 +1983,6 @@ let run_test include_dirs options testing_scope =
   write_stdout J.write_test_run test_run
 
 let run_test_cmd include_dirs options test_scope_name scope_input_opt =
-  ignore
-    (Global.enforce_options
-       ~trace:(Some (lazy (Message.ignore_ppf ()), `Stdout))
-       ());
   match scope_input_opt with
   | None -> run_test include_dirs options test_scope_name
   | Some json -> run_with_inputs include_dirs options test_scope_name json

@@ -30,8 +30,8 @@ type Props = {
   test: Test;
   onTestChange(newValue: Test, mayBeBatched: boolean): void;
   onTestDelete(testScope: string): void;
-  onTestRun(testScope: string): void;
-  onTestOutputsReset(testScope: string): void;
+  onTestRun(testScope: string, hasExpected: boolean): void;
+  onTestOutputsReset(testScope: string, hasExpected: boolean): void;
   runState?: {
     status: TestRunStatus;
     results?: TestRunResults;
@@ -128,6 +128,12 @@ export default function TestEditor(props: Props): ReactElement {
     }
   }, [props.runState]);
 
+  // Whether the run needs to be traced. A variable declared with only one of
+  // the two attributes still counts: this mirrors the map the compiler builds
+  // from both of them, so that both sides agree on whether the trace is needed.
+  const hasExpected =
+    props.test.variables.size > 0 || props.test.variable_paths.size > 0;
+
   const scrollToFirstUnset = (): void => {
     scrollToFirstInvalidOrUnset(unsetElementRef.current ?? document, 0);
   };
@@ -138,7 +144,7 @@ export default function TestEditor(props: Props): ReactElement {
       const confirmed = await confirm('RunTestWithUnsetValues');
       if (!confirmed) return;
     }
-    props.onTestRun(props.test.testing_scope);
+    props.onTestRun(props.test.testing_scope, hasExpected);
   };
 
   const openTraceEditor = (): void => {
@@ -155,7 +161,7 @@ export default function TestEditor(props: Props): ReactElement {
       const confirmed = await confirm('RunTestWithUnsetValues');
       if (!confirmed) return;
     }
-    props.onTestOutputsReset(props.test.testing_scope);
+    props.onTestOutputsReset(props.test.testing_scope, hasExpected);
   };
 
   return (
