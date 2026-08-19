@@ -146,6 +146,11 @@ export function runTestScope(
   // NB: bare `--trace` defaults to writing the trace on stdout, where the JSON
   // result is read from; the plugin redirects it away, which is what makes this
   // safe.
+  if (trace) {
+    logger.log(`La faut de baisé que j'ai fait ${filename}`);
+  } else {
+    logger.log(`Trace est à faux sur ${filename}`);
+  }
   const traceArgs = trace ? ['--trace'] : [];
   const args = [
     'testcase',
