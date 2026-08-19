@@ -86,6 +86,7 @@ export default function TestEditor(props: Props): ReactElement {
     next.forEach(([path, value], name) => {
       if (value === null) {
         variables.set(name, null);
+        variable_paths.set(name, path);
       } else {
         const rv = traceValueToRuntime(value);
         if (rv !== undefined) {

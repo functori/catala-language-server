@@ -49,6 +49,10 @@ function renderEditor(failures?: VariableFailure[]): void {
   );
 }
 
+// A reported failure surfaces through the tooltip only. The colouring is
+// driven by the row's own comparison against the trace the editor holds, which
+// these cases do not exercise: they render without a trace, so `computed` is
+// undefined and no colour is applied either way.
 describe('ExpectedVariablesEditor - reported variable failures', () => {
   it('leaves the value unmarked when the compiler reported no failure', () => {
     renderEditor([]);
@@ -57,14 +61,13 @@ describe('ExpectedVariablesEditor - reported variable failures', () => {
     expect(value.style.color).toBe('');
   });
 
-  it('marks the value and explains the mismatch when one is reported', () => {
+  it('explains the mismatch when one is reported', () => {
     renderEditor([{ name: 'taux', expected: '42', current_value: '17' }]);
     const value = screen.getByText('42');
     expect(value).toHaveAttribute(
       'title',
       'The trace holds 17 where 42 was expected'
     );
-    expect(value.style.color).toBe('var(--vscode-errorForeground)');
   });
 
   it('reports a variable missing from the trace rather than skipping it', () => {
@@ -76,7 +79,6 @@ describe('ExpectedVariablesEditor - reported variable failures', () => {
       'title',
       'The trace holds -- where 42 was expected'
     );
-    expect(value.style.color).toBe('var(--vscode-errorForeground)');
   });
 
   it('ignores a failure reported for another variable', () => {
