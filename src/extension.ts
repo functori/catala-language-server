@@ -714,7 +714,6 @@ export async function activate(
     TestCaseEditorProvider.register(
       context,
       resultController,
-      ctrl
     )
   );
 

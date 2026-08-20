@@ -148,11 +148,9 @@ export class TestCaseEditorProvider
   constructor(
     private readonly context: vscode.ExtensionContext,
     private resultController: ResultController,
-    private testController: vscode.TestController
   ) {
     this.testQueue = new PQueue({ concurrency: 1 });
     this.resultController = resultController;
-    this.testController = testController;
   }
 
   saveCustomDocument(
@@ -209,12 +207,10 @@ export class TestCaseEditorProvider
   public static register(
     context: vscode.ExtensionContext,
     resultController: ResultController,
-    testController: vscode.TestController
   ): vscode.Disposable {
     const provider = new TestCaseEditorProvider(
       context,
       resultController,
-      testController
     );
     logger.log(`Registering ${TestCaseEditorProvider.viewType}`);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
