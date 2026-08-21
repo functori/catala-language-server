@@ -128,7 +128,8 @@ export async function testScopePicker(
     }
   } catch (err) {
     logger.log(
-      `OpenTestScopePicker failed: ${err instanceof Error ? err.message : String(err)
+      `OpenTestScopePicker failed: ${
+        err instanceof Error ? err.message : String(err)
       }`
     );
   }
@@ -139,7 +140,8 @@ export async function testScopePicker(
 // sets up the UI, provide initial data and exchanges messages with the
 // web view whose entry point is in `uiEntryPoint.ts`
 export class TestCaseEditorProvider
-  implements vscode.CustomEditorProvider<CatalaTestCaseDocument> {
+  implements vscode.CustomEditorProvider<CatalaTestCaseDocument>
+{
   private testQueue: PQueue;
   private _onDidChangeCustomDocument = new vscode.EventEmitter<
     vscode.CustomDocumentEditEvent<CatalaTestCaseDocument>
@@ -629,7 +631,7 @@ export class TestCaseEditorProvider
     if (!entry) {
       // Create placeholder entry with the message queued; resolveCustomEditor will register later.
       TestCaseEditorProvider.webviews.set(key, {
-        post: () => { },
+        post: () => {},
         ready: false,
         queue: [msg],
       });
