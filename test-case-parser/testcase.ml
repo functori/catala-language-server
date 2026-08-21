@@ -70,6 +70,20 @@ let check_trace =
            given by $(b,#[testcase.variable.path]). Without this option the \
            expected variables are not checked.")
 
+(* Mirrors clerk's own [--build-dir]: the caller may have compiled the
+   dependencies elsewhere than the default, and the interpretation here loads
+   the standard library and the tested modules from that directory. *)
+let build_dir =
+  Arg.(
+    value
+    & opt (some string) None
+    & info ["build-dir"] ~docv:"DIR"
+        ~doc:
+          "Look for the compiled artifacts (standard library and module \
+           dependencies) in $(i,DIR) rather than in $(b,_build). $(i,DIR) is \
+           understood relative to the project root, and is expected to be the \
+           directory clerk built them into.")
+
 let cmd_run =
   Cmd.v
     Cmd.(
@@ -85,7 +99,8 @@ let cmd_run =
       $ Cli.Flags.Global.options
       $ Cli.Flags.ex_scope
       $ Cli.Flags.scope_input
-      $ check_trace)
+      $ check_trace
+      $ build_dir)
 
 let cmd_write =
   Cmd.v
