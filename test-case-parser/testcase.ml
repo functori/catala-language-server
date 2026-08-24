@@ -66,9 +66,9 @@ let check_trace =
     & info ["check-trace"] ~docv:"FILE"
         ~doc:
           "Check the values declared by the $(b,#[testcase.variable]) \
-           attributes against the JSON trace in $(i,FILE), following the paths \
-           given by $(b,#[testcase.variable.path]). Without this option the \
-           expected variables are not checked.")
+           attributes against the JSON trace in $(i,FILE), looking each \
+           variable up by name. Without this option the expected variables are \
+           not checked.")
 
 (* Mirrors clerk's own [--build-dir]: the caller may have compiled the
    dependencies elsewhere than the default, and the interpretation here loads

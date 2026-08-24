@@ -12,7 +12,7 @@ import { createHash } from 'crypto';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import type { TraceResult } from './messages';
-import { type TraceElement, traceFromJson, withJsonPaths } from './traceUtils';
+import { type TraceElement, traceFromJson } from './traceUtils';
 import { getCwd } from '../shared/util_client';
 import { logger } from '../extension/logger';
 
@@ -113,9 +113,7 @@ export function initTraceCache(storageDir: string): void {
   traceCache = new PersistentCache<TraceElement[], TraceElement[]>(
     join(storageDir, 'trace-cache.json'),
     (v) => v,
-    // Entries written before `jsonPath` existed don't carry it: rebuild it so a
-    // cache hit is indistinguishable from a fresh run.
-    (v) => withJsonPaths(v)
+    (v) => v
   );
 }
 

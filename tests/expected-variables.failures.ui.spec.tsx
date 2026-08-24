@@ -12,9 +12,7 @@ vi.mock('@vscode-elements/react-elements', () => ({
   VscodeTextfield: () => <input />,
 }));
 
-// A test carrying one auxiliary variable expected to be 42, read from the
-// trace at "[0].trace[0]". Both the value and the path are needed for the row
-// to be listed.
+// A test carrying one auxiliary variable expected to be 42.
 function testWithVariable(): Test {
   return {
     testing_scope: 'TestCalculImpot',
@@ -30,7 +28,6 @@ function testWithVariable(): Test {
     variables: new Map([
       ['taux', { value: { value: { kind: 'Integer', value: 42 }, attrs: [] } }],
     ]),
-    variable_paths: new Map([['taux', '[0].trace[0]']]),
     description: '',
     title: 'Test',
   };

@@ -124,11 +124,6 @@ type test = {
   test_inputs: test_inputs;
   test_outputs: test_outputs;
   variables: (string * runtime_value option) list <json repr="object"> <ts repr="map">;
-  (* Where each auxiliary variable was picked in the trace JSON, e.g.
-     "[0].trace[0].trace[6]". Keyed by the same names as [variables], but
-     independent from it: a variable may have a value and no path, or the
-     reverse. *)
-  ~variable_paths: (string * string) list <json repr="object"> <ts repr="map">;
   description: string;
   title: string;
 }
@@ -224,14 +219,14 @@ type diff = {
 }
 
 (* One auxiliary variable whose value in the trace does not match the one
-   declared by its [#[testcase.variable]] attribute, at the location given by
-   [#[testcase.variable.path]].
+   declared by its [#[testcase.variable]] attribute. The variable is looked up
+   in the trace by name.
 
    Mirrors [Clerk_report.expected]. The values are the rendered strings the
    checker compares, not [runtime_value]s: the comparison deliberately happens
    on the trace's own rendering, so that hand-written expected values need not
    have the runtime's formatting rules replicated. [current_value] is absent
-   when the trace carries no value at the declared path. *)
+   when the trace carries no value for the variable. *)
 type variable_failure = {
   name: string;
   expected: string;

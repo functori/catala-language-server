@@ -78,24 +78,19 @@ export default function TestEditor(props: Props): ReactElement {
     );
   }
 
-  function onVariablesChange(
-    next: Map<string, [string, TraceValue | null]>
-  ): void {
+  function onVariablesChange(next: Map<string, TraceValue | null>): void {
     const variables: Map<string, Option<RuntimeValue>> = new Map();
-    const variable_paths: Map<string, string> = new Map();
-    next.forEach(([path, value], name) => {
+    next.forEach((value, name) => {
       if (value === null) {
         variables.set(name, null);
-        variable_paths.set(name, path);
       } else {
         const rv = traceValueToRuntime(value);
         if (rv !== undefined) {
           variables.set(name, { value: { value: rv, attrs: [] } });
-          variable_paths.set(name, path);
         }
       }
     });
-    props.onTestChange({ ...props.test, variables, variable_paths }, false);
+    props.onTestChange({ ...props.test, variables }, false);
   }
 
   // Mismatches on the auxiliary variables, as reported by the compiler for the
@@ -129,11 +124,10 @@ export default function TestEditor(props: Props): ReactElement {
     }
   }, [props.runState]);
 
-  // Whether the run needs to be traced. A variable declared with only one of
-  // the two attributes still counts: this mirrors the map the compiler builds
-  // from both of them, so that both sides agree on whether the trace is needed.
-  const hasExpected =
-    props.test.variables.size > 0 || props.test.variable_paths.size > 0;
+  // Whether the run needs to be traced: the trace is what the compiler checks
+  // the expected variables against, so it is only worth producing when the
+  // test declares some.
+  const hasExpected = props.test.variables.size > 0;
 
   const scrollToFirstUnset = (): void => {
     scrollToFirstInvalidOrUnset(unsetElementRef.current ?? document, 0);

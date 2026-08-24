@@ -40,34 +40,11 @@ export type TraceValue =
   | { kind: 'struct'; fields: Record<string, TraceValue> }
   | { kind: 'array'; values: [TraceValue, string | undefined][] };
 
-// Location of a node inside the raw trace JSON, e.g. `[3, 'trace', 0]` for
-// `json[3].trace[0]`. Building a variable path is lossy — `traceVariablesAux`
-// hoists nodes to their parent's level, `mergeSteps` collapses chains into a
-// single dotted name and `indexDuplicateSteps` numbers homonyms by their rank
-// in the *variable* tree — so the JSON location is carried along instead of
-// being reconstructed from the path afterwards, which is not possible.
-export type JsonPath = (string | number)[];
-
-export function jsonPathToString(path: JsonPath): string {
-  let acc: string = '';
-  for (let elt of path) {
-    if (typeof elt == 'string') {
-      acc += `.${elt}`;
-    } else if (typeof elt == 'number') {
-      acc += `[${elt}]`;
-    } else {
-      new Error('Unexpected type for a json path');
-    }
-  }
-  return acc;
-}
-
 export type TraceElement = {
   element: TraceKind;
   pos?: CodeLocation;
   value?: TraceValue;
   trace?: TraceElement[];
-  jsonPath: JsonPath;
 };
 
 export type TraceVariable =
@@ -381,10 +358,7 @@ export function traceValueEqual(a: TraceValue, b: TraceValue): boolean {
   }
 }
 
-function traceElementFromJson(
-  e: JsonValue,
-  jsonPath: JsonPath
-): TraceElement | null {
+function traceElementFromJson(e: JsonValue): TraceElement | null {
   if (
     e === null ||
     typeof e !== 'object' ||
@@ -401,9 +375,7 @@ function traceElementFromJson(
   }
   const trace = Array.isArray(o.trace)
     ? o.trace
-        .map((child, i) =>
-          traceElementFromJson(child, [...jsonPath, 'trace', i])
-        )
+        .map((child) => traceElementFromJson(child))
         .filter((x): x is TraceElement => x !== null)
     : undefined;
   return {
@@ -411,7 +383,6 @@ function traceElementFromJson(
     pos: o.pos as unknown as CodeLocation | undefined,
     value: o.value !== undefined ? traceValueFromJson(o.value) : undefined,
     trace,
-    jsonPath,
   };
 }
 
@@ -419,29 +390,9 @@ export function traceFromJson(trace: JsonValue): TraceElement[] | null {
   if (!Array.isArray(trace)) {
     return null;
   }
-  const elements = trace.map((e, i) => traceElementFromJson(e, [i]));
+  const elements = trace.map(traceElementFromJson);
   const looksLikeTrace = elements.every((e) => e !== null);
   return !looksLikeTrace ? null : (elements as TraceElement[]);
-}
-
-// Re-derives `jsonPath` for a tree that was built before the field existed
-// (the on-disk trace cache stores `TraceElement[]` verbatim, so entries written
-// by an older version lack it). The element tree mirrors the JSON one, so the
-// paths can be rebuilt from its shape.
-export function withJsonPaths(trace: TraceElement[]): TraceElement[] {
-  const walk = (elements: TraceElement[], prefix: JsonPath): TraceElement[] =>
-    elements.map((te, i) => {
-      const jsonPath = [...prefix, i];
-      return {
-        ...te,
-        jsonPath,
-        trace:
-          te.trace !== undefined
-            ? walk(te.trace, [...jsonPath, 'trace'])
-            : undefined,
-      };
-    });
-  return walk(trace, []);
 }
 
 function mergeSteps(l: TraceVariable[]): TraceVariable[] {

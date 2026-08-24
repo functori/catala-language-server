@@ -12,8 +12,6 @@ import {
   traceValueFromRuntime,
   variablePath,
   variableSegment,
-  jsonPathToString,
-  type JsonPath,
 } from '../trace-editor/traceUtils';
 import type { Test, VariableFailure } from '../generated/catala_types';
 
@@ -28,7 +26,7 @@ type Props = {
    * from the trace the editor happens to hold.
    */
   failures?: VariableFailure[];
-  onChange(next: Map<string, [string, TraceValue | null]>): void;
+  onChange(next: Map<string, TraceValue | null>): void;
 };
 
 function isolateStateVariable(
@@ -138,12 +136,11 @@ export default function ExpectedVariablesEditor({
   const failureByName = new Map(
     (failures ?? []).map((failure) => [failure.name, failure])
   );
-  const testVariables: Map<string, [string, TraceValue | null]> = new Map();
+  const testVariables: Map<string, TraceValue | null> = new Map();
   test.variables.forEach((rv, name) => {
     const value = rv !== null ? traceValueFromRuntime(rv.value) : null;
-    const jsonPath = test.variable_paths.get(name);
-    if (value !== undefined && jsonPath !== undefined) {
-      testVariables.set(name, [jsonPath, value]);
+    if (value !== undefined) {
+      testVariables.set(name, value);
     }
   });
 
@@ -161,20 +158,9 @@ export default function ExpectedVariablesEditor({
     return findTraceValue(path, trVariablesAux);
   }
 
-  // `jsonPath` is only known when the variable is picked from the trace
-  // catalog; re-setting the value of a row already in the test keeps the path
-  // it was stored with.
-  function setVar(
-    path: string,
-    tv: TraceValue | null,
-    jsonPath?: JsonPath
-  ): void {
+  function setVar(path: string, tv: TraceValue | null): void {
     const next = new Map(testVariables);
-    const jsonPathStr =
-      jsonPath !== undefined
-        ? jsonPathToString(jsonPath)
-        : (testVariables.get(path)?.[0] ?? '');
-    next.set(path, [jsonPathStr, tv]);
+    next.set(path, tv);
     onChange(next);
   }
 
@@ -193,7 +179,7 @@ export default function ExpectedVariablesEditor({
         <div className="composite-editor">
           {testVariables.size > 0 && (
             <div className="simple-items-vertical">
-              {[...testVariables.entries()].map(([path, [, tv]]) => (
+              {[...testVariables.entries()].map(([path, tv]) => (
                 <VariableRow
                   key={path}
                   name={path}
@@ -372,13 +358,7 @@ function VariableRow({
   );
 }
 
-// Adding a variable from the catalog carries the JSON location of the trace
-// node it was read from, so it can be stored alongside the value.
-type AddVariable = (
-  path: string,
-  tv: TraceValue | null,
-  jsonPath?: JsonPath
-) => void;
+type AddVariable = (path: string, tv: TraceValue | null) => void;
 
 function filterByName(vars: TraceVariable[], q: string): TraceVariable[] {
   const out: TraceVariable[] = [];
@@ -659,7 +639,6 @@ function ValueRow({
     return null;
   }
   const path = variablePath(crumbs.join('.'), node);
-  const jsonPath = node.source?.jsonPath;
   const computedStr = formatTraceValue(computed);
   const trimmed = input.trim();
   const addValue = trimmed ? parseAs(computed.kind, trimmed) : null;
@@ -713,7 +692,7 @@ function ValueRow({
           style={{ flexGrow: 1 }}
           onClick={() => {
             if (addValue !== undefined) {
-              onAdd(path, addValue, jsonPath);
+              onAdd(path, addValue);
               setInput('');
             }
           }}

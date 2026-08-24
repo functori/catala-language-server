@@ -59,7 +59,6 @@ type Pos.attr += TestDescription of string
 type Pos.attr += TestTitle of string
 type Pos.attr += ArrayItemLabel of string
 type Pos.attr += ExpectedVariable of string
-type Pos.attr += ExpectedVariablePath of string
 
 let register_attributes () =
   Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["uid"]
@@ -100,14 +99,7 @@ let register_attributes () =
     (fun ~pos:_ value ->
       match value with
       | Shared_ast.String (s, _pos) -> Some (ExpectedVariable s)
-      | _ -> failwith "unexpected variable label");
-  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["variable"; "path"]
-    ~contexts:(function
-      | Desugared.Name_resolution.ScopeDecl -> true | _ -> false)
-    (fun ~pos:_ value ->
-      match value with
-      | Shared_ast.String (s, _pos) -> Some (ExpectedVariablePath s)
-      | _ -> failwith "unexpected variable path")
+      | _ -> failwith "unexpected variable label")
 
 let to_relative (p : File.t) = File.make_relative_to ~dir:(Sys.getcwd ()) p
 
@@ -664,7 +656,6 @@ let get_scope_test
     test_outputs;
     test_inputs;
     variables = [];
-    variable_paths = [];
     description;
     title;
   }
@@ -972,14 +963,6 @@ let parse_expected_variable (s : string) :
     if value = "" then Some (name, None)
     else Some (name, Some (runtime_value_of_string value))
 
-let parse_expected_variable_path (s : string) : (string * string) option =
-  match String.split_on_char ':' s with
-  | [expected; path] ->
-    let name = String.trim expected in
-    let value_path = String.trim path in
-    if value_path = "" then None else Some (name, value_path)
-  | _ -> None
-
 (* Splits a "name: payload" attribute payload, keeping [payload] exactly as
    written in the source: [Expected.check_expected] needs the surface form to
    re-render it through the trace's own encoder. *)
@@ -1001,15 +984,10 @@ let split_expected_attr (s : string) : (string * string) option =
    scopes, and `testcase run` runs exactly one. *)
 let expected_variables info : Scan.expected_variable Scan.M.t =
   List.fold_left
-    (fun acc -> function
-      | `Value (name, value) -> Scan.add_expected_value name value acc
-      | `Path (name, path) -> Scan.add_expected_path name path acc)
+    (fun acc (name, value) -> Scan.add_expected_value name value acc)
     Scan.M.empty
     (Pos.get_attrs info (function
-      | ExpectedVariable s ->
-        Option.map (fun (n, v) -> `Value (n, v)) (split_expected_attr s)
-      | ExpectedVariablePath s ->
-        Option.map (fun (n, p) -> `Path (n, p)) (split_expected_attr s)
+      | ExpectedVariable s -> split_expected_attr s
       | _ -> None))
 
 let get_catala_test (prg, naming_ctx) testing_scope_name =
@@ -1168,20 +1146,7 @@ let get_catala_test (prg, naming_ctx) testing_scope_name =
       | ExpectedVariable s -> parse_expected_variable s
       | _ -> None)
   in
-  let variable_paths =
-    Pos.get_attrs info (function
-      | ExpectedVariablePath s -> parse_expected_variable_path s
-      | _ -> None)
-  in
-  {
-    base_test with
-    O.test_inputs;
-    test_outputs;
-    variables;
-    variable_paths;
-    description;
-    title;
-  }
+  { base_test with O.test_inputs; test_outputs; variables; description; title }
 
 let import_catala_tests (prg, naming_ctx) =
   List.map (get_catala_test (prg, naming_ctx)) (get_test_scopes prg)
@@ -1382,10 +1347,6 @@ let write_catala_test ppf t lang =
       in
       fprintf ppf "#[testcase.variable = %s]@\n" (String.quote payload))
     t.variables;
-  List.iter
-    (fun (var, value) ->
-      fprintf ppf "#[testcase.variable.path = \"%s: %s\"]@\n" var value)
-    t.variable_paths;
   fprintf ppf "@[<v 2>%s %s:@," strings.declaration_scope t.testing_scope;
   fprintf ppf "%s %s %s %s.%s@," strings.output_scope sscope_var strings.scope
     t.tested_scope.module_name t.tested_scope.name;
