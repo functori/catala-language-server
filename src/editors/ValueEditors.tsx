@@ -292,7 +292,7 @@ type IntEditorProps = {
   editable?: boolean;
 };
 
-function IntEditor(props: IntEditorProps): ReactElement {
+export function IntEditor(props: IntEditorProps): ReactElement {
   const runtimeValue = props.valueDef?.value;
   const isUnset = !runtimeValue || runtimeValue.value.kind === 'Unset';
   const initialValue =
@@ -374,7 +374,7 @@ type DateEditorProps = {
   editable?: boolean;
 };
 
-function DateEditor(props: DateEditorProps): ReactElement {
+export function DateEditor(props: DateEditorProps): ReactElement {
   const runtimeValue = props.valueDef?.value;
   const isUnset = !runtimeValue || runtimeValue.value.kind === 'Unset';
   const initialValue =
@@ -483,7 +483,7 @@ type RatEditorProps = {
   editable?: boolean;
 };
 
-function RatEditor(props: RatEditorProps): ReactElement {
+export function RatEditor(props: RatEditorProps): ReactElement {
   const runtimeValue = props.valueDef?.value;
   const isUnset = !runtimeValue || runtimeValue.value.kind === 'Unset';
   const initialValue =
@@ -574,7 +574,7 @@ type BoolEditorProps = {
   editable?: boolean;
 };
 
-function BoolEditor(props: BoolEditorProps): ReactElement {
+export function BoolEditor(props: BoolEditorProps): ReactElement {
   const runtimeValue = props.valueDef?.value;
   const isUnset = !runtimeValue || runtimeValue.value.kind === 'Unset';
   const vProps = useValidationHint(isUnset ? 'unset' : 'valid');
@@ -618,7 +618,7 @@ type DurationEditorProps = {
   editable?: boolean;
 };
 
-function DurationEditor(props: DurationEditorProps): ReactElement {
+export function DurationEditor(props: DurationEditorProps): ReactElement {
   const runtimeValue = props.valueDef?.value;
   const initialValue =
     runtimeValue?.value.kind === 'Duration'
@@ -812,7 +812,7 @@ type MoneyEditorProps = {
   editable?: boolean;
 };
 
-function MoneyEditor(props: MoneyEditorProps): ReactElement {
+export function MoneyEditor(props: MoneyEditorProps): ReactElement {
   const runtimeValue = props.valueDef?.value;
   const isUnset = !runtimeValue || runtimeValue.value.kind === 'Unset';
   const initialValue = // in cents
