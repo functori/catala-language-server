@@ -1,5 +1,5 @@
 import { type ReactElement, useState } from 'react';
-import type { IntlShape} from 'react-intl';
+import type { IntlShape } from 'react-intl';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { VscodeButton, VscodeTextfield } from '@vscode-elements/react-elements';
 import {
@@ -62,7 +62,7 @@ function isolateStateVariable(
   return [valueVariables, stateVariables];
 }
 
-function formtatRuntimeValue(
+function formatRuntimeValue(
   rv: RuntimeValue | undefined,
   intl: IntlShape
 ): string | undefined {
@@ -119,7 +119,7 @@ function TraceValueEditor({
       );
     case 'absent':
     case 'enum': {
-      const inputStr = formtatRuntimeValue(input, intl);
+      const inputStr = formatRuntimeValue(input, intl);
       return (
         <VscodeTextfield
           value={inputStr}
@@ -135,7 +135,6 @@ function TraceValueEditor({
               : undefined;
             setInput(jsonValue);
           }}
-          style={{ flex: 1, width: '100%' }}
         />
       );
     }
@@ -310,6 +309,7 @@ function VariableRow({
     }
   }
 
+  const inputStr = formatRuntimeValue(input, intl) ?? '';
   return (
     <div className="simple-item-vertical atomic-element">
       <label className="item-label body-1" style={{ textTransform: 'none' }}>
@@ -324,12 +324,18 @@ function VariableRow({
         >
           {expectedStr}
         </span>
-        <TraceValueEditor
-          kind={computed ? computed.kind : 'absent'}
-          input={input}
-          setInput={setInput}
-          intl={intl}
-        />
+        <div style={{ margin: 'auto', width: '20em' }}>
+          {computed !== undefined ? (
+            <TraceValueEditor
+              input={input}
+              setInput={setInput}
+              kind={computed?.kind!}
+              intl={intl}
+            />
+          ) : (
+            <span className="codicon codicon-loading codicon-modifier-spin" />
+          )}
+        </div>
         <VscodeButton
           secondary
           icon="arrow-left"
@@ -344,10 +350,11 @@ function VariableRow({
         />
         <VscodeButton
           secondary
+          disabled={inputStr == ''}
           icon="check"
           title={intl.formatMessage(
             { id: 'testEditor.setVariable' },
-            { value: 'applyStr' }
+            { value: inputStr }
           )}
           onClick={apply}
         />
@@ -417,6 +424,7 @@ function VariableCatalog({
         <tbody>
           {[...stateVariables.entries()].map(([stateName, nodes]) => (
             <StateRow
+              key={`st-${stateName}`}
               varName={stateName}
               nodes={nodes}
               crumbs={[]}
@@ -428,17 +436,22 @@ function VariableCatalog({
               (v): v is Extract<TraceVariable, { kind: 'value' }> =>
                 v.kind === 'value' && outputs[v.name] === undefined
             )
-            .map((v, i) => (
-              <ValueRow key={`v-${i}`} node={v} crumbs={[]} onAdd={onAdd} />
+            .map((v) => (
+              <ValueRow
+                key={`v-${v.name}`}
+                node={v}
+                crumbs={[]}
+                onAdd={onAdd}
+              />
             ))}
           {filtered
             .filter(
               (v): v is Extract<TraceVariable, { kind: 'step' }> =>
                 v.kind === 'step'
             )
-            .map((v, i) => (
+            .map((v) => (
               <StepRow
-                key={`s-${i}`}
+                key={`s-${variableSegment(v)}`}
                 node={v}
                 crumbs={[]}
                 onAdd={onAdd}
@@ -540,9 +553,9 @@ function StepRow({
               (v): v is Extract<TraceVariable, { kind: 'value' }> =>
                 v.kind === 'value' && !v.name.includes('#')
             )
-            .map((v, i) => (
+            .map((v) => (
               <ValueRow
-                key={`v-${i}`}
+                key={`v-${v.name}`}
                 node={v}
                 crumbs={selfCrumbs}
                 onAdd={onAdd}
@@ -550,6 +563,7 @@ function StepRow({
             ))}
           {[...stateVariables.entries()].map(([stateName, nodes]) => (
             <StateRow
+              key={`st-${stateName}`}
               varName={stateName}
               nodes={nodes}
               crumbs={selfCrumbs}
@@ -562,9 +576,9 @@ function StepRow({
               (v): v is Extract<TraceVariable, { kind: 'step' }> =>
                 v.kind === 'step'
             )
-            .map((v, i) => (
+            .map((v) => (
               <StepRow
-                key={`s-${i}`}
+                key={`s-${variableSegment(v)}`}
                 node={v}
                 crumbs={selfCrumbs}
                 onAdd={onAdd}
@@ -616,10 +630,10 @@ function StateRow({
               (v): v is Extract<TraceVariable, { kind: 'value' }> =>
                 v.kind === 'value'
             )
-            .map((v, i) => (
+            .map((v) => (
               <ValueRow
                 padding={true}
-                key={`v-${i}`}
+                key={`v-${v.name}`}
                 node={v}
                 crumbs={crumbs}
                 onAdd={onAdd}
@@ -648,7 +662,15 @@ function ValueRow({
   const computedRuntime: RuntimeValue | undefined = runtimeComputed
     ? { value: runtimeComputed, attrs: [] }
     : undefined;
-  const [input, setInput] = useState<RuntimeValue | undefined>(computedRuntime);
+  const [input, setInput] = useState<RuntimeValue | undefined>(undefined);
+  const computedKey = computed === undefined ? '' : JSON.stringify(computed);
+  const [seed, setSeed] = useState<string | undefined>(undefined);
+  if (seed !== computedKey) {
+    // Input is set only on first rendering, using a seed to re-set
+    // input
+    setSeed(computedKey);
+    setInput(computedRuntime);
+  }
   if (
     computed === undefined ||
     computed.kind === 'struct' ||
@@ -658,7 +680,6 @@ function ValueRow({
     return null;
   }
   const path = variablePath(crumbs.join('.'), node);
-  const computedStr = formatTraceValue(computed, intl);
   const addValue = input !== undefined ? traceValueFromRuntime(input) : null;
   const addDisabled = input !== undefined && addValue === undefined;
   const splittedName = node.name.split('#');
@@ -684,34 +705,23 @@ function ValueRow({
           intl={intl}
         />
       </td>
-      <td/>
+      <td />
       {/* `display: flex` on the `td` itself would take it out of the table's
           column model, so the flex row lives on an inner element. */}
       <td>
-        <span className="variable-catalog-actions">
-          <VscodeButton
-            secondary
-            icon="arrow-left"
-            disabled={computedStr === undefined}
-            title={intl.formatMessage(
-              { id: 'testEditor.fillComputedVariable' },
-              { value: computedStr ?? '' }
-            )}
-            onClick={() => onAdd(path, computed)}
-          />
-          <VscodeButton
-            secondary
-            icon="add"
-            disabled={addDisabled}
-            title={intl.formatMessage({ id: 'testEditor.addVariable' })}
-            onClick={() => {
-              if (addValue !== undefined) {
-                onAdd(path, addValue);
-                setInput(undefined);
-              }
-            }}
-          />
-        </span>
+        <VscodeButton
+          className="variable-catalog-actions"
+          secondary
+          icon="add"
+          disabled={addDisabled}
+          title={intl.formatMessage({ id: 'testEditor.addVariable' })}
+          onClick={() => {
+            if (addValue !== undefined) {
+              onAdd(path, addValue);
+              setInput(undefined);
+            }
+          }}
+        />
       </td>
     </tr>
   );
