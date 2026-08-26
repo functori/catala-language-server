@@ -29,11 +29,6 @@ function execBinary(
   opts: ExecOptions = {}
 ): ExecResult {
   logger.log(`Running ${bin} ${args.join(' ')}`);
-  const startedAt = Date.now();
-  // Logged on both paths: these two commands (clerk, then catala) are the whole
-  // cost of a test run, so timing them is what tells the two apart.
-  const logElapsed = (): void =>
-    logger.log(`  ↳ ${bin} took ${Date.now() - startedAt} ms`);
   try {
     const useShell = process.platform === 'win32';
     const output = execFileSync(bin, useShell ? args.map(shellArg) : args, {
@@ -41,10 +36,8 @@ function execBinary(
       shell: useShell,
       ...opts,
     });
-    logElapsed();
     return { ok: true, output };
   } catch (error) {
-    logElapsed();
     const stderr = (error as SpawnSyncReturns<Buffer | string>).stderr;
     return {
       ok: false,
