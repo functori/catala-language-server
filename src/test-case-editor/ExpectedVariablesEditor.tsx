@@ -146,6 +146,8 @@ export default function ExpectedVariablesEditor({
     return findTraceValue(path, trVariablesAux);
   }
 
+  const hasTraceVars = trVariablesAux.length > 0;
+
   function setVar(path: string, tv: TraceValue | null): void {
     const next = new Map(testVariables);
     next.set(path, tv);
@@ -167,16 +169,20 @@ export default function ExpectedVariablesEditor({
         <div className="composite-editor">
           {testVariables.size > 0 && (
             <div className="simple-items-vertical">
-              {[...testVariables.entries()].map(([path, tv]) => (
-                <VariableRow
-                  key={path}
-                  name={path}
-                  expected={tv}
-                  computed={computedOf(path)}
-                  onSet={setVar}
-                  onRemove={remove}
-                />
-              ))}
+              {[...testVariables.entries()].map(([path, tv]) => {
+                const computed = computedOf(path);
+                return (
+                  <VariableRow
+                    key={path}
+                    name={path}
+                    expected={tv}
+                    computed={computed}
+                    missing={hasTraceVars && computed === undefined}
+                    onSet={setVar}
+                    onRemove={remove}
+                  />
+                );
+              })}
             </div>
           )}
           {runTrace !== false && (
@@ -225,12 +231,14 @@ function VariableRow({
   name,
   expected,
   computed,
+  missing,
   onSet,
   onRemove,
 }: {
   name: string;
   expected: TraceValue | null;
   computed?: TraceValue;
+  missing?: boolean;
   onSet(name: string, rv: TraceValue | null): void;
   onRemove(name: string): void;
 }): ReactElement {
@@ -275,7 +283,17 @@ function VariableRow({
   }
 
   return (
-    <div className="simple-item-vertical atomic-element">
+    <div
+      className="simple-item-vertical atomic-element"
+      style={
+        missing
+          ? {
+              background:
+                'var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.2))',
+            }
+          : undefined
+      }
+    >
       <label className="item-label body-1" style={{ textTransform: 'none' }}>
         {name}
       </label>
