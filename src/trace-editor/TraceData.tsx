@@ -69,6 +69,7 @@ type VarRow = {
   value?: string;
   noExpected?: boolean;
   kind?: string;
+  missing?: boolean;
 };
 
 export function DataPanel({
@@ -95,6 +96,7 @@ export function DataPanel({
       }))
   );
 
+  const hasTraceVars = trVariables.length > 0;
   const internalRows: VarRow[] = [...test.variables.entries()].map(
     ([name, expected]) => {
       const computed = findTraceValue(name, trVariables);
@@ -103,6 +105,7 @@ export function DataPanel({
         expected: expected ? formatTraceValue(expected) : undefined,
         value: computed ? formatTraceValue(computed) : undefined,
         kind: expected ? expected.kind : undefined,
+        missing: hasTraceVars && computed === undefined,
       };
     }
   );
@@ -189,11 +192,13 @@ function VarRowView({
 }): ReactElement {
   const comparable =
     !row.noExpected && row.expected !== undefined && row.value !== undefined;
-  const background = !comparable
-    ? undefined
-    : row.expected === row.value
-      ? 'var(--vscode-diffEditor-insertedTextBackground, rgba(35, 200, 60, 0.2))'
-      : 'var(--vscode-diffEditor-removedTextBackground, rgba(255, 50, 50, 0.2))';
+  const background = row.missing
+    ? 'var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.2))'
+    : !comparable
+      ? undefined
+      : row.expected === row.value
+        ? 'var(--vscode-diffEditor-insertedTextBackground, rgba(35, 200, 60, 0.2))'
+        : 'var(--vscode-diffEditor-removedTextBackground, rgba(255, 50, 50, 0.2))';
   return (
     <tr style={{ background }}>
       <td style={{ ...tdStyle, fontWeight: 600 }}>
