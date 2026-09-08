@@ -30,7 +30,7 @@
   catala.surface
   catala.clerk_lib
   catala.clerk_utils
-  catala.clerk_backend
+  catala.clerk_backends
   ptime.clock.os
   uri
   re

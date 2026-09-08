@@ -247,7 +247,6 @@ export class TestCaseEditorProvider
     const checkVariable = await this.checkExpected(
       getCwd(document.uri.fsPath) ?? path.dirname(document.uri.fsPath)
     );
-    logger.log(`Check Variable: ${checkVariable}`);
     const config = vscode.workspace.getConfiguration('catala');
     const isCustomEditorEnabled = config.get<boolean>(
       'enableCustomTestCaseEditor'

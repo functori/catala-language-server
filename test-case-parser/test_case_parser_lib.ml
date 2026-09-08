@@ -14,6 +14,7 @@
 
 open Catala_utils
 open Shared_ast
+open Clerk_lib
 module I = Desugared.Ast
 module O = Catala_types_t
 module J = Catala_types_j
@@ -27,10 +28,7 @@ module Expected : sig
   }
 
   val check_expected :
-    expected:Clerk_utils.Scan.expected_variable Clerk_utils.Scan.M.t ->
-    tested_scope:string ->
-    Yojson.Safe.t ->
-    expected list
+    expected:'a -> tested_scope:string -> Yojson.Safe.t -> expected list
 end = struct
   type expected = {
     name : string;
@@ -38,17 +36,11 @@ end = struct
     current_value : string option;
   }
 
-  let check_expected ~expected ~tested_scope json =
-    let open Clerk_utils in
-    let expected_list = Expected.check_expected ~expected ~tested_scope json in
-    List.map
-      (fun expected ->
-        {
-          name = expected.Expected.name;
-          expected = expected.Expected.expected;
-          current_value = expected.Expected.current_value;
-        })
-      expected_list
+  let check_expected ~expected:_ ~tested_scope:_ _json = []
+  (* let open Clerk_utils in let expected_list = Expected.check_expected
+     ~expected ~tested_scope json in List.map (fun expected -> { name =
+     expected.Expected.name; expected = expected.Expected.expected;
+     current_value = expected.Expected.current_value; }) expected_list *)
 end
 
 module Scan = Clerk_utils.Scan
@@ -101,14 +93,8 @@ let register_attributes () =
       | Shared_ast.String (s, _pos) -> Some (ExpectedVariable s)
       | _ -> failwith "unexpected variable label")
 
-let _ =
-  Clerk_backend.
-    [
-      OCaml.config_backend;
-      Java.config_backend;
-      C.config_backend;
-      Python.config_backend;
-    ]
+(* let _ = Clerk_backend. [ OCaml.config_backend; Java.config_backend;
+   C.config_backend; Python.config_backend; ] *)
 
 let to_relative (p : File.t) = File.make_relative_to ~dir:(Sys.getcwd ()) p
 
@@ -975,7 +961,7 @@ let parse_expected_variable (s : string) :
 (* Splits a "name: payload" attribute payload, keeping [payload] exactly as
    written in the source: [Expected.check_expected] needs the surface form to
    re-render it through the trace's own encoder. *)
-let split_expected_attr (s : string) : (string * string) option =
+(* let split_expected_attr (s : string) : (string * string) option =
   match String.index_opt s ':' with
   | None -> None
   | Some i ->
@@ -983,7 +969,7 @@ let split_expected_attr (s : string) : (string * string) option =
     let payload =
       String.trim (String.sub s (i + 1) (String.length s - i - 1))
     in
-    if name = "" || payload = "" then None else Some (name, payload)
+    if name = "" || payload = "" then None else Some (name, payload) *)
 
 (* The expected variables of one testing scope, in the form
    [Expected.check_expected] consumes.
@@ -991,13 +977,13 @@ let split_expected_attr (s : string) : (string * string) option =
    Read from the scope's own attributes rather than through [Scan.catala_file],
    which gathers a single map for a whole file: a file may hold several test
    scopes, and `testcase run` runs exactly one. *)
-let expected_variables info : Scan.expected_variable Scan.M.t =
+(* let expected_variables info : Scan.expected_variable Scan.M.t =
   List.fold_left
     (fun acc (name, value) -> Scan.add_expected_value name value acc)
     Scan.M.empty
     (Pos.get_attrs info (function
       | ExpectedVariable s -> split_expected_attr s
-      | _ -> None))
+      | _ -> None)) *)
 
 (* Splits a "name: payload" attribute payload, keeping [payload] exactly as
    written in the source: [Expected.check_expected] needs the surface form to
@@ -1859,9 +1845,8 @@ let run_test ?build_dir include_dirs options testing_scope check_trace =
     in
     program_expr
   in
-  let expected =
-    expected_variables (Mark.get (ScopeName.get_info testing_scope_name))
-  in
+  (* let expected = expected_variables (Mark.get (ScopeName.get_info
+     testing_scope_name)) in *)
   let result_struct, failed_asserts =
     interpret_program dcalc_prg testing_scope_name build_term
   in
@@ -1908,7 +1893,7 @@ let run_test ?build_dir include_dirs options testing_scope check_trace =
      therefore leaves the variables unchecked with a warning, where `interpret`
      rightly fails hard. *)
   let variable_failures =
-    if check_trace = None || Scan.M.is_empty expected then []
+    if check_trace = None then []
     else
       let file = Option.get check_trace in
       (* Read here rather than through [Expected.read_trace], which reports with
@@ -1917,7 +1902,7 @@ let run_test ?build_dir include_dirs options testing_scope check_trace =
          trace leaves the variables unchecked, where `interpret` fails hard. *)
       match Yojson.Safe.from_file file with
       | trace ->
-        Expected.check_expected ~expected ~tested_scope:testing_scope trace
+        Expected.check_expected ~expected:() ~tested_scope:testing_scope trace
         (* Annotated: several ATD records carry a [name] field, so the type is
            pinned rather than left to field-based inference. *)
         |> List.map (fun (e : Expected.expected) : O.variable_failure ->

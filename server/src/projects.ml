@@ -16,6 +16,7 @@
 
 open Catala_utils
 open Server_types
+open Clerk_lib
 
 let to_doc_id (i : Scan.item) = Doc_id.of_file i.file_name
 
@@ -597,7 +598,6 @@ let eq_item (i : Scan.item) (i' : Scan.item) =
     has_inline_tests = _;
     has_scope_tests = _;
     is_stdlib = _;
-    expected_variables = _;
   } =
     i
   in
@@ -610,7 +610,6 @@ let eq_item (i : Scan.item) (i' : Scan.item) =
     has_inline_tests = _;
     has_scope_tests = _;
     is_stdlib = _;
-    expected_variables = _;
   } =
     i'
   in

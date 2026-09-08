@@ -15,6 +15,8 @@
    the License. *)
 
 open Server_types
+open Clerk_lib
+
 
 module Scan_item : sig
   type t = Scan.item

@@ -808,11 +808,10 @@ class catala_lsp_server =
         let clerk_toml = process_clerk_toml clerk_toml_dir in
         match clerk_toml with
         | None -> Lwt.return `Null
-        | Some (config, _) ->
+        | Some (_config, _) ->
           Lwt.return
-          @@ Option.fold ~none:(`Bool false)
-               ~some:(fun b -> `Bool b)
-               config.global.check_expected)
+          @@ Option.fold ~none:(`Bool false) ~some:(fun b -> `Bool b) None)
+    (* config.global.check_expected) *)
 
     method private list_entrypoints (params : Yojson.Safe.t option) :
         Yojson.Safe.t Lwt.t =

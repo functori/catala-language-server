@@ -20,6 +20,7 @@ open Lwt.Syntax
 open Server_types
 open Debug_interpret
 open Debug_protocol
+open Clerk_lib
 
 type dcalc_expr = ((yes, no, yes) interpr_kind, typed) gexpr
 type dcalc_env = (yes, no, typed) env

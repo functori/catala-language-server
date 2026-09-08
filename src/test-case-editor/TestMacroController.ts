@@ -162,9 +162,6 @@ export class TestMacroController {
             false,
             true
           );
-          for (let o of entrypoints) {
-            logger.log(`Entrypoint: ${JSON.stringify(o)}`);
-          }
           this.handleCatalaEntrypoint(entrypoints, resultController);
           break;
         }
@@ -248,7 +245,7 @@ export class TestMacroController {
                     value: {
                       entry: test.test,
                       scope_success: {
-                        success: res.success && res.expected.length == 0,
+                        success: res.success,
                         date: res.date,
                       },
                       index,

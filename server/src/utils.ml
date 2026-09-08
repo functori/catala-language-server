@@ -18,6 +18,7 @@ open Linol_lsp
 open Linol_lwt
 open Catala_utils
 open Server_types
+open Clerk_lib
 
 let ( let*? ) = Option.bind
 let ( let*?! ) (x, default) f = match x with None -> default | Some x -> f x
@@ -172,14 +173,14 @@ let lookup_catala_enable_project_scan ~(notify_back : Jsonrpc2.notify_back) :
 
 (* FIXME: this forces loading the backend modules and triggering the
    registration without having to enable the -linkall flag. *)
-let _ =
-  Clerk_backend.
+(* let _ =
+  Clerk_backends.
     [
       OCaml.config_backend;
       Java.config_backend;
       C.config_backend;
       Python.config_backend;
-    ]
+    ] *)
 
 let process_clerk_toml clerk_toml_dir =
   try

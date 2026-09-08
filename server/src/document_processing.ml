@@ -21,6 +21,7 @@ open Catala_utils
 open Server_state
 open Server_types
 open Shared_ast
+open Clerk_lib
 
 let err_severity = function
   | Catala_utils.Message.Lexing | Parsing | Typing | Generic | AssertFailure ->

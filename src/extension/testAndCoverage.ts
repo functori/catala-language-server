@@ -19,7 +19,6 @@ import type {
   VariableFailure,
 } from '../generated/catala_types';
 import path from 'path';
-import { logger } from './logger';
 
 type ClerkLocation = {
   file: string;
@@ -192,7 +191,7 @@ async function clerkRunTest(
   cancellation: vscode.CancellationToken,
   with_coverage?: boolean
 ): Promise<ClerkTestRunResult | Error> {
-  const args = ['test', '--json']
+  const args = ['test', '--quiet', '--json']
     .concat(with_coverage ? ['--code-coverage'] : [])
     .concat(paths);
   return new Promise((resolve) => {
@@ -218,7 +217,6 @@ async function clerkRunTest(
         const results = JSON.parse(
           output.toString()
         ) as ClerkTestAndCoverageResult;
-        logger.log(`Hausse du json: ${JSON.stringify(results)}`);
         if (results?.['test-results']) {
           resolve({ results, code: code ?? 0, err_msg: stderr });
         } else {
