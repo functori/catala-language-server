@@ -63,9 +63,9 @@ let register_attributes () =
     ~contexts:(function
       | Desugared.Name_resolution.ScopeDecl -> true | _ -> false)
     (fun ~pos:_ value ->
-       match value with
-       | Shared_ast.String (s, _pos) -> Some (ExpectedVariable s)
-       | _ -> failwith "unexpected variable label")
+      match value with
+      | Shared_ast.String (s, _pos) -> Some (ExpectedVariable s)
+      | _ -> failwith "unexpected variable label")
 
 let to_relative (p : File.t) = File.make_relative_to ~dir:(Sys.getcwd ()) p
 
@@ -871,13 +871,14 @@ let string_of_runtime_value ~lang (v : O.runtime_value) : string =
     done;
     let s = String.sub s 0 !len in
     if s.[String.length s - 1] = '.' then s ^ "0" else s
-  | O.Money m ->
+  | O.Money m -> (
     let major = abs m / 100 and minor = abs m mod 100 in
     let sign = if m < 0 then "-" else "" in
-    (match lang with
+    match lang with
     | `En -> Printf.sprintf "%s$%d.%02d" sign major minor
     | _ -> Printf.sprintf "%s%d,%02d €" sign major minor)
-  | O.Date { year; month; day } -> Printf.sprintf "%04d-%02d-%02d" year month day
+  | O.Date { year; month; day } ->
+    Printf.sprintf "%04d-%02d-%02d" year month day
   | O.Duration { years; months; days } ->
     Printf.sprintf "%dy %dm %dd" years months days
   | O.Enum (_, (ctor, _)) -> ctor
@@ -886,7 +887,8 @@ let string_of_runtime_value ~lang (v : O.runtime_value) : string =
 let runtime_value_of_string (s : string) : O.runtime_value =
   let enum ctor =
     O.Enum
-      ({ O.enum_name = "Optional"; constructors = []; ctor_attrs = [] }, (ctor, None))
+      ( { O.enum_name = "Optional"; constructors = []; ctor_attrs = [] },
+        (ctor, None) )
   in
   let money_of s =
     let mk n =
@@ -919,10 +921,10 @@ let runtime_value_of_string (s : string) : O.runtime_value =
         match int_of_string_opt s with
         | Some i -> O.Integer i
         | None -> (
-          match scan "%d-%d-%d%!" (fun y m d -> (y, m, d)) with
+          match scan "%d-%d-%d%!" (fun y m d -> y, m, d) with
           | Some (year, month, day) -> O.Date { year; month; day }
           | None -> (
-            match scan "%dy %dm %dd%!" (fun y m d -> (y, m, d)) with
+            match scan "%dy %dm %dd%!" (fun y m d -> y, m, d) with
             | Some (years, months, days) -> O.Duration { years; months; days }
             | None -> (
               match float_of_string_opt s with
@@ -953,20 +955,6 @@ let split_expected_attr (s : string) : (string * string) option =
       String.trim (String.sub s (i + 1) (String.length s - i - 1))
     in
     if name = "" || payload = "" then None else Some (name, payload)
-
-(* The expected variables of one testing scope, in the form
-   [Expected.check_expected] consumes.
-
-   Read from the scope's own attributes rather than through [Scan.catala_file],
-   which gathers a single map for a whole file: a file may hold several test
-   scopes, and `testcase run` runs exactly one. *)
-let expected_variables info : Scan.expected_variable Scan.M.t =
-  List.fold_left
-    (fun acc (name, value) -> Scan.add_expected_value name value acc)
-    Scan.M.empty
-    (Pos.get_attrs info (function
-      | ExpectedVariable s -> split_expected_attr s
-      | _ -> None))
 
 let get_catala_test (prg, naming_ctx) testing_scope_name =
   let testing_scope =
@@ -1121,8 +1109,8 @@ let get_catala_test (prg, naming_ctx) testing_scope_name =
   in
   let variables =
     Pos.get_attrs info (function
-        | ExpectedVariable s -> parse_expected_variable s
-        | _ -> None)
+      | ExpectedVariable s -> parse_expected_variable s
+      | _ -> None)
   in
   { base_test with O.test_inputs; test_outputs; variables; description; title }
 
@@ -1332,7 +1320,8 @@ let write_catala_test ppf t lang =
       let payload =
         match value with
         | None -> var
-        | Some v -> Printf.sprintf "%s: %s" var (string_of_runtime_value ~lang v)
+        | Some v ->
+          Printf.sprintf "%s: %s" var (string_of_runtime_value ~lang v)
       in
       fprintf ppf "#[testcase.variable = %s]@\n" (String.quote payload))
     t.variables;
