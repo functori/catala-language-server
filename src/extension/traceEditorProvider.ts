@@ -17,6 +17,7 @@ import { resolveLanguage } from '../shared/settings';
 import type { TraceElement } from '../trace-editor/traceUtils';
 import type { Test } from '../generated/catala_types';
 import { writeTest } from '../generated/catala_types';
+import { TestCaseEditorProvider } from './testCaseEditorProvider';
 
 const fileLineCache = new Map<string, string>();
 
@@ -268,16 +269,16 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
         case 'updateData': {
-          // Open the same file with the test case editor in a side-by-side
-          // group, keeping the focus on the trace editor.
-          await vscode.commands.executeCommand(
-            'vscode.openWith',
+          logger.log(`Log data value: ${JSON.stringify(message.value)}`);
+          let result = await TestCaseEditorProvider.focusDataInput(
             document.uri,
-            // Literal instead of TestCaseEditorProvider.viewType to avoid a
-            // circular import (that module already imports this one).
-            'catala.testCaseEditor',
-            { viewColumn: vscode.ViewColumn.Beside }
+            message.value
           );
+          if (!result) {
+            vscode.window.showErrorMessage(
+              'Unexpected error when trying to focus'
+            );
+          }
           break;
         }
       }
