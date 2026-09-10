@@ -46,6 +46,7 @@ import {
 } from './extension/catalaFolding';
 import path from 'path';
 import { TestMacroController } from './extension/TestMacroController';
+import { SettingsStore } from './extension/settingsStore';
 
 const itemMessagesFR = {
   generalTestsTitle: 'Vue globale des tests',
@@ -502,6 +503,16 @@ export async function activate(
 ): Promise<void> {
   // Enable the persistent trace cache (stored under global storage).
   initTraceCache(context.globalStorageUri.fsPath);
+
+  const settingsStore = new SettingsStore(context);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('catala.openSettings', () =>
+      vscode.commands.executeCommand(
+        'workbench.action.openSettings',
+        '@ext:catalalang.catala'
+      )
+    )
+  );
   vscode.debug.registerDebugAdapterDescriptorFactory('catala-debugger', {
     createDebugAdapterDescriptor(_session) {
       const dap_path = resolveBinaryPath('catala-dap', context, 'main_dap.exe');
@@ -623,7 +634,7 @@ export async function activate(
 
     initTests(entrypointsRequest, context, client, ctrl, resultController);
 
-    const macroTestsView = new TestMacroController();
+    const macroTestsView = new TestMacroController(settingsStore);
     context.subscriptions.push(
       vscode.commands.registerCommand(
         'catala.debugAllTests',
@@ -718,6 +729,10 @@ export async function activate(
     )
   );
 
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('catala.settings', new tree_view([]))
+  );
+
   logger.log(`Register "Catala Tests" data in th Tree data provider`);
 
   context.subscriptions.push(
@@ -768,11 +783,17 @@ export async function activate(
       context,
       resultController,
       codiconsCssPath,
-      checkTraceAssert(() => client)
+      checkTraceAssert(() => client),
+      settingsStore
     )
   );
   context.subscriptions.push(
-    TraceEditorProvider.register(context, () => client, codiconsCssPath)
+    TraceEditorProvider.register(
+      context,
+      () => client,
+      codiconsCssPath,
+      settingsStore
+    )
   );
 
   context.subscriptions.push(
