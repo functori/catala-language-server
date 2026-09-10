@@ -14,6 +14,7 @@ import type { TestDebugger } from './generated/catala_types';
 import { readDownMessage, writeUpMessage } from './generated/catala_types';
 import { Box, Checkbox, FormControlLabel, Grid } from '@mui/material';
 import { VscodeTextfield } from '@vscode-elements/react-elements';
+import { isSettingsMessage } from './shared/settings';
 import { assertUnreachable } from './shared/util';
 import { setVsCodeApi } from './shared/webviewApi';
 import type { Filter } from './FilterPin';
@@ -1101,6 +1102,9 @@ export default function GeneralTests({
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
+      if (isSettingsMessage(event.data)) {
+        return;
+      }
       const message = readDownMessage(event.data);
       switch (message.kind) {
         case 'AllTests': {

@@ -58,6 +58,11 @@
           "icon": "$(info)"
         },
         {
+          "id": "catala.settings",
+          "name": "%view.catala.settings.title%",
+          "icon": "$(gear)"
+        },
+        {
           "id": "catala.help",
           "name": "%view.catala.help.title%",
           "icon": "$(info)"
@@ -129,6 +134,12 @@
       {
         "command": "catala.trace.addToFilter",
         "title": "%command.catala.trace.addToFilter.title%"
+      },
+      {
+        "command": "catala.openSettings",
+        "category": "catala",
+        "title": "%command.catala.openSettings.title%",
+        "icon": "$(gear)"
       }
     ],
     "menus": {
@@ -154,6 +165,11 @@
         {
           "command": "catala.refreshSwitches",
           "when": "view == catala.switches",
+          "group": "navigation"
+        },
+        {
+          "command": "catala.openSettings",
+          "when": "view == catala.settings",
           "group": "navigation"
         }
       ],
@@ -330,6 +346,23 @@
           "type": "string",
           "default": null,
           "description": "Custom path to the `clerk` executable"
+        },
+        "catala.language": {
+          "type": "string",
+          "enum": [
+            "default",
+            "en",
+            "fr",
+            "file"
+          ],
+          "enumDescriptions": [
+            "Let each editor pick, as it did before there was a setting",
+            "English, whatever is being edited",
+            "French, whatever is being edited",
+            "The language of the file itself, from its .catala_xx suffix"
+          ],
+          "default": "default",
+          "description": "Language the Catala editors present values in"
         }
       }
     },
@@ -477,7 +510,13 @@
         "editor.tabSize": 2,
         "editor.insertSpaces": true
       }
-    }
+    },
+    "viewsWelcome": [
+      {
+        "view": "catala.settings",
+        "contents": "%view.catala.settings.welcome%"
+      }
+    ]
   },
   "activationEvents": [
     "workspaceContains:**/clerk.toml",
