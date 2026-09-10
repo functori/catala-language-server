@@ -341,8 +341,14 @@ export class TestCaseEditorProvider
             kind: 'Update',
             value: document.parseResults,
           });
-          TestCaseEditorProvider.markReady(document.uri);
           void sendTrace();
+          break;
+        }
+        // The webview acknowledges the `Update` above once it has rendered the
+        // document: only then can queued messages (e.g. `FocusData`) find the
+        // fields they target, so this -- not `Ready` -- is what flushes them.
+        case 'MarkAsUpdate': {
+          TestCaseEditorProvider.markReady(document.uri);
           break;
         }
         case 'GuiEdit': {
@@ -672,11 +678,14 @@ export class TestCaseEditorProvider
       return false;
     }
 
-    // Deliver immediately if ready, or queue until the webview signals Ready.
-    return TestCaseEditorProvider.postOrQueue(uri, {
+    // Deliver immediately if ready, or queue until the webview signals Ready
+    // -- a queued request is the normal path when the editor was just opened
+    // above, so `postOrQueue` returning false is not a failure here.
+    TestCaseEditorProvider.postOrQueue(uri, {
       kind: 'FocusData',
       value: input_field,
     });
+    return true;
   }
 
   public static async focusDiffInCustomEditor(
