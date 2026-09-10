@@ -206,7 +206,7 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
       switch (message.kind) {
         case 'ready':
           following.dispose();
-          following = this.settings.follow(webview);
+          following = this.settings.follow(webview, file);
           await sendInit(inputs);
           break;
         case 'run': {
