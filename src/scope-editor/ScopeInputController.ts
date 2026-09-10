@@ -150,6 +150,10 @@ export class ScopeInputController {
           );
         case 'Reload':
           throw new Error('Unexpected Reload');
+        // Only the test case editor acknowledges its `Update`s; this view has
+        // no queued messages waiting on one.
+        case 'MarkAsUpdate':
+          throw new Error('Unexpected MarkAsUpdate');
         default:
           assertUnreachable(typed_msg);
       }

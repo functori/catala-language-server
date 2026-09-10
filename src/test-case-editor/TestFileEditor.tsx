@@ -87,6 +87,8 @@ export default function TestFileEditor({
   const [focusOnData, setFocusOnData] = useState<TraceData | undefined>(
     undefined
   );
+  // Number of `Update` messages applied, used to acknowledge them below.
+  const [appliedUpdates, setAppliedUpdates] = useState(0);
   useEffect(() => {
     setVsCodeApi(vscode);
   }, [vscode]);
@@ -95,6 +97,12 @@ export default function TestFileEditor({
   // than passed down to the field as a prop: the field only has to carry the
   // matching id. Clearing the request once handled is what makes a second
   // click on the same trace value focus again.
+  //
+  // The target is guaranteed to be rendered by the time the request arrives:
+  // the extension queues it (`postOrQueue` in `testCaseEditorProvider`) until
+  // the `MarkAsUpdate` acknowledgement below, which is only sent once the
+  // document received in an `Update` has been committed, so the fields exist
+  // when this runs.
   useEffect(() => {
     if (focusOnData === undefined) return;
     const element = document.getElementById(focusTargetId(focusOnData));
@@ -109,6 +117,14 @@ export default function TestFileEditor({
     }
     setFocusOnData(undefined);
   }, [focusOnData]);
+
+  // Acknowledging from an effect rather than from the message handler is what
+  // makes the guarantee above hold: the extension only flushes its queue once
+  // the `Update` has been rendered.
+  useEffect(() => {
+    if (appliedUpdates === 0) return;
+    vscode.postMessage(writeUpMessage({ kind: 'MarkAsUpdate' }));
+  }, [appliedUpdates, vscode]);
 
   const onTestChange = useCallback(
     (newValue: Test, mayBeBatched: boolean): void => {
@@ -268,6 +284,7 @@ export default function TestFileEditor({
       switch (message.kind) {
         case 'Update':
           setState(parseResultsToUiState(message.value));
+          setAppliedUpdates((n) => n + 1);
           break;
         case 'TestRunResults': {
           const { scope, reset_outputs, results } = message.value;

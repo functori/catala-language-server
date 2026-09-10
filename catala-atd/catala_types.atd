@@ -312,6 +312,9 @@ type test_entrypoint = [
 
 type up_message = [
   | Ready
+  (* Acknowledges an `Update`: sent once the webview has applied the new
+     document, so the extension knows it can deliver the messages it queued. *)
+  | MarkAsUpdate
   | Reload
   | GuiEdit of (test_list * bool) (* bool: 'edit may be batched' *)
   | OpenInTextEditor of string option (* filename *)

@@ -282,6 +282,7 @@ export type TestEntrypoint =
 
 export type UpMessage =
 | { kind: 'Ready' }
+| { kind: 'MarkAsUpdate' }
 | { kind: 'Reload' }
 | { kind: 'GuiEdit'; value: [TestList, boolean] }
 | { kind: 'OpenInTextEditor'; value: Option<string> }
@@ -1268,6 +1269,8 @@ export function writeUpMessage(x: UpMessage, context: any = x): any {
   switch (x.kind) {
     case 'Ready':
       return 'Ready'
+    case 'MarkAsUpdate':
+      return 'MarkAsUpdate'
     case 'Reload':
       return 'Reload'
     case 'GuiEdit':
@@ -1294,6 +1297,8 @@ export function readUpMessage(x: any, context: any = x): UpMessage {
     switch (x) {
       case 'Ready':
         return { kind: 'Ready' }
+      case 'MarkAsUpdate':
+        return { kind: 'MarkAsUpdate' }
       case 'Reload':
         return { kind: 'Reload' }
       case 'OpenTestScopePicker':
