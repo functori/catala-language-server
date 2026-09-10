@@ -10,6 +10,7 @@ import {
   type Diff,
   readDownMessage,
   writeUpMessage,
+  type TraceData,
 } from '../generated/catala_types';
 import TestEditor from './TestEditor';
 import BrokenTestView from './BrokenTestView';
@@ -20,6 +21,7 @@ import type { WebviewApi } from 'vscode-webview';
 import { setVsCodeApi } from '../shared/webviewApi';
 import { confirm, resolveConfirmResult } from '../messaging/confirm';
 import { replaceLosses } from './testCaseUtils';
+import { focusTargetId } from '../shared/focusTarget';
 import type { TraceElement } from '../trace-editor/traceUtils';
 
 /**
@@ -86,9 +88,32 @@ export default function TestFileEditor({
   const [testRunState, setTestRunState] = useState<TestRunState>({});
   // Trace computed per test scope (from running the scope with tracing).
   const [traces, setTraces] = useState<Record<string, TraceElement[]>>({});
+  // Pending focus request from the trace editor, if any.
+  const [focusOnData, setFocusOnData] = useState<TraceData | undefined>(
+    undefined
+  );
   useEffect(() => {
     setVsCodeApi(vscode);
   }, [vscode]);
+
+  // Focus is an imperative DOM action, so the request is resolved here rather
+  // than passed down to the field as a prop: the field only has to carry the
+  // matching id. Clearing the request once handled is what makes a second
+  // click on the same trace value focus again.
+  useEffect(() => {
+    if (focusOnData === undefined) return;
+    const element = document.getElementById(focusTargetId(focusOnData));
+    if (element !== null) {
+      // `tabIndex` is what makes a plain container focusable at all; -1 keeps
+      // it out of the tab order, so it is only ever reached this way.
+      if (!element.hasAttribute('tabindex')) {
+        element.tabIndex = -1;
+      }
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.focus();
+    }
+    setFocusOnData(undefined);
+  }, [focusOnData]);
 
   const onTestChange = useCallback(
     (newValue: Test, mayBeBatched: boolean): void => {
@@ -283,6 +308,10 @@ export default function TestFileEditor({
             }
             return next;
           });
+          break;
+        }
+        case 'FocusData': {
+          setFocusOnData(message.value);
           break;
         }
         case 'ConfirmResult': {
