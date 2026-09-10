@@ -95,40 +95,49 @@ function sortTree(nodes: DataNode[]): DataNode[] {
   );
 }
 
+function isContainer(node: DataNode): boolean {
+  return node.kind === 'struct' || node.kind === 'array';
+}
+
 function nodesFromTrace(
   variables: TraceVariable[],
   prefix: string,
   expected: Map<string, TraceValue | null>,
   matched: Set<string>,
+  showContainers: boolean,
   intl: IntlShape
 ): DataNode[] {
   return leavesFirst(
-    variables.map((variable): DataNode => {
+    variables.flatMap((variable): DataNode[] => {
       const label = variableSegment(variable);
       const path = variablePath(prefix, variable);
       if (expected.has(path)) {
         matched.add(path);
       }
       if (variable.kind === 'step') {
-        return {
-          label,
-          path,
-          children: nodesFromTrace(
-            variable.variables,
+        return [
+          {
+            label,
             path,
-            expected,
-            matched,
-            intl
-          ),
-        };
+            children: nodesFromTrace(
+              variable.variables,
+              path,
+              expected,
+              matched,
+              showContainers,
+              intl
+            ),
+          },
+        ];
       }
-      return buildNode(
+      const node = buildNode(
         label,
         path,
         expected.get(path) ?? undefined,
         variable.value,
         intl
       );
+      return showContainers || !isContainer(node) ? [node] : [];
     })
   );
 }
@@ -280,11 +289,13 @@ export function DataPanel({
   setFilter,
   trace,
   intl,
+  showContainers = false,
 }: {
   test: TraceTest;
   setFilter: SetFilter;
   trace?: TraceElement[];
   intl: IntlShape;
+  showContainers?: boolean;
 }): ReactElement {
   const [trVariables, trOutputs] = traceVariablesForTest(
     trace ?? [],
@@ -299,21 +310,30 @@ export function DataPanel({
 
   const hasTraceVars = trVariables.length > 0;
   const matched = new Set<string>();
+  const auxiliary = trVariables.filter(
+    (variable) =>
+      variable.kind === 'step' || trOutputs[variable.name] === undefined
+  );
   let internalNodes = nodesFromTrace(
-    trVariables,
+    auxiliary,
     '',
     test.variables,
     matched,
+    showContainers,
     intl
   );
   for (const [name, expected] of test.variables) {
     if (matched.has(name)) {
       continue;
     }
-    internalNodes = insertAt(internalNodes, pathSegments(name), '', {
+    const leaf = {
       ...buildNode(name, name, expected ?? undefined, undefined, intl),
       missing: hasTraceVars,
-    });
+    };
+    if (!showContainers && isContainer(leaf)) {
+      continue;
+    }
+    internalNodes = insertAt(internalNodes, pathSegments(name), '', leaf);
   }
   internalNodes = sortTree(internalNodes);
 
@@ -546,7 +566,7 @@ function NodeRow({
           </span>
         </span>
       </td>
-      {noExpected ? (
+      {noExpected || node.expected === undefined ? (
         <td style={disabledCellStyle}>—</td>
       ) : (
         <td
@@ -556,7 +576,7 @@ function NodeRow({
             setFilter(node.expected ?? '');
           }}
         >
-          {node.expected ?? ''}
+          {node.expected}
         </td>
       )}
       <td
@@ -601,7 +621,7 @@ const tdStyle: CSSProperties = {
   cursor: 'pointer',
   textAlign: 'left',
   padding: '1px 8px 1px 0',
-  verticalAlign: 'top',
+  verticalAlign: 'middle',
 };
 
 const ROW_INSET = 8;
@@ -668,7 +688,7 @@ const crumbSeparatorStyle: CSSProperties = {
 };
 
 const nameCellStyle: CSSProperties = {
-  display: 'inline-flex',
+  display: 'flex',
   alignItems: 'center',
   gap: 4,
 };
@@ -693,5 +713,4 @@ const disabledCellStyle: CSSProperties = {
   ...tdStyle,
   color: 'var(--vscode-descriptionForeground)',
   opacity: 0.5,
-  textAlign: 'center',
 };

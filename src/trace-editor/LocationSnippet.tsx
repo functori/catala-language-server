@@ -15,43 +15,11 @@ import type { CodeLocation } from './traceUtils';
 import { posText } from './traceUtils';
 
 export const CwdContext = createContext<string>('');
-export const SpawnPanelContext = createContext<
-  ((filter: string) => void) | null
->(null);
-
 export function resolvePath(cwd: string, file: string): string {
   if (!cwd || file.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(file)) {
     return file;
   }
   return `${cwd.replace(/[\\/]+$/, '')}/${file}`;
-}
-
-// -- The "View with filter" menu item -----------------------------------------
-
-const snippetContextAttribute = JSON.stringify({
-  webviewSection: 'traceSnippet',
-  preventDefaultContextMenuItems: false,
-});
-
-let viewWithFilterTarget: ((filter: string) => void) | null = null;
-let viewWithFilterListenerAttached = false;
-
-function armViewWithFilter(spawn: (filter: string) => void): void {
-  viewWithFilterTarget = spawn;
-  if (viewWithFilterListenerAttached) {
-    return;
-  }
-  viewWithFilterListenerAttached = true;
-  window.addEventListener('message', (event: MessageEvent): void => {
-    const m = event.data as TraceDownMessage;
-    if (m?.kind !== 'viewWithFilter') {
-      return;
-    }
-    const text = window.getSelection()?.toString().trim() ?? '';
-    if (text !== '' && viewWithFilterTarget !== null) {
-      viewWithFilterTarget(text);
-    }
-  });
 }
 
 // -- Fetching the source lines ------------------------------------------------
@@ -114,7 +82,6 @@ function SnippetBlock({
   children: ReactNode;
 }): ReactElement {
   const cwd = useContext(CwdContext);
-  const spawnPanel = useContext(SpawnPanelContext);
   const intl = useIntl();
   const [hover, setHover] = useState(false);
   const openLocation = (e: MouseEvent): void => {
@@ -131,19 +98,8 @@ function SnippetBlock({
     { id: 'trace.openLocation' },
     { target: posText(pos) }
   );
-  const onContextMenu = (): void => {
-    if (spawnPanel !== null) {
-      armViewWithFilter(spawnPanel);
-    }
-  };
   return (
-    <div
-      style={snippetStyle}
-      onContextMenu={onContextMenu}
-      data-vscode-context={
-        spawnPanel === null ? undefined : snippetContextAttribute
-      }
-    >
+    <div style={snippetStyle}>
       <pre style={sourceStyle}>{children}</pre>
       <button
         type="button"

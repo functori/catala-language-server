@@ -3,10 +3,12 @@ import {
   type MouseEvent,
   type ReactElement,
   type ReactNode,
+  type Ref,
   createContext,
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -26,12 +28,8 @@ import {
 } from '../shared/util';
 import { getVsCodeApi } from '../shared/webviewApi';
 import type { TraceUpMessage } from './messages';
-import {
-  CwdContext,
-  LocationSnippet,
-  SpawnPanelContext,
-  resolvePath,
-} from './LocationSnippet';
+import { CwdContext, LocationSnippet, resolvePath } from './LocationSnippet';
+import { isSelectingText, useTraceMenu } from './traceMenu';
 import type { CodeLocation, TraceElement, TraceKind } from './traceUtils';
 import {
   type TraceValue,
@@ -524,6 +522,7 @@ export function TracePanel({
   filterRequest,
   initialFilter,
   fromClosestMatch,
+  focusOnMount,
   onClose,
 }: {
   trace: TraceElement[];
@@ -533,6 +532,7 @@ export function TracePanel({
   filterRequest?: FilterCommand | null;
   initialFilter?: string;
   fromClosestMatch?: boolean;
+  focusOnMount?: boolean;
   onClose?: () => void;
 }): ReactElement {
   const intl = useIntl();
@@ -553,7 +553,7 @@ export function TracePanel({
     setDerived((old) => [...old, { id, filter: spawnFilter }]);
   }, []);
 
-  const saveFilter = (newFilter: string): void => {
+  const saveFilter = useCallback((newFilter: string): void => {
     const trimmed = newFilter.trim();
     if (trimmed === '') {
       return;
@@ -563,7 +563,14 @@ export function TracePanel({
         ? old
         : [...old, { filter: trimmed, option: 'include' }]
     );
-  };
+  }, []);
+
+  const menuProps = useTraceMenu(
+    useMemo(
+      () => ({ spawnPanel, addFilter: saveFilter }),
+      [spawnPanel, saveFilter]
+    )
+  );
 
   const onClickFilter = (clicked: string): void => {
     setSavedFilters((old) =>
@@ -581,8 +588,26 @@ export function TracePanel({
     }
   }, [filterRequest]);
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const treeRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const target = treeRef.current ?? rootRef.current;
+    if (focusOnMount !== true || target === null) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      target.focus();
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 0);
+    return (): void => clearTimeout(timer);
+  }, [focusOnMount]);
+
   return (
-    <div>
+    <div
+      {...menuProps}
+      ref={rootRef}
+      tabIndex={focusOnMount === true ? -1 : undefined}
+    >
       <div style={panelHeaderStyle}>
         <span style={{ fontWeight: 600 }}>
           {label ?? <FormattedMessage id="trace.label" />}
@@ -664,16 +689,15 @@ export function TracePanel({
             removeFilter={removeFilter}
             onClickFilter={onClickFilter}
           />
-          <SpawnPanelContext.Provider value={spawnPanel}>
-            <TraceTreeView
-              trace={trace}
-              filters={savedFilters}
-              cwd={cwd}
-              expand={expand}
-              test={test}
-              fromClosestMatch={fromClosestMatch}
-            />
-          </SpawnPanelContext.Provider>
+          <TraceTreeView
+            trace={trace}
+            filters={savedFilters}
+            cwd={cwd}
+            expand={expand}
+            test={test}
+            fromClosestMatch={fromClosestMatch}
+            listRef={treeRef}
+          />
         </>
       ) : (
         <>
@@ -702,6 +726,7 @@ export function TracePanel({
             test={test}
             initialFilter={d.filter}
             fromClosestMatch
+            focusOnMount
             label={
               <FormattedMessage
                 id="trace.filteredView"
@@ -763,6 +788,7 @@ function TraceTreeView({
   expand,
   test,
   fromClosestMatch = false,
+  listRef,
 }: {
   trace: TraceElement[];
   filters?: Filter[];
@@ -770,6 +796,7 @@ function TraceTreeView({
   expand?: ExpandCommand | null;
   test?: TraceTest;
   fromClosestMatch?: boolean;
+  listRef?: Ref<HTMLUListElement>;
 }): ReactElement {
   const intl = useIntl();
 
@@ -850,7 +877,7 @@ function TraceTreeView({
         <ExpectedContext.Provider value={expected}>
           <IndexContext.Provider value={stepIndices}>
             <FilterContext.Provider value={f}>
-              <ul style={rootListStyle}>
+              <ul style={rootListStyle} ref={listRef} tabIndex={-1}>
                 {roots.map((el, i) => (
                   <TraceNode
                     key={i}
@@ -1013,7 +1040,9 @@ function TraceNode({
           cursor: expandable ? 'pointer' : 'default',
           background: matchBackground,
         }}
-        onClick={() => expandable && setExpanded((e) => !e)}
+        onClick={() =>
+          expandable && !isSelectingText() && setExpanded((e) => !e)
+        }
       >
         {expandable ? (
           <span
