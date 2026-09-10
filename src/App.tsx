@@ -10,6 +10,7 @@ import frMessages from './locales/fr.json';
 import enMessages from './locales/en.json';
 import plMessages from './locales/pl.json';
 import GeneralTests from './GeneralTests';
+import { CatalaSettingsProvider } from './shared/useSettings';
 
 type Messages = Record<string, string>;
 
@@ -30,7 +31,9 @@ export default function App({ language, vscode }: Props): ReactElement {
 
   return (
     <IntlProvider locale={language} messages={messages} defaultLocale="en">
-      <TestFileEditor contents={{ state: 'initializing' }} vscode={vscode} />
+      <CatalaSettingsProvider>
+        <TestFileEditor contents={{ state: 'initializing' }} vscode={vscode} />
+      </CatalaSettingsProvider>
     </IntlProvider>
   );
 }
@@ -40,11 +43,13 @@ export function InputApp({ language, vscode, scopename }: Props): ReactElement {
 
   return (
     <IntlProvider locale={language} messages={messages} defaultLocale="en">
-      <ScopeInputEditor
-        contents={{ state: 'initializing' }}
-        vscode={vscode}
-        scopename={scopename ?? ''}
-      />
+      <CatalaSettingsProvider>
+        <ScopeInputEditor
+          contents={{ state: 'initializing' }}
+          vscode={vscode}
+          scopename={scopename ?? ''}
+        />
+      </CatalaSettingsProvider>
     </IntlProvider>
   );
 }
@@ -54,7 +59,9 @@ export function GeneralTestsUi({ language, vscode }: Props): ReactElement {
 
   return (
     <IntlProvider locale={language} messages={messages} defaultLocale="en">
-      <GeneralTests vscode={vscode} />
+      <CatalaSettingsProvider>
+        <GeneralTests vscode={vscode} />
+      </CatalaSettingsProvider>
     </IntlProvider>
   );
 }
@@ -64,7 +71,9 @@ export function TraceApp({ language, vscode }: Props): ReactElement {
 
   return (
     <IntlProvider locale={language} messages={messages} defaultLocale="en">
-      <TraceEditor vscode={vscode} />
+      <CatalaSettingsProvider>
+        <TraceEditor vscode={vscode} />
+      </CatalaSettingsProvider>
     </IntlProvider>
   );
 }
