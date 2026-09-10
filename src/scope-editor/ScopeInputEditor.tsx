@@ -137,6 +137,9 @@ export default function ScopeInputEditor({
         case 'TestScopeResult': {
           throw Error(`This view can't trigger a TestScopeResult`);
         }
+        case 'FocusData': {
+          throw Error(`This view has no data panel to focus`);
+        }
         default:
           assertUnreachable(message);
       }
