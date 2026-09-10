@@ -367,7 +367,10 @@ export class TestCaseEditorProvider
         case 'Ready': {
           logger.log(`Got ready message from webview, sending parsed document`);
           following.dispose();
-          following = this.settings.follow(webviewPanel.webview);
+          following = this.settings.follow(
+            webviewPanel.webview,
+            document.uri.fsPath
+          );
           postMessageToWebView({
             kind: 'Update',
             value: document.parseResults,

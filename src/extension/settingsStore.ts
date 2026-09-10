@@ -1,16 +1,16 @@
 import * as vscode from 'vscode';
 import type { CatalaSettings, SettingsMessage } from '../shared/settings';
-import { readSettings } from '../shared/settings';
+import { readSettings, resolveLanguage } from '../shared/settings';
 
 const SECTION = 'catala';
 
 export type SettingsSource = {
   get(): CatalaSettings;
-  follow(webview: vscode.Webview): vscode.Disposable;
+  follow(webview: vscode.Webview, file?: string): vscode.Disposable;
 };
 
 export class SettingsStore implements SettingsSource {
-  private readonly webviews = new Set<vscode.Webview>();
+  private readonly webviews = new Map<vscode.Webview, string | undefined>();
 
   constructor(context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -18,8 +18,8 @@ export class SettingsStore implements SettingsSource {
         if (!event.affectsConfiguration(SECTION)) {
           return;
         }
-        for (const webview of this.webviews) {
-          void this.post(webview);
+        for (const [webview, file] of this.webviews) {
+          void this.post(webview, file);
         }
       })
     );
@@ -30,16 +30,21 @@ export class SettingsStore implements SettingsSource {
     return readSettings({ language: configuration.get('language') });
   }
 
-  public follow(webview: vscode.Webview): vscode.Disposable {
-    this.webviews.add(webview);
-    void this.post(webview);
+  public follow(webview: vscode.Webview, file?: string): vscode.Disposable {
+    this.webviews.set(webview, file);
+    void this.post(webview, file);
     return new vscode.Disposable(() => this.webviews.delete(webview));
   }
 
-  private async post(webview: vscode.Webview): Promise<void> {
+  private async post(
+    webview: vscode.Webview,
+    file: string | undefined
+  ): Promise<void> {
+    const settings = this.get();
     const message: SettingsMessage = {
       kind: 'catalaSettings',
-      value: this.get(),
+      value: settings,
+      locale: resolveLanguage(settings, file, vscode.env.language),
     };
     await webview.postMessage(message);
   }
