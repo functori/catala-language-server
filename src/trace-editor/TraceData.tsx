@@ -293,7 +293,7 @@ export function DataPanel({
   intl,
   showContainers = false,
 }: {
-  vscode: WebviewApi<unknown>,
+  vscode: WebviewApi<unknown>;
   test: TraceTest;
   setFilter: SetFilter;
   trace?: TraceElement[];
@@ -359,6 +359,12 @@ export function DataPanel({
             </th>
             <th style={thStyle}>
               <FormattedMessage id="trace.col.value" />
+            </th>
+            <th>
+              <span
+                className="codicon codicon-edit"
+                style={{ cursor: 'pointer' }}
+              />
             </th>
           </tr>
         </thead>
@@ -427,11 +433,11 @@ function Section({
     <>
       {!first && (
         <tr aria-hidden>
-          <td colSpan={3} style={sectionGapStyle} />
+          <td colSpan={4} style={sectionGapStyle} />
         </tr>
       )}
       <tr style={{ cursor: 'pointer' }} onClick={() => setOpen((o) => !o)}>
-        <td colSpan={3} style={sectionStyle}>
+        <td colSpan={4} style={sectionStyle}>
           <div style={sectionHeaderStyle}>
             <span style={nameCellStyle}>
               <span
@@ -492,7 +498,7 @@ function NodeRow({
   noExpected,
   setFilter,
 }: {
-  vscode: WebviewApi<unknown>,
+  vscode: WebviewApi<unknown>;
   node: DataNode;
   crumbs: string[];
   noExpected?: boolean;
@@ -516,7 +522,7 @@ function NodeRow({
           }}
           onClick={() => setOpen((o) => !o)}
         >
-          <td colSpan={3} style={pathRowStyle}>
+          <td colSpan={4} style={pathRowStyle}>
             <span style={nameCellStyle}>
               <span
                 style={chevronStyle}
@@ -592,11 +598,20 @@ function NodeRow({
         style={tdStyle}
         onClick={(e) => {
           e.preventDefault();
-          vscode.postMessage({ kind: 'updateData' });
-          // setFilter(node.value ?? '');
+          setFilter(node.value ?? '');
         }}
       >
         {node.value ?? ''}
+      </td>
+      <td>
+        <span
+          className="codicon codicon-edit"
+          style={{ cursor: 'pointer' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            vscode.postMessage({ kind: 'updateData' });
+          }}
+        />
       </td>
     </tr>
   );
