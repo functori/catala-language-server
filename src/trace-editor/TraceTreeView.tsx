@@ -773,7 +773,10 @@ function FilterPins({
             className="codicon codicon-close"
             title={intl.formatMessage({ id: 'trace.removeFilter' })}
             style={{ cursor: 'pointer' }}
-            onClick={() => removeFilter(filter.filter)}
+            onClick={(e) => {
+              e.stopPropagation();
+              removeFilter(filter.filter);
+            }}
           />
         </span>
       ))}
