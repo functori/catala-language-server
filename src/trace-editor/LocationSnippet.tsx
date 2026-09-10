@@ -26,13 +26,6 @@ export function resolvePath(cwd: string, file: string): string {
   return `${cwd.replace(/[\\/]+$/, '')}/${file}`;
 }
 
-// -- The "View with filter" menu item -----------------------------------------
-
-const snippetContextAttribute = JSON.stringify({
-  webviewSection: 'traceSnippet',
-  preventDefaultContextMenuItems: false,
-});
-
 // -- Fetching the source lines ------------------------------------------------
 
 const extractCache = new Map<string, string | null>();
@@ -93,7 +86,6 @@ function SnippetBlock({
   children: ReactNode;
 }): ReactElement {
   const cwd = useContext(CwdContext);
-  const spawnPanel = useContext(SpawnPanelContext);
   const intl = useIntl();
   const [hover, setHover] = useState(false);
   const openLocation = (e: MouseEvent): void => {
@@ -111,12 +103,7 @@ function SnippetBlock({
     { target: posText(pos) }
   );
   return (
-    <div
-      style={snippetStyle}
-      data-vscode-context={
-        spawnPanel === null ? undefined : snippetContextAttribute
-      }
-    >
+    <div style={snippetStyle}>
       <pre style={sourceStyle}>{children}</pre>
       <button
         type="button"
