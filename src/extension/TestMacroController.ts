@@ -17,6 +17,7 @@ import PQueue from 'p-queue';
 import type { ResultController } from './testAndCoverage';
 import { runTestVscode, TestId, TestMap } from './testAndCoverage';
 import { getCwd } from '../shared/util_client';
+import type { SettingsSource } from '../extension/settingsStore';
 
 // Path of a test file relative to the workspace folder it belongs to, which is
 // what the 'debug all tests' panel displays: an absolute path is both too long
@@ -41,6 +42,9 @@ export class TestMacroController {
   // user closes it (a disposed panel can neither be revealed nor posted to).
   panel: vscode.WebviewPanel | undefined;
   tests: TestDebugger[] = [];
+  private following: vscode.Disposable = new vscode.Disposable(() => {});
+
+  constructor(private readonly settings: SettingsSource) {}
 
   private testQueue: PQueue = new PQueue({ concurrency: 1 });
 
@@ -69,7 +73,8 @@ export class TestMacroController {
             filename: filename,
             relative_filename: relativeFilename(filename),
             test: e.entrypoint.value,
-            success: res.success && (res.failed_trace_assert ?? []).length === 0,
+            success:
+              res.success && (res.failed_trace_assert ?? []).length === 0,
             date: res.date,
           };
           this.tests.push(testEntrypoint);
@@ -135,6 +140,7 @@ export class TestMacroController {
     // reference so the next invocation creates a fresh one instead of
     // revealing (or posting to) a disposed webview.
     panel.onDidDispose(() => {
+      this.following.dispose();
       if (this.panel === panel) {
         this.panel = undefined;
         this.tests = [];
@@ -145,6 +151,8 @@ export class TestMacroController {
       const typed_msg = readUpMessage(message);
       switch (typed_msg.kind) {
         case 'Ready': {
+          this.following.dispose();
+          this.following = this.settings.follow(panel.webview);
           this.tests = [];
           const entrypoints = await catala_entry;
           this.handleCatalaEntrypoint(entrypoints, resultController);
@@ -194,7 +202,9 @@ export class TestMacroController {
                   value: {
                     entry: testElt.test,
                     scope_success: {
-                      success: res.success && (res.failed_trace_assert ?? []).length === 0,
+                      success:
+                        res.success &&
+                        (res.failed_trace_assert ?? []).length === 0,
                       date: res.date,
                     },
                     index,
@@ -243,7 +253,8 @@ export class TestMacroController {
                       entry: test.test,
                       scope_success: {
                         success:
-                          res.success && (res.failed_trace_assert ?? []).length === 0,
+                          res.success &&
+                          (res.failed_trace_assert ?? []).length === 0,
                         date: res.date,
                       },
                       index,
