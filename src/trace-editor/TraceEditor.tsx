@@ -221,6 +221,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
             layout={layout}
             left={
               <DataPanel
+                vscode={vscode}
                 addFilter={requestFilter}
                 test={scope[1]}
                 trace={
