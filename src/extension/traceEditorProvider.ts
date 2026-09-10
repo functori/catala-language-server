@@ -259,6 +259,19 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
           postToWebView({ kind: 'extract', id: message.id, text });
           break;
         }
+        case 'updateData': {
+          // Open the same file with the test case editor in a side-by-side
+          // group, keeping the focus on the trace editor.
+          await vscode.commands.executeCommand(
+            'vscode.openWith',
+            document.uri,
+            // Literal instead of TestCaseEditorProvider.viewType to avoid a
+            // circular import (that module already imports this one).
+            'catala.testCaseEditor',
+            { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }
+          );
+          break;
+        }
       }
     });
 
