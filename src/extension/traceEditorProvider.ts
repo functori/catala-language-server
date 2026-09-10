@@ -268,7 +268,7 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
             // Literal instead of TestCaseEditorProvider.viewType to avoid a
             // circular import (that module already imports this one).
             'catala.testCaseEditor',
-            { viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }
+            { viewColumn: vscode.ViewColumn.Beside }
           );
           break;
         }
