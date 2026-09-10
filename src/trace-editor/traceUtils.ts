@@ -21,10 +21,7 @@ export type CodeLocation = {
   law_headings?: string[];
 };
 
-export type TraceKind = { kind: string; decl_pos?: CodeLocation } & Record<
-  string,
-  JsonValue
->;
+export type TraceKind = { kind: string } & Record<string, JsonValue>;
 
 export type TraceValue =
   | { kind: 'absent' }
@@ -59,12 +56,8 @@ export type TraceVariable =
       source?: TraceElement;
     };
 
-// The step a test's variable paths are relative to, as returned by
-// `traceVariablesForTest`.
 export type TestedScope = {
   variable: Extract<TraceVariable, { kind: 'step' }>;
-  // Path of that step in the whole variable tree: prepend it to a path coming
-  // from `traceVariablesForTest` to get one that is absolute.
   path: string;
 };
 
@@ -306,8 +299,8 @@ export function formatTraceValue(
         )
         .join(',\n')}\n${indent}}`;
     case 'array':
-      if (!all) return undefined;
       if (v.values.length === 0) return '[]';
+      if (!all) return undefined;
       return `[\n${v.values
         .map(
           ([x, label]) =>
@@ -529,6 +522,23 @@ export function stepIndexMap(trace: TraceElement[]): Map<TraceElement, number> {
   return map;
 }
 
+export function fieldValue(e: Event): string {
+  return (e.target as { value?: string } | null)?.value ?? '';
+}
+
+/** A location as `file:line`, the way both the tree and a snippet name one. */
+export function posText(pos?: CodeLocation): string {
+  if (!pos) return '';
+  return `${pos.file}:${pos.start.line}`;
+}
+
+/**
+ * Height left for the panels under the editor's header. The editor measures it
+ * and sets it on their container; each panel caps itself with it. Declared
+ * here rather than in either of them, since those two import each other.
+ */
+export const PANEL_HEIGHT_VAR = '--trace-panel-height';
+
 export function variableSegment(v: TraceVariable): string {
   return v.kind === 'step' && v.index !== undefined
     ? `${v.name}[${v.index}]`
@@ -571,8 +581,6 @@ function findScope(
   }
 }
 
-// The returned variables are those of the tested scope, so the paths built from
-// them are relative to it; the third element is that anchor.
 export function traceVariablesForTest(
   trace: TraceElement[],
   scope: string
