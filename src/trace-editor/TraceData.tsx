@@ -24,6 +24,7 @@ import {
   PANEL_HEIGHT_VAR,
 } from './traceUtils';
 import type { AddFilter } from './traceMenu';
+import type { WebviewApi } from 'vscode-webview';
 
 const ExpandContext = createContext<ExpandCommand | null>(null);
 
@@ -284,12 +285,14 @@ function typeIcon(kind?: string): string {
 // -- Components ----------------------------------------------------------------
 
 export function DataPanel({
+  vscode,
   test,
   trace,
   intl,
   addFilter,
   showContainers = false,
 }: {
+  vscode: WebviewApi<unknown>,
   test: TraceTest;
   addFilter: AddFilter;
   trace?: TraceElement[];
@@ -362,6 +365,7 @@ export function DataPanel({
           <Section id="trace.section.inputs" intl={intl} first>
             {inputNodes.map((node, i) => (
               <NodeRow
+                vscode={vscode}
                 key={`in-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
@@ -373,6 +377,7 @@ export function DataPanel({
           <Section id="trace.section.internal" intl={intl}>
             {internalNodes.map((node, i) => (
               <NodeRow
+                vscode={vscode}
                 key={`int-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
@@ -383,6 +388,7 @@ export function DataPanel({
           <Section id="trace.section.outputs" intl={intl}>
             {outputNodes.map((node, i) => (
               <NodeRow
+                vscode={vscode}
                 key={`out-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
@@ -479,11 +485,13 @@ function Breadcrumb({ crumbs }: { crumbs: string[] }): ReactElement {
 }
 
 function NodeRow({
+  vscode,
   node,
   crumbs,
   noExpected,
   addFilter,
 }: {
+  vscode: WebviewApi<unknown>,
   node: DataNode;
   crumbs: string[];
   noExpected?: boolean;
@@ -525,6 +533,7 @@ function NodeRow({
         {open &&
           children.map((child, i) => (
             <NodeRow
+              vscode={vscode}
               key={`${child.path}-${i}`}
               node={child}
               crumbs={selfCrumbs}
