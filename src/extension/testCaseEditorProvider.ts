@@ -6,6 +6,7 @@ import type {
   ParseResults,
   TestList,
   TestRunResults,
+  TraceData,
   UpMessage,
 } from '../generated/catala_types';
 import {
@@ -652,6 +653,30 @@ export class TestCaseEditorProvider
     }
     entry.post(msg);
     return true;
+  }
+
+  public static async focusDataInput(
+    uri: vscode.Uri,
+    input_field: TraceData
+  ): Promise<boolean> {
+    try {
+      // Open the same file with the test case editor in a side-by-side
+      // group, keeping the focus on the trace editor.
+      await vscode.commands.executeCommand(
+        'vscode.openWith',
+        uri,
+        TestCaseEditorProvider.viewType,
+        { viewColumn: vscode.ViewColumn.Beside }
+      );
+    } catch {
+      return false;
+    }
+
+    // Deliver immediately if ready, or queue until the webview signals Ready.
+    return TestCaseEditorProvider.postOrQueue(uri, {
+      kind: 'FocusData',
+      value: input_field,
+    });
   }
 
   public static async focusDiffInCustomEditor(

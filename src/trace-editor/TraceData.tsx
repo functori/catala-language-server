@@ -373,6 +373,7 @@ export function DataPanel({
             {inputNodes.map((node, i) => (
               <NodeRow
                 vscode={vscode}
+                kind="Input"
                 key={`in-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
@@ -386,6 +387,7 @@ export function DataPanel({
               <NodeRow
                 vscode={vscode}
                 key={`int-${node.path}-${i}`}
+                kind="Internal"
                 node={node}
                 crumbs={[]}
                 setFilter={setFilter}
@@ -396,6 +398,7 @@ export function DataPanel({
             {outputNodes.map((node, i) => (
               <NodeRow
                 vscode={vscode}
+                kind="Result"
                 key={`out-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
@@ -494,12 +497,14 @@ function Breadcrumb({ crumbs }: { crumbs: string[] }): ReactElement {
 function NodeRow({
   vscode,
   node,
+  kind,
   crumbs,
   noExpected,
   setFilter,
 }: {
   vscode: WebviewApi<unknown>;
   node: DataNode;
+  kind: 'Internal' | 'Input' | 'Result';
   crumbs: string[];
   noExpected?: boolean;
   setFilter: SetFilter;
@@ -542,6 +547,7 @@ function NodeRow({
             <NodeRow
               vscode={vscode}
               key={`${child.path}-${i}`}
+              kind={kind}
               node={child}
               crumbs={selfCrumbs}
               noExpected={noExpected}
@@ -609,7 +615,10 @@ function NodeRow({
           style={{ cursor: 'pointer' }}
           onClick={(e) => {
             e.stopPropagation();
-            vscode.postMessage({ kind: 'updateData' });
+            vscode.postMessage({
+              kind: 'updateData',
+              value: { kind: kind, value: node.path },
+            });
           }}
         />
       </td>
