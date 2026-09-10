@@ -12,6 +12,8 @@ import * as vscode from 'vscode';
 import { CatalaTestCaseDocument } from '../../shared/CatalaTestCaseDocument';
 import { TestCaseEditorProvider } from '../../extension/testCaseEditorProvider';
 import { ResultController } from '../../extension/testAndCoverage';
+import type { SettingsSource } from '../../extension/settingsStore';
+import { defaultSettings } from '../../shared/settings';
 
 /**
  * A memento that forgets everything. Registration only stores its
@@ -89,11 +91,16 @@ suite('Extension, end to end', function () {
     const resultController = new ResultController(dummyStorage, 'catala_en');
     // A real controller rather than a stub: the test host provides one for
     // free, and it has to be disposed either way.
+    const settings: SettingsSource = {
+      get: () => defaultSettings,
+      follow: () => new vscode.Disposable(() => {}),
+    };
     const disposable = TestCaseEditorProvider.register(
       context,
       resultController,
       'codicon.css',
-      checkTraceAssert
+      checkTraceAssert,
+      settings
     );
     assert.ok(disposable);
     disposable.dispose();
