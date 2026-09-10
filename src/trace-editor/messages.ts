@@ -13,7 +13,8 @@ export type TraceUpMessage =
       id: number;
       file: string;
       line: number;
-    };
+    }
+  | { kind: 'updateData' };
 
 export type TraceDownMessage =
   | {
