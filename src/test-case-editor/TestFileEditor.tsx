@@ -14,6 +14,7 @@ import {
 import TestEditor from './TestEditor';
 import BrokenTestView from './BrokenTestView';
 import { assertUnreachable } from '../shared/util';
+import { isSettingsMessage } from '../shared/settings';
 import { pathEquals, isPathPrefix } from '../diff/highlight';
 import type { WebviewApi } from 'vscode-webview';
 import { setVsCodeApi } from '../shared/webviewApi';
@@ -256,6 +257,9 @@ export default function TestFileEditor({
       if (isTraceMessage(event.data)) {
         const { scope, trace } = event.data;
         setTraces((prev) => ({ ...prev, [scope]: trace }));
+        return;
+      }
+      if (isSettingsMessage(event.data)) {
         return;
       }
       const message = readDownMessage(event.data);
