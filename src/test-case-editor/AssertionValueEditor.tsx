@@ -6,6 +6,7 @@ import { renderAtomicValue } from './testCaseUtils';
 import '../styles/assertions-editor.css';
 import { findMatchingDiff, isParentOfAnyDiff } from '../diff/highlight';
 import { isAtomicRuntime } from '../diff/diff';
+import { focusTargetId, pathToString } from '../shared/focusTarget';
 
 // Diff policy note: this component only renders highlights. Path-stable accept actions should call onDiffResolved(path).
 // Array structural edits are path-unstable and handled in ArrayEditor via onInvalidateDiffs; arrays are asserted as a whole.
@@ -92,10 +93,14 @@ export default function AssertionValueEditor({
     diffs.length > 0 && highlightDiffs
       ? createDiffHighlightHook(diffs, formatBool)
       : undefined;
-
+  const id = focusTargetId({
+    kind: 'Result',
+    value: pathToString(currentPath),
+  });
   return (
     <div className="assertion-value-editor">
       <ValueEditor
+        id={id}
         testIO={testIO}
         onValueChange={onValueChange}
         editorHook={editorHook}

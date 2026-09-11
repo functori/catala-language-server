@@ -23,6 +23,7 @@ import {
   variablePath,
   variableSegment,
 } from './traceUtils';
+import type { WebviewApi } from 'vscode-webview';
 
 const ExpandContext = createContext<ExpandCommand | null>(null);
 
@@ -285,12 +286,14 @@ function typeIcon(kind?: string): string {
 type SetFilter = (filter: string) => void;
 
 export function DataPanel({
+  vscode,
   test,
   setFilter,
   trace,
   intl,
   showContainers = false,
 }: {
+  vscode: WebviewApi<unknown>;
   test: TraceTest;
   setFilter: SetFilter;
   trace?: TraceElement[];
@@ -357,12 +360,20 @@ export function DataPanel({
             <th style={thStyle}>
               <FormattedMessage id="trace.col.value" />
             </th>
+            <th>
+              <span
+                className="codicon codicon-edit"
+                style={{ cursor: 'pointer' }}
+              />
+            </th>
           </tr>
         </thead>
         <tbody>
           <Section id="trace.section.inputs" intl={intl} first>
             {inputNodes.map((node, i) => (
               <NodeRow
+                vscode={vscode}
+                kind="Input"
                 key={`in-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
@@ -374,7 +385,9 @@ export function DataPanel({
           <Section id="trace.section.internal" intl={intl}>
             {internalNodes.map((node, i) => (
               <NodeRow
+                vscode={vscode}
                 key={`int-${node.path}-${i}`}
+                kind="Internal"
                 node={node}
                 crumbs={[]}
                 setFilter={setFilter}
@@ -384,6 +397,8 @@ export function DataPanel({
           <Section id="trace.section.outputs" intl={intl}>
             {outputNodes.map((node, i) => (
               <NodeRow
+                vscode={vscode}
+                kind="Result"
                 key={`out-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
@@ -421,11 +436,11 @@ function Section({
     <>
       {!first && (
         <tr aria-hidden>
-          <td colSpan={3} style={sectionGapStyle} />
+          <td colSpan={4} style={sectionGapStyle} />
         </tr>
       )}
       <tr style={{ cursor: 'pointer' }} onClick={() => setOpen((o) => !o)}>
-        <td colSpan={3} style={sectionStyle}>
+        <td colSpan={4} style={sectionStyle}>
           <div style={sectionHeaderStyle}>
             <span style={nameCellStyle}>
               <span
@@ -480,12 +495,16 @@ function Breadcrumb({ crumbs }: { crumbs: string[] }): ReactElement {
 }
 
 function NodeRow({
+  vscode,
   node,
+  kind,
   crumbs,
   noExpected,
   setFilter,
 }: {
+  vscode: WebviewApi<unknown>;
   node: DataNode;
+  kind: 'Internal' | 'Input' | 'Result';
   crumbs: string[];
   noExpected?: boolean;
   setFilter: SetFilter;
@@ -508,7 +527,7 @@ function NodeRow({
           }}
           onClick={() => setOpen((o) => !o)}
         >
-          <td colSpan={3} style={pathRowStyle}>
+          <td colSpan={4} style={pathRowStyle}>
             <span style={nameCellStyle}>
               <span
                 style={chevronStyle}
@@ -526,7 +545,9 @@ function NodeRow({
         {open &&
           children.map((child, i) => (
             <NodeRow
+              vscode={vscode}
               key={`${child.path}-${i}`}
+              kind={kind}
               node={child}
               crumbs={selfCrumbs}
               noExpected={noExpected}
@@ -587,6 +608,19 @@ function NodeRow({
         }}
       >
         {node.value ?? ''}
+      </td>
+      <td>
+        <span
+          className="codicon codicon-edit"
+          style={{ cursor: 'pointer' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            vscode.postMessage({
+              kind: 'updateData',
+              value: { kind: kind, value: node.path },
+            });
+          }}
+        />
       </td>
     </tr>
   );

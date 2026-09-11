@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactElement, useCallback } from 'react';
+import {
+  useEffect,
+  useState,
+  type ReactElement,
+  useCallback,
+  useRef,
+} from 'react';
 import { FormattedMessage } from 'react-intl';
 import {
   type ParseResults,
@@ -9,12 +15,14 @@ import {
   type Diff,
   readDownMessage,
   writeUpMessage,
+  type TraceData,
 } from '../generated/catala_types';
 import TestEditor from './TestEditor';
 import { assertUnreachable } from '../shared/util';
 import { pathEquals, isPathPrefix } from '../diff/highlight';
 import type { WebviewApi } from 'vscode-webview';
 import { setVsCodeApi } from '../shared/webviewApi';
+import { focusTargetId } from '../shared/focusTarget';
 import { resolveConfirmResult } from '../messaging/confirm';
 import type { TraceElement } from '../trace-editor/traceUtils';
 
@@ -70,6 +78,10 @@ type TestRunState = {
   };
 };
 
+// Kept in step with the `focus-flash` animation in `misc.css`.
+const FOCUS_FLASH_CLASS = 'focus-flash';
+const FOCUS_FLASH_MS = 2000;
+
 type Props = { contents: UIState; vscode: WebviewApi<unknown> };
 
 /** Editor for a collection of tests in a single file */
@@ -81,9 +93,74 @@ export default function TestFileEditor({
   const [testRunState, setTestRunState] = useState<TestRunState>({});
   // Trace computed per test scope (from running the scope with tracing).
   const [traces, setTraces] = useState<Record<string, TraceElement[]>>({});
+  // Pending focus request from the trace editor, if any.
+  const [focusOnData, setFocusOnData] = useState<TraceData | undefined>(
+    undefined
+  );
+  // Field flashed by the last focus request, with the timer that ends its
+  // flash; see the effect below.
+  const flashing = useRef<
+    { element: HTMLElement; timer: ReturnType<typeof setTimeout> } | undefined
+  >(undefined);
+  // Number of `Update` messages applied, used to acknowledge them below.
+  const [appliedUpdates, setAppliedUpdates] = useState(0);
   useEffect(() => {
     setVsCodeApi(vscode);
   }, [vscode]);
+
+  // Focus is an imperative DOM action, so the request is resolved here rather
+  // than passed down to the field as a prop: the field only has to carry the
+  // matching id. Clearing the request once handled is what makes a second
+  // click on the same trace value focus again.
+  //
+  // The target is guaranteed to be rendered by the time the request arrives:
+  // the extension queues it (`postOrQueue` in `testCaseEditorProvider`) until
+  // the `MarkAsUpdate` acknowledgement below, which is only sent once the
+  // document received in an `Update` has been committed, so the fields exist
+  // when this runs.
+  useEffect(() => {
+    if (focusOnData === undefined) return;
+    const element = document.getElementById(focusTargetId(focusOnData));
+    if (element !== null) {
+      // `tabIndex` is what makes a plain container focusable at all; -1 keeps
+      // it out of the tab order, so it is only ever reached this way.
+      if (!element.hasAttribute('tabindex')) {
+        element.tabIndex = -1;
+      }
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.focus();
+      const pending = flashing.current;
+      if (pending !== undefined) {
+        clearTimeout(pending.timer);
+        pending.element.classList.remove(FOCUS_FLASH_CLASS);
+      }
+      void element.offsetWidth;
+      element.classList.add(FOCUS_FLASH_CLASS);
+      flashing.current = {
+        element,
+        timer: setTimeout(() => {
+          element.classList.remove(FOCUS_FLASH_CLASS);
+          flashing.current = undefined;
+        }, FOCUS_FLASH_MS),
+      };
+    } else {
+      // No field carries that id: the request names a path no editor renders
+      // (nested fields currently reuse their parent's id). Logged rather than
+      // ignored, or the focus silently does nothing.
+      console.warn(
+        `No field to focus for ${focusTargetId(focusOnData)} (${focusOnData.kind} ${focusOnData.value})`
+      );
+    }
+    setFocusOnData(undefined);
+  }, [focusOnData]);
+
+  // Acknowledging from an effect rather than from the message handler is what
+  // makes the guarantee above hold: the extension only flushes its queue once
+  // the `Update` has been rendered.
+  useEffect(() => {
+    if (appliedUpdates === 0) return;
+    vscode.postMessage(writeUpMessage({ kind: 'MarkAsUpdate' }));
+  }, [appliedUpdates, vscode]);
 
   const onTestChange = useCallback(
     (newValue: Test, mayBeBatched: boolean): void => {
@@ -243,6 +320,7 @@ export default function TestFileEditor({
       switch (message.kind) {
         case 'Update':
           setState(parseResultsToUiState(message.value));
+          setAppliedUpdates((n) => n + 1);
           break;
         case 'TestRunResults': {
           const { scope, reset_outputs, results } = message.value;
@@ -260,6 +338,10 @@ export default function TestFileEditor({
             }
             return next;
           });
+          break;
+        }
+        case 'FocusData': {
+          setFocusOnData(message.value);
           break;
         }
         case 'ConfirmResult': {

@@ -7,6 +7,7 @@ import ValueEditor, {
 } from '../editors/ValueEditors';
 import { CompositeEditor, type EditorItem } from '../editors/CompositeEditor';
 import { confirm } from '../messaging/confirm';
+import { focusTargetId } from '../shared/focusTarget';
 
 type InputFieldProps = {
   inputName: string;
@@ -53,7 +54,10 @@ function InputField({
 
   if (!overriding) {
     return (
-      <div className="context-var-placeholder">
+      <div
+        id={focusTargetId({ kind: 'Input', value: inputName })}
+        className="context-var-placeholder"
+      >
         <span className="context-var-default-text">
           {intl.formatMessage({ id: 'testEditor.usingComputedDefault' })}
         </span>
@@ -67,6 +71,7 @@ function InputField({
   return (
     <div className={isContext ? 'context-var-editor' : undefined}>
       <ValueEditor
+        id={focusTargetId({ kind: 'Input', value: inputName })}
         testIO={testIo}
         onValueChange={onTestInputChange}
         currentPath={[{ kind: 'StructField', value: inputName }]}

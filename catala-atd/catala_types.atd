@@ -312,6 +312,9 @@ type test_entrypoint = [
 
 type up_message = [
   | Ready
+  (* Acknowledges an `Update`: sent once the webview has applied the new
+     document, so the extension knows it can deliver the messages it queued. *)
+  | MarkAsUpdate
   | Reload
   | GuiEdit of (test_list * bool) (* bool: 'edit may be batched' *)
   | OpenInTextEditor of string option (* filename *)
@@ -330,12 +333,19 @@ type test_scope_result = {
   order: bool
 }
 
+type trace_data = [
+   | Input of string
+   | Internal of string
+   | Result of string
+]
+
 type down_message = [
   | Update of parse_results
   | TestRunResults of test_run_results_msg
   | TestScopeResult of test_scope_result
   | ConfirmResult of confirm_result
   | AllTests of test_debugger_list
+  | FocusData of trace_data
 ]
 
 (* List entrypoints *)

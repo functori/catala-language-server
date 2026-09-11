@@ -83,6 +83,7 @@ function useValidationHint(state: ValidationState): {
 
 type Props = {
   testIO: TestIo;
+  id?: string;
   onValueChange(newValue: TestIo): void;
   editorHook?: (editor: ReactElement, path: PathSegment[]) => ReactElement;
   currentPath: PathSegment[];
@@ -125,6 +126,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TInt':
       editor = (
         <IntEditor
+          id={props.id}
           valueDef={valueDef}
           onValueChange={handleValueChange}
           editable={editable}
@@ -134,6 +136,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TBool':
       editor = (
         <BoolEditor
+          id={props.id}
           valueDef={valueDef}
           onValueChange={handleValueChange}
           editable={editable}
@@ -143,6 +146,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TStruct':
       editor = (
         <StructEditor
+          id={props.id}
           structDeclaration={typ.value}
           valueDef={valueDef}
           onValueChange={handleValueChange}
@@ -158,6 +162,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TRat':
       editor = (
         <RatEditor
+          id={props.id}
           valueDef={valueDef}
           onValueChange={handleValueChange}
           editable={editable}
@@ -167,6 +172,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TDate':
       editor = (
         <DateEditor
+          id={props.id}
           valueDef={valueDef}
           onValueChange={handleValueChange}
           editable={editable}
@@ -176,6 +182,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TDuration':
       editor = (
         <DurationEditor
+          id={props.id}
           valueDef={valueDef}
           onValueChange={handleValueChange}
           editable={editable}
@@ -185,6 +192,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TMoney':
       editor = (
         <MoneyEditor
+          id={props.id}
           valueDef={valueDef}
           onValueChange={handleValueChange}
           editable={editable}
@@ -194,6 +202,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TEnum':
       editor = (
         <EnumEditor
+          id={props.id}
           enumDeclaration={typ.value}
           valueDef={valueDef}
           onValueChange={handleValueChange}
@@ -209,6 +218,7 @@ export default function ValueEditor(props: Props): ReactElement {
     case 'TArray':
       editor = (
         <ArrayEditor
+          id={props.id}
           elementType={typ.value}
           valueDef={valueDef}
           onValueChange={handleValueChange}
@@ -232,6 +242,7 @@ export default function ValueEditor(props: Props): ReactElement {
       };
       editor = (
         <EnumEditor
+          id={props.id}
           enumDeclaration={option_decl}
           valueDef={valueDef}
           onValueChange={handleValueChange}
@@ -267,6 +278,7 @@ function isValidInt(value: string): boolean {
 }
 
 type IntEditorProps = {
+  id?: string;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
   editable?: boolean;
@@ -332,6 +344,7 @@ export function IntEditor(props: IntEditorProps): ReactElement {
 
   return (
     <div
+      id={props.id}
       className={`value-editor int-editor-wrapper ${vProps.className}`}
       title={vProps.title}
     >
@@ -349,6 +362,7 @@ export function IntEditor(props: IntEditorProps): ReactElement {
 }
 
 type DateEditorProps = {
+  id?: string;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
   editable?: boolean;
@@ -430,6 +444,7 @@ export function DateEditor(props: DateEditorProps): ReactElement {
 
   return (
     <div
+      id={props.id}
       className={`value-editor date-editor-wrapper ${vProps.className}`}
       title={vProps.title}
     >
@@ -452,6 +467,7 @@ function isValidRat(value: string): boolean {
 }
 
 type RatEditorProps = {
+  id?: string;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
   editable?: boolean;
@@ -526,6 +542,7 @@ export function RatEditor(props: RatEditorProps): ReactElement {
 
   return (
     <div
+      id={props.id}
       className={`value-editor rat-editor-wrapper ${vProps.className}`}
       title={vProps.title}
     >
@@ -543,6 +560,7 @@ export function RatEditor(props: RatEditorProps): ReactElement {
 }
 
 type BoolEditorProps = {
+  id?: string;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
   editable?: boolean;
@@ -571,6 +589,7 @@ export function BoolEditor(props: BoolEditorProps): ReactElement {
 
   return (
     <div
+      id={props.id}
       className={`value-editor bool-editor-wrapper ${vProps.className}`}
       title={vProps.title}
     >
@@ -596,6 +615,7 @@ export function BoolEditor(props: BoolEditorProps): ReactElement {
 }
 
 type DurationEditorProps = {
+  id?: string;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
   editable?: boolean;
@@ -712,6 +732,7 @@ export function DurationEditor(props: DurationEditorProps): ReactElement {
 
   return (
     <div
+      id={props.id}
       className={`value-editor duration-editor ${vProps.className}`}
       title={vProps.title}
     >
@@ -782,6 +803,7 @@ function isValidMoney(value: string): boolean {
 }
 
 type MoneyEditorProps = {
+  id?: string;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
   editable?: boolean;
@@ -862,6 +884,7 @@ export function MoneyEditor(props: MoneyEditorProps): ReactElement {
 
   return (
     <div
+      id={props.id}
       className={`value-editor money-editor ${currencyClass} ${vProps.className}`}
       title={vProps.title}
     >
@@ -879,6 +902,7 @@ export function MoneyEditor(props: MoneyEditorProps): ReactElement {
 }
 
 type StructEditorProps = {
+  id?: string;
   structDeclaration: StructDeclaration;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
@@ -892,6 +916,7 @@ type StructEditorProps = {
 
 function StructEditor(props: StructEditorProps): ReactElement {
   const {
+    id,
     structDeclaration,
     valueDef,
     onValueChange,
@@ -954,6 +979,7 @@ function StructEditor(props: StructEditorProps): ReactElement {
         count,
         editor: (
           <ValueEditor
+            id={id}
             testIO={{
               typ: fieldType,
               value: fieldValue ? { value: fieldValue } : undefined,
@@ -980,6 +1006,7 @@ function StructEditor(props: StructEditorProps): ReactElement {
   return (
     <NestingDepthIncrementer>
       <div
+        id={id}
         className={`struct-editor struct-container nest-${nestingDepth % 2}`}
       >
         <CompositeEditor items={editorItems} />
@@ -989,6 +1016,7 @@ function StructEditor(props: StructEditorProps): ReactElement {
 }
 
 type EnumEditorProps = {
+  id?: string;
   enumDeclaration: EnumDeclaration;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
@@ -1002,6 +1030,7 @@ type EnumEditorProps = {
 
 function EnumEditor(props: EnumEditorProps): ReactElement {
   const {
+    id,
     enumDeclaration,
     valueDef,
     onValueChange,
@@ -1094,6 +1123,7 @@ function EnumEditor(props: EnumEditorProps): ReactElement {
   // Build the expected editor (existing UI)
   const expectedEditor = (
     <div
+      id={id}
       className={`value-editor enum-editor ${vProps.className}`}
       title={vProps.title}
     >
@@ -1129,7 +1159,10 @@ function EnumEditor(props: EnumEditorProps): ReactElement {
 
   if (showEnumActualPreview) {
     return (
-      <div className="diff-highlight container-diff enum-preview enum-phantom">
+      <div
+        id={id}
+        className="diff-highlight container-diff enum-preview enum-phantom"
+      >
         <div className="expected-value">
           <div className="expected-label">
             <FormattedMessage id="diff.expected" defaultMessage="Expected" />

@@ -36,6 +36,7 @@ import {
   MoneyEditor,
   RatEditor,
 } from '../editors/ValueEditors';
+import { focusTargetId } from '../shared/focusTarget';
 
 type Props = {
   test: Test;
@@ -95,54 +96,93 @@ function formatRuntimeValue(
 }
 
 function TraceValueEditor({
+  path,
   input,
   setInput,
   kind,
   intl,
 }: {
+  path: string;
   input: RuntimeValue | undefined;
   setInput: React.Dispatch<React.SetStateAction<RuntimeValue | undefined>>;
   kind: string;
   intl: IntlShape;
 }): ReactElement {
   let rv: ValueDef | undefined = input ? { value: input } : undefined;
+  // Carried by the editor's own root element rather than by a wrapper, so that
+  // a focus request from the trace editor lands on the field itself.
+  const id = focusTargetId({ kind: 'Internal', value: path });
+  let editor: ReactElement;
   switch (kind) {
     case 'money': {
-      return (
-        <MoneyEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    }
-    case 'bool': {
-      return (
-        <BoolEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    }
-    case 'integer': {
-      return (
-        <IntEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    }
-    case 'decimal':
-      return (
-        <RatEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    case 'date':
-      return (
-        <DateEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    case 'duration':
-      return (
-        <DurationEditor
+      editor = (
+        <MoneyEditor
+          id={id}
           valueDef={rv}
           onValueChange={setInput}
           editable={true}
         />
       );
+      break;
+    }
+    case 'bool': {
+      editor = (
+        <BoolEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
+    }
+    case 'integer': {
+      editor = (
+        <IntEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
+    }
+    case 'decimal':
+      editor = (
+        <RatEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
+    case 'date':
+      editor = (
+        <DateEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
+    case 'duration':
+      editor = (
+        <DurationEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
     case 'absent':
     case 'enum': {
       const inputStr = formatRuntimeValue(input, intl);
-      return (
+      editor = (
         <VscodeTextfield
+          id={id}
           value={inputStr}
           onInput={(e) => {
             let valueField =
@@ -158,10 +198,15 @@ function TraceValueEditor({
           }}
         />
       );
+      break;
     }
     default:
-      return <span />;
+      // Nothing to edit, but the anchor is kept so a focus request on this
+      // path still finds its place in the document.
+      editor = <span id={id} />;
+      break;
   }
+  return editor;
 }
 
 // Only the presence of a name matters here, hence the value being left opaque.
@@ -422,6 +467,7 @@ function VariableRow({
         <div style={{ margin: 'auto', width: '20em' }}>
           {computed !== undefined ? (
             <TraceValueEditor
+              path={name}
               input={input}
               setInput={setInput}
               kind={computed?.kind!}
@@ -805,6 +851,7 @@ function ValueRow({
       </td>
       <td>
         <TraceValueEditor
+          path={path}
           kind={computed.kind}
           input={input}
           setInput={setInput}

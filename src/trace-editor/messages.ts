@@ -1,3 +1,4 @@
+import type { TraceData } from '../generated/catala_types';
 import type { JsonValue } from '../shared/util_client';
 import type { TraceElement } from './traceUtils';
 
@@ -13,7 +14,8 @@ export type TraceUpMessage =
       id: number;
       file: string;
       line: number;
-    };
+    }
+  | { kind: 'updateData'; value: TraceData };
 
 export type TraceDownMessage =
   | {
