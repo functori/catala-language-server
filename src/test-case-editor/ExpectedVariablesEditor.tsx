@@ -109,39 +109,68 @@ function TraceValueEditor({
   intl: IntlShape;
 }): ReactElement {
   let rv: ValueDef | undefined = input ? { value: input } : undefined;
+  // Carried by the editor's own root element rather than by a wrapper, so that
+  // a focus request from the trace editor lands on the field itself.
+  const id = focusTargetId({ kind: 'Internal', value: path });
   let editor: ReactElement;
   switch (kind) {
     case 'money': {
       editor = (
-        <MoneyEditor valueDef={rv} onValueChange={setInput} editable={true} />
+        <MoneyEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
       );
       break;
     }
     case 'bool': {
       editor = (
-        <BoolEditor valueDef={rv} onValueChange={setInput} editable={true} />
+        <BoolEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
       );
       break;
     }
     case 'integer': {
       editor = (
-        <IntEditor valueDef={rv} onValueChange={setInput} editable={true} />
+        <IntEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
       );
       break;
     }
     case 'decimal':
       editor = (
-        <RatEditor valueDef={rv} onValueChange={setInput} editable={true} />
+        <RatEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
       );
       break;
     case 'date':
       editor = (
-        <DateEditor valueDef={rv} onValueChange={setInput} editable={true} />
+        <DateEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
       );
       break;
     case 'duration':
       editor = (
         <DurationEditor
+          id={id}
           valueDef={rv}
           onValueChange={setInput}
           editable={true}
@@ -153,6 +182,7 @@ function TraceValueEditor({
       const inputStr = formatRuntimeValue(input, intl);
       editor = (
         <VscodeTextfield
+          id={id}
           value={inputStr}
           onInput={(e) => {
             let valueField =
@@ -171,12 +201,12 @@ function TraceValueEditor({
       break;
     }
     default:
-      editor = <span />;
+      // Nothing to edit, but the anchor is kept so a focus request on this
+      // path still finds its place in the document.
+      editor = <span id={id} />;
       break;
   }
-  return (
-    <div id={focusTargetId({ kind: 'Internal', value: path })}> {editor} </div>
-  );
+  return editor;
 }
 
 // Only the presence of a name matters here, hence the value being left opaque.
