@@ -87,6 +87,7 @@ type RowMetadata = {
 };
 
 type TableArrayEditorProps = {
+  id?: string;
   elementType: Typ;
   schema: TableSchema;
   valueDef?: ValueDef;
@@ -143,6 +144,7 @@ function renderTableCell(
 
 export function TableArrayEditor(props: TableArrayEditorProps): ReactElement {
   const {
+    id,
     elementType,
     valueDef,
     onValueChange,
@@ -284,7 +286,7 @@ export function TableArrayEditor(props: TableArrayEditorProps): ReactElement {
   // Only show empty state if there are no rows AND no phantom rows
   if (currentArray.length === 0 && phantomRowIndices.length === 0) {
     return (
-      <div className="table-array-editor">
+      <div id={id} className="table-array-editor">
         <div className="empty-table-message">
           <FormattedMessage id="tableView.noData" defaultMessage="No data" />
         </div>
@@ -310,7 +312,7 @@ export function TableArrayEditor(props: TableArrayEditorProps): ReactElement {
   }
 
   return (
-    <div className="table-array-editor">
+    <div id={id} className="table-array-editor">
       {/* View toggle button - only for main table, not sub-tables */}
       {!isSubTable && props.onSwitchToTreeView && (
         <div className="table-view-toggle">
