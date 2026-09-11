@@ -20,3 +20,28 @@
   border-radius: 4px;
   padding: var(--spacing16);
 }
+
+/* Field pointed at by a focus request coming from the trace editor.
+   The browser only paints a focus ring for keyboard navigation, and one field
+   among dozens is easy to miss, so the target flashes for a moment. The
+   outline is what carries the effect: the target may be a web component whose
+   background lives in its shadow DOM, out of reach from here. */
+@keyframes focus-flash {
+  0%,
+  100% {
+    outline-color: transparent;
+    box-shadow: none;
+  }
+  25%,
+  75% {
+    outline-color: var(--vscode-focusBorder, #007fd4);
+    box-shadow: 0 0 0 4px var(--vscode-editor-findMatchHighlightBackground);
+  }
+}
+
+.focus-flash {
+  border-radius: 2px;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  animation: focus-flash 1.6s ease-in-out;
+}

@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactElement, useCallback } from 'react';
+import {
+  useEffect,
+  useState,
+  type ReactElement,
+  useCallback,
+  useRef,
+} from 'react';
 import { FormattedMessage } from 'react-intl';
 import {
   type ParseResults,
@@ -72,6 +78,10 @@ type TestRunState = {
   };
 };
 
+// Kept in step with the `focus-flash` animation in `misc.css`.
+const FOCUS_FLASH_CLASS = 'focus-flash';
+const FOCUS_FLASH_MS = 2000;
+
 type Props = { contents: UIState; vscode: WebviewApi<unknown> };
 
 /** Editor for a collection of tests in a single file */
@@ -87,6 +97,11 @@ export default function TestFileEditor({
   const [focusOnData, setFocusOnData] = useState<TraceData | undefined>(
     undefined
   );
+  // Field flashed by the last focus request, with the timer that ends its
+  // flash; see the effect below.
+  const flashing = useRef<
+    { element: HTMLElement; timer: ReturnType<typeof setTimeout> } | undefined
+  >(undefined);
   // Number of `Update` messages applied, used to acknowledge them below.
   const [appliedUpdates, setAppliedUpdates] = useState(0);
   useEffect(() => {
@@ -114,6 +129,27 @@ export default function TestFileEditor({
       }
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       element.focus();
+      const pending = flashing.current;
+      if (pending !== undefined) {
+        clearTimeout(pending.timer);
+        pending.element.classList.remove(FOCUS_FLASH_CLASS);
+      }
+      void element.offsetWidth;
+      element.classList.add(FOCUS_FLASH_CLASS);
+      flashing.current = {
+        element,
+        timer: setTimeout(() => {
+          element.classList.remove(FOCUS_FLASH_CLASS);
+          flashing.current = undefined;
+        }, FOCUS_FLASH_MS),
+      };
+    } else {
+      // No field carries that id: the request names a path no editor renders
+      // (nested fields currently reuse their parent's id). Logged rather than
+      // ignored, or the focus silently does nothing.
+      console.warn(
+        `No field to focus for ${focusTargetId(focusOnData)} (${focusOnData.kind} ${focusOnData.value})`
+      );
     }
     setFocusOnData(undefined);
   }, [focusOnData]);

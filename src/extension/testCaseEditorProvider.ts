@@ -275,7 +275,11 @@ export class TestCaseEditorProvider
     function postMessageToWebView(message: DownMessage): void {
       webviewPanel.webview.postMessage(writeDownMessage(message));
     }
-    TestCaseEditorProvider.registerWebview(document.uri, postMessageToWebView);
+    TestCaseEditorProvider.registerWebview(
+      document.uri,
+      postMessageToWebView,
+      webviewPanel
+    );
 
     async function runTest(
       fileName: string,
@@ -602,24 +606,34 @@ export class TestCaseEditorProvider
 
   public static readonly viewType = 'catala.testCaseEditor';
 
-  // Registry of open custom editor webviews to send messages to
+  // Registry of open custom editor webviews to send messages to. The panel is
+  // kept alongside `post` so an editor that is already open can be revealed --
+  // messages alone cannot bring it to the front.
   private static webviews = new Map<
     string,
-    { post: (msg: DownMessage) => void; ready: boolean; queue: DownMessage[] }
+    {
+      post: (msg: DownMessage) => void;
+      panel: vscode.WebviewPanel | undefined;
+      ready: boolean;
+      queue: DownMessage[];
+    }
   >();
 
   private static registerWebview(
     uri: vscode.Uri,
-    post: (m: DownMessage) => void
+    post: (m: DownMessage) => void,
+    panel: vscode.WebviewPanel
   ): void {
     const key = uri.toString();
     const existing = TestCaseEditorProvider.webviews.get(key);
     if (existing) {
       existing.post = post;
+      existing.panel = panel;
       TestCaseEditorProvider.webviews.set(key, existing);
     } else {
       TestCaseEditorProvider.webviews.set(key, {
         post,
+        panel,
         ready: false,
         queue: [],
       });
@@ -648,6 +662,7 @@ export class TestCaseEditorProvider
       // Create placeholder entry with the message queued; resolveCustomEditor will register later.
       TestCaseEditorProvider.webviews.set(key, {
         post: () => {},
+        panel: undefined,
         ready: false,
         queue: [msg],
       });
@@ -665,26 +680,40 @@ export class TestCaseEditorProvider
     uri: vscode.Uri,
     input_field: TraceData
   ): Promise<boolean> {
-    try {
-      // Open the same file with the test case editor in a side-by-side
-      // group, keeping the focus on the trace editor.
-      await vscode.commands.executeCommand(
-        'vscode.openWith',
-        uri,
-        TestCaseEditorProvider.viewType,
-        { viewColumn: vscode.ViewColumn.Beside }
-      );
-    } catch {
-      return false;
+    const panel = TestCaseEditorProvider.webviews.get(uri.toString())?.panel;
+    if (panel !== undefined) {
+      // The editor is already open: `vscode.openWith` would leave the focus
+      // where it is, and a webview that does not hold the focus cannot focus
+      // one of its fields. Revealing the panel takes the focus, and passing no
+      // column leaves the editor in the group the user put it in.
+      panel.reveal(undefined, false);
+    } else {
+      try {
+        // Open the same file with the test case editor in a side-by-side
+        // group, leaving the trace editor visible next to it.
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          uri,
+          TestCaseEditorProvider.viewType,
+          { viewColumn: vscode.ViewColumn.Beside }
+        );
+      } catch {
+        return false;
+      }
     }
 
     // Deliver immediately if ready, or queue until the webview signals Ready
     // -- a queued request is the normal path when the editor was just opened
     // above, so `postOrQueue` returning false is not a failure here.
-    TestCaseEditorProvider.postOrQueue(uri, {
+    const delivered = TestCaseEditorProvider.postOrQueue(uri, {
       kind: 'FocusData',
       value: input_field,
     });
+    logger.log(
+      `Focus request for ${input_field.kind} ${input_field.value}: ` +
+        `${panel !== undefined ? 'revealed the open editor' : 'opened the editor'}, ` +
+        `${delivered ? 'message sent' : 'message queued'}`
+    );
     return true;
   }
 
