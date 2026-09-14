@@ -40,7 +40,9 @@ end = struct
 
   let check_expected ~expected ~tested_scope json =
     let open Clerk_utils in
-    let expected_list = Expected.check_expected ~expected ~tested_scope json in
+    let expected_list =
+      Expected.check_expected ~expected ~tested_scope (Some json)
+    in
     List.map
       (fun expected ->
         {
