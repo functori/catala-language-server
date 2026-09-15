@@ -147,7 +147,7 @@ export class TestCaseEditorProvider
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private resultController: ResultController,
+    private resultController: ResultController
   ) {
     this.testQueue = new PQueue({ concurrency: 1 });
     this.resultController = resultController;
@@ -206,12 +206,9 @@ export class TestCaseEditorProvider
 
   public static register(
     context: vscode.ExtensionContext,
-    resultController: ResultController,
+    resultController: ResultController
   ): vscode.Disposable {
-    const provider = new TestCaseEditorProvider(
-      context,
-      resultController,
-    );
+    const provider = new TestCaseEditorProvider(context, resultController);
     logger.log(`Registering ${TestCaseEditorProvider.viewType}`);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
       TestCaseEditorProvider.viewType,
