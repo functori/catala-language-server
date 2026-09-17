@@ -390,8 +390,8 @@ function traceElementFromJson(e: JsonValue): TraceElement | null {
   }
   const trace = Array.isArray(o.trace)
     ? o.trace
-      .map(traceElementFromJson)
-      .filter((x): x is TraceElement => x !== null)
+        .map(traceElementFromJson)
+        .filter((x): x is TraceElement => x !== null)
     : undefined;
   return {
     element: element as unknown as TraceKind,
@@ -605,9 +605,7 @@ export function traceVariablesForTest(
   return [variables, outputs, testedScope];
 }
 
-function readTraceTestVariables(
-  x: JsonValue
-): Map<string, TraceValue | null> {
+function readTraceTestVariables(x: JsonValue): Map<string, TraceValue | null> {
   const map = new Map<string, TraceValue | null>();
   if (x !== null && typeof x === 'object' && !Array.isArray(x)) {
     const o = x as Record<string, JsonValue>;

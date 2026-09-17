@@ -10,11 +10,7 @@ import {
 import type { JsonValue } from '../shared/util_client';
 import { getVsCodeApi } from '../shared/webviewApi';
 import type { TraceUpMessage } from './messages';
-import {
-  CwdContext,
-  LocationSnippet,
-  resolvePath,
-} from './LocationSnippet';
+import { CwdContext, LocationSnippet, resolvePath } from './LocationSnippet';
 import type { CodeLocation, TraceElement, TraceKind } from './traceUtils';
 import {
   type TraceValue,
@@ -502,10 +498,10 @@ function TraceNode({
 
   const [node, displayName, isMerged]: [TraceElement, string, boolean] =
     te.element.kind === 'scope_var' &&
-      typeof te.element.name === 'string' &&
-      te.trace?.length === 1 &&
-      te.trace[0].element.kind === 'scope_call' &&
-      typeof te.trace[0].element.name === 'string'
+    typeof te.element.name === 'string' &&
+    te.trace?.length === 1 &&
+    te.trace[0].element.kind === 'scope_call' &&
+    typeof te.trace[0].element.name === 'string'
       ? [te.trace[0], `${te.element.name}.${te.trace[0].element.name}`, true]
       : [te, te.element.name as string, false];
 
@@ -513,9 +509,9 @@ function TraceNode({
   const hasChildren = children.length > 0;
   const containerValue =
     te.element.kind !== 'if_branching' &&
-      te.element.kind !== 'scope_call' &&
-      te.value !== undefined &&
-      formatTraceValue(te.value, intl) === undefined
+    te.element.kind !== 'scope_call' &&
+    te.value !== undefined &&
+    formatTraceValue(te.value, intl) === undefined
       ? formatTraceValue(te.value, intl, 'en', true)
       : undefined;
   const onlyContainerValue =
@@ -594,15 +590,15 @@ function TraceNode({
 
   const described: Described = isMerged
     ? {
-      symbol: '→',
-      label: intl.formatMessage(
-        { id: 'trace.computationOf' },
-        { name: `${detail(te.element.name)} (${detail(node.element.name)})` }
-      ),
-      tone: 'scope',
-      showsValue: true,
-      showsCode: true,
-    }
+        symbol: '→',
+        label: intl.formatMessage(
+          { id: 'trace.computationOf' },
+          { name: `${detail(te.element.name)} (${detail(node.element.name)})` }
+        ),
+        tone: 'scope',
+        showsValue: true,
+        showsCode: true,
+      }
     : describe(node.element, intl);
   const snippetPos = described.showsCode ? te.pos : undefined;
   const accentColor =

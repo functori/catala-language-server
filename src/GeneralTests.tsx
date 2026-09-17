@@ -226,7 +226,7 @@ function OpenGUI({
           writeUpMessage({ kind: 'OpenInTestEditor', value: filename })
         );
       }}
-      className='codicon codicon-eye open-gui'
+      className="codicon codicon-eye open-gui"
     />
   );
 }
@@ -273,9 +273,7 @@ function OpenTextEditor({
 function TestItem({ vscode, test, onRun }: TestItemArg): ReactElement {
   const intl = useIntl();
   return (
-    <Box
-      className='test-item'
-    >
+    <Box className="test-item">
       <div className="test-item-header">
         <b
           className="test-title"
@@ -398,12 +396,8 @@ function TestLine({
       <th className="path-column">
         <TestPath vscode={vscode} test={test} />
       </th>
-      <td>
-        {testTitle(test)}
-      </td>
-      <td>
-        {testingScope(test)}
-      </td>
+      <td>{testTitle(test)}</td>
+      <td>{testingScope(test)}</td>
       <td
         className={overflowActive ? `descr-column` : ''}
         onClick={(event) => {
@@ -494,7 +488,7 @@ function HeaderLine({
           />
         </td>
         <td>
-          <RunIcon onRun={() => { }} />
+          <RunIcon onRun={() => {}} />
         </td>
         <td>
           <FormattedMessage
@@ -535,7 +529,12 @@ function testingScope(test: TestDebugger): string {
 function testMacro(test: TestDebugger): TestMacro {
   return {
     ...test,
-    state: test.success == true ? 'Success' : test.success == undefined ? 'Unknown' : 'Failed',
+    state:
+      test.success == true
+        ? 'Success'
+        : test.success == undefined
+          ? 'Unknown'
+          : 'Failed',
   };
 }
 
@@ -604,9 +603,7 @@ function TestPath({
       }}
     >
       {directory == '' ? null : (
-        <span className="test-path-directory">
-          {directory}
-        </span>
+        <span className="test-path-directory">{directory}</span>
       )}
       {name}
     </a>
@@ -1231,13 +1228,13 @@ export default function GeneralTests({
           title={intl.formatMessage(
             reload
               ? {
-                id: 'generalTests.tooltip.reloading',
-                defaultMessage: 'Rechargement en cours…',
-              }
+                  id: 'generalTests.tooltip.reloading',
+                  defaultMessage: 'Rechargement en cours…',
+                }
               : {
-                id: 'generalTests.tooltip.reload',
-                defaultMessage: 'Recharger la liste des tests',
-              }
+                  id: 'generalTests.tooltip.reload',
+                  defaultMessage: 'Recharger la liste des tests',
+                }
           )}
         >
           <span
@@ -1259,7 +1256,8 @@ export default function GeneralTests({
           grid={grid}
           filterScope={filterScope}
           onRun={onRun}
-        />)}
+        />
+      )}
     </div>
   );
 }

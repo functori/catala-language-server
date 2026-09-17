@@ -42,26 +42,26 @@ import { TestMacroController } from './test-case-editor/TestMacroController';
 const itemMessagesFR = {
   generalTestsTitle: 'Vue globale des tests',
   openCatalaBook: 'Ouvrir le manuel de Catala',
-  github: 'Ouvrir le répertoire GitHub de Catala'
-}
+  github: 'Ouvrir le répertoire GitHub de Catala',
+};
 
 const itemMessagesEN = {
   generalTestsTitle: 'General tests view',
   openCatalaBook: 'Open Catala book',
-  github: 'Open the Catala GitHub repository'
-}
+  github: 'Open the Catala GitHub repository',
+};
 
 const itemMessagesPL = {
   generalTestsTitle: 'Przegląd testów',
   openCatalaBook: 'Otwórz podręcznik Catala',
-  github: 'Otwórz repozytorium Catala na GitHubie'
-}
+  github: 'Otwórz repozytorium Catala na GitHubie',
+};
 
 const itemMessages: Record<string, Record<string, string>> = {
   fr: itemMessagesFR,
   en: itemMessagesEN,
   pl: itemMessagesPL,
-}
+};
 
 // `icon` are codicon id, the (id without the `codicon-` prefix).
 // `new vscode.ThemeIcon('github')`

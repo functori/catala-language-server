@@ -15,9 +15,6 @@ import type { CodeLocation } from './traceUtils';
 import { posText } from './traceUtils';
 
 export const CwdContext = createContext<string>('');
-export const SpawnPanelContext = createContext<
-  ((filter: string) => void) | null
->(null);
 
 export function resolvePath(cwd: string, file: string): string {
   if (!cwd || file.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(file)) {

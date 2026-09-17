@@ -23,7 +23,8 @@ import {
 } from '../test-case-editor/testCaseCompilerInterop';
 import { renameIfNeeded } from '../test-case-editor/testCaseUtils';
 import { CatalaTestCaseDocument } from '../shared/CatalaTestCaseDocument';
-import { ResultController, TestId } from './testAndCoverage';
+import type { ResultController } from './testAndCoverage';
+import { TestId } from './testAndCoverage';
 import { TraceEditorProvider } from './traceEditorProvider';
 import { runTrace } from '../trace-editor/traceRunner';
 import type { TraceElement } from '../trace-editor/traceUtils';
@@ -213,7 +214,11 @@ export class TestCaseEditorProvider
     resultController: ResultController,
     codiconsCssPath: string
   ): vscode.Disposable {
-    const provider = new TestCaseEditorProvider(context,resultController, codiconsCssPath);
+    const provider = new TestCaseEditorProvider(
+      context,
+      resultController,
+      codiconsCssPath
+    );
     logger.log(`Registering ${TestCaseEditorProvider.viewType}`);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
       TestCaseEditorProvider.viewType,

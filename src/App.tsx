@@ -55,7 +55,7 @@ export function GeneralTestsUi({ language, vscode }: Props): ReactElement {
   return (
     <IntlProvider locale={language} messages={messages} defaultLocale="en">
       <GeneralTests vscode={vscode} />
-    </IntlProvider >
+    </IntlProvider>
   );
 }
 

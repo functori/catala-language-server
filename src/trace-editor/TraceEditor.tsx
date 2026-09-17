@@ -1,9 +1,4 @@
-import {
-  type ReactElement,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { WebviewApi } from 'vscode-webview';
 import {
@@ -131,7 +126,6 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
 
   const running = runState.status === 'running';
 
-
   if (!initialized) {
     return (
       <div
@@ -199,9 +193,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
             <DataPanel
               setFilter={setFilter}
               test={scope[1]}
-              trace={
-                runState.status === 'success' ? runState.trace : undefined
-              }
+              trace={runState.status === 'success' ? runState.trace : undefined}
               intl={intl}
             />
           }
@@ -282,8 +274,8 @@ function TraceResult({
   test,
 }: {
   runState: RunState;
-  filter: string,
-  setFilter: (filter: string) => void,
+  filter: string;
+  setFilter: (filter: string) => void;
   cwd: string;
   test?: TraceTest;
 }): ReactElement | null {
