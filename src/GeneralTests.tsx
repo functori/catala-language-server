@@ -16,7 +16,7 @@ import { Box, Checkbox, FormControlLabel, Grid } from '@mui/material';
 import { VscodeTextfield } from '@vscode-elements/react-elements';
 import { assertUnreachable } from './shared/util';
 import { setVsCodeApi } from './shared/webviewApi';
-import type { Filter} from './FilterPin';
+import type { Filter } from './FilterPin';
 import { FilterPins } from './FilterPin';
 
 type TestGridArg = {
@@ -490,7 +490,7 @@ function HeaderLine({
           />
         </td>
         <td>
-          <RunIcon onRun={() => { }} />
+          <RunIcon onRun={() => {}} />
         </td>
         <td>
           <FormattedMessage
@@ -607,9 +607,9 @@ function TestPath({
             isGui(test)
               ? { kind: 'OpenInTestEditor', value: test.filename }
               : {
-                kind: 'OpenInTextEditor',
-                value: { value: test.filename },
-              }
+                  kind: 'OpenInTextEditor',
+                  value: { value: test.filename },
+                }
           )
         );
       }}
@@ -910,10 +910,13 @@ function FilterPanel({
     matchFilter(test, filters, [], filterGui)
   );
 
-  const addFilter = (filter: string) : void => {
+  const addFilter = (filter: string): void => {
     let filterToAdd = filter.trim();
     setFilters((savedFilters) => {
-      if (filterToAdd == '' || savedFilters.some((elt: Filter) => elt.filter == filterToAdd)) {
+      if (
+        filterToAdd == '' ||
+        savedFilters.some((elt: Filter) => elt.filter == filterToAdd)
+      ) {
         return savedFilters;
       } else {
         return [...savedFilters, { filter: filterToAdd, option: 'include' }];
@@ -995,11 +998,16 @@ function FilterPanel({
                 setFilter(value);
               }}
             >
-              <span style={{ cursor: 'pointer' }} onClick={(e) => {
-                e.preventDefault();
-                addFilter(filter);
-                setFilter('');
-              }} className="codicon codicon-save" slot="content-after" />
+              <span
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  addFilter(filter);
+                  setFilter('');
+                }}
+                className="codicon codicon-save"
+                slot="content-after"
+              />
               <span className="codicon codicon-search" slot="content-before" />
             </VscodeTextfield>
           </div>
@@ -1265,13 +1273,13 @@ export default function GeneralTests({
           title={intl.formatMessage(
             reload
               ? {
-                id: 'generalTests.tooltip.reloading',
-                defaultMessage: 'Rechargement en cours…',
-              }
+                  id: 'generalTests.tooltip.reloading',
+                  defaultMessage: 'Rechargement en cours…',
+                }
               : {
-                id: 'generalTests.tooltip.reload',
-                defaultMessage: 'Recharger la liste des tests',
-              }
+                  id: 'generalTests.tooltip.reload',
+                  defaultMessage: 'Recharger la liste des tests',
+                }
           )}
         >
           <span
