@@ -16,6 +16,8 @@ import { Box, Checkbox, FormControlLabel, Grid } from '@mui/material';
 import { VscodeTextfield } from '@vscode-elements/react-elements';
 import { assertUnreachable } from './shared/util';
 import { setVsCodeApi } from './shared/webviewApi';
+import type { Filter} from './FilterPin';
+import { FilterPins } from './FilterPin';
 
 type TestGridArg = {
   vscode: WebviewApi<unknown>;
@@ -48,10 +50,10 @@ type TestItemArg = {
  */
 type FilterArg = {
   tests: TestMacro[] | undefined;
-  filter: string;
+  filters: Filter[];
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
-  setFilter: React.Dispatch<React.SetStateAction<string>>;
+  setFilters: React.Dispatch<React.SetStateAction<Filter[]>>;
   filterGui: boolean;
   setFilterGui: React.Dispatch<React.SetStateAction<boolean>>;
 };
@@ -488,7 +490,7 @@ function HeaderLine({
           />
         </td>
         <td>
-          <RunIcon onRun={() => {}} />
+          <RunIcon onRun={() => { }} />
         </td>
         <td>
           <FormattedMessage
@@ -551,22 +553,32 @@ function testMacro(test: TestDebugger): TestMacro {
  */
 function matchFilter(
   test: TestDebugger,
-  filterRaw: string,
+  filters: Filter[],
   filterScope: string[],
   filterGui: boolean
 ): boolean {
-  let filter = filterRaw.toLowerCase();
-  let searchBarFilter =
-    testTitle(test).toLowerCase().includes(filter) ||
-    testDescription(test).toLowerCase().includes(filter) ||
-    testingScope(test).toLowerCase().includes(filter) ||
-    (test.index + 1).toString().includes(filter);
+  let pinsMatch = true;
+  for (let filterPin of filters) {
+    if (filterPin.option != 'ignore') {
+      let filter = filterPin.filter.toLowerCase().trim();
+      let pinMatch =
+        testTitle(test).toLowerCase().includes(filter) ||
+        testDescription(test).toLowerCase().includes(filter) ||
+        testingScope(test).toLowerCase().includes(filter) ||
+        (test.index + 1).toString().includes(filter);
+      if (filterPin.option == 'include') {
+        pinsMatch = pinsMatch && pinMatch;
+      } else {
+        pinsMatch = pinsMatch && !pinMatch;
+      }
+    }
+  }
   let scopeFilter =
     filterScope.length == 0
       ? true
       : filterScope.some((value) => testingScope(test) == value);
   let guiFilter = filterGui ? isGui(test) : true;
-  return searchBarFilter && scopeFilter && guiFilter;
+  return pinsMatch && scopeFilter && guiFilter;
 }
 
 function TestPath({
@@ -595,9 +607,9 @@ function TestPath({
             isGui(test)
               ? { kind: 'OpenInTestEditor', value: test.filename }
               : {
-                  kind: 'OpenInTextEditor',
-                  value: { value: test.filename },
-                }
+                kind: 'OpenInTextEditor',
+                value: { value: test.filename },
+              }
           )
         );
       }}
@@ -875,27 +887,39 @@ function ScopeFilter({
   );
 }
 
-function Filter({
+function FilterPanel({
   tests,
-  filter,
+  filters,
   filterScope,
   setFilterScope,
-  setFilter,
+  setFilters,
   filterGui,
   setFilterGui,
 }: FilterArg): ReactElement {
   const intl = useIntl();
+  const [filter, setFilter] = useState<string>('');
   // Restore the default state: GUI-only checkbox checked, no scope selected,
   // empty search bar.
   const resetFilters = (): void => {
     setFilterGui(true);
     setFilterScope([]);
-    setFilter('');
+    setFilters([]);
   };
 
   const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filter, [], filterGui)
+    matchFilter(test, filters, [], filterGui)
   );
+
+  const addFilter = (filter: string) : void => {
+    let filterToAdd = filter.trim();
+    setFilters((savedFilters) => {
+      if (filterToAdd == '' || savedFilters.some((elt: Filter) => elt.filter == filterToAdd)) {
+        return savedFilters;
+      } else {
+        return [...savedFilters, { filter: filterToAdd, option: 'include' }];
+      }
+    });
+  };
 
   return (
     <div className="box-filter">
@@ -951,6 +975,7 @@ function Filter({
             setFilterScope={setFilterScope}
           />
           <div style={{ marginLeft: 'auto' }}>
+            <FilterPins filters={filters} setFilters={setFilters} />
             <VscodeTextfield
               className="search-bar"
               value={filter}
@@ -958,11 +983,23 @@ function Filter({
                 id: 'generalTests.searchPlaceholder',
                 defaultMessage: 'Rechercher un test…',
               })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addFilter(filter);
+                  setFilter('');
+                }
+              }}
               onInput={(e) => {
                 const value = (e.target as HTMLInputElement).value;
                 setFilter(value);
               }}
             >
+              <span style={{ cursor: 'pointer' }} onClick={(e) => {
+                e.preventDefault();
+                addFilter(filter);
+                setFilter('');
+              }} className="codicon codicon-save" slot="content-after" />
               <span className="codicon codicon-search" slot="content-before" />
             </VscodeTextfield>
           </div>
@@ -998,11 +1035,11 @@ function Loading({
 }
 
 function noFilter(
-  filter: string,
+  filters: Filter[],
   filterScope: string[],
   filterGui: boolean
 ): boolean {
-  return filter.trim() == '' && filterScope.length == 0 && filterGui == false;
+  return filters.length == 0 && filterScope.length == 0 && filterGui == false;
 }
 
 // Total duration of the `highlight` blink animation (`blink 1s ... 4` = 1s ×
@@ -1014,7 +1051,7 @@ export default function GeneralTests({
   vscode,
 }: GeneralTestsArg): ReactElement {
   const intl = useIntl();
-  const [filter, setFilter] = useState<string>('');
+  const [filters, setFilters] = useState<Filter[]>([]);
   const [filterScope, setFilterScope] = useState<string[]>([]);
   const [filterGui, setFilterGui] = useState<boolean>(true);
   // Whether failures are brought to the front. Not a user preference any more:
@@ -1125,7 +1162,7 @@ export default function GeneralTests({
   };
 
   const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filter, filterScope, filterGui)
+    matchFilter(test, filters, filterScope, filterGui)
   );
 
   return (
@@ -1147,7 +1184,7 @@ export default function GeneralTests({
           <RunAllTests
             onRun={() => {
               if (tests) {
-                if (noFilter(filter, filterScope, filterGui)) {
+                if (noFilter(filters, filterScope, filterGui)) {
                   setTests((oldTests) =>
                     oldTests?.map((test) => {
                       return { ...test, state: 'Loading' };
@@ -1176,14 +1213,14 @@ export default function GeneralTests({
           />{' '}
         </div>
       </div>
-      <Filter
+      <FilterPanel
         tests={tests}
         setFilterScope={setFilterScope}
         filterScope={filterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
-        filter={filter}
-        setFilter={setFilter}
+        filters={filters}
+        setFilters={setFilters}
       />
       <div className="select-test-print">
         <FormattedMessage
@@ -1228,13 +1265,13 @@ export default function GeneralTests({
           title={intl.formatMessage(
             reload
               ? {
-                  id: 'generalTests.tooltip.reloading',
-                  defaultMessage: 'Rechargement en cours…',
-                }
+                id: 'generalTests.tooltip.reloading',
+                defaultMessage: 'Rechargement en cours…',
+              }
               : {
-                  id: 'generalTests.tooltip.reload',
-                  defaultMessage: 'Recharger la liste des tests',
-                }
+                id: 'generalTests.tooltip.reload',
+                defaultMessage: 'Recharger la liste des tests',
+              }
           )}
         >
           <span
