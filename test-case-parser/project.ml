@@ -37,7 +37,16 @@ let lookup_clerk_toml from_dir =
     end
   with _ -> None
 
-let lookup_include_dirs ?(prefix_build = false) ?buffer_path options =
+(* Where clerk leaves its artifacts, relative to the project root. Overridable
+   from the command line: a caller that built with [clerk --build-dir] has them
+   somewhere else. *)
+let default_build_dir = "_build"
+
+let lookup_include_dirs
+    ?(build_dir = default_build_dir)
+    ?(prefix_build = false)
+    ?buffer_path
+    options =
   (* Otherwise, lookup for the toml *)
   let dir =
     match options.Global.input_src with
@@ -62,7 +71,9 @@ let lookup_include_dirs ?(prefix_build = false) ?buffer_path options =
     in
     let include_dirs =
       if prefix_build then
-        List.map (fun p -> File.(path_to_build / "_build" / p)) all_include_dirs
+        List.map
+          (fun p -> File.(path_to_build / build_dir / p))
+          all_include_dirs
       else List.map (File.( / ) path_to_build) all_include_dirs
     in
     let all_include_dirs =

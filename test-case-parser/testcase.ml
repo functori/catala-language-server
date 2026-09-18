@@ -95,6 +95,20 @@ let cmd_partial_read =
            file, and it must agree with $(b,read) wherever both succeed.")
     Term.(const Recovery.read_partial_test $ Cli.Flags.Global.options)
 
+(* Mirrors clerk's own [--build-dir]: the caller may have compiled the
+   dependencies elsewhere than the default, and the interpretation here loads
+   the standard library and the tested modules from that directory. *)
+let build_dir =
+  Arg.(
+    value
+    & opt (some string) None
+    & info ["build-dir"] ~docv:"DIR"
+        ~doc:
+          "Look for the compiled artifacts (standard library and module \
+           dependencies) in $(i,DIR) rather than in $(b,_build). $(i,DIR) is \
+           understood relative to the project root, and is expected to be the \
+           directory clerk built them into.")
+
 let cmd_run =
   Cmd.v
     Cmd.(
@@ -112,6 +126,7 @@ let cmd_run =
       $ Cli.Flags.Global.options
       $ Cli.Flags.ex_scope
       $ Cli.Flags.scope_input
+      $ build_dir
       $ buffer_path)
 
 let cmd_write =
