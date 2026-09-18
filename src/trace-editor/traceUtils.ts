@@ -525,6 +525,14 @@ export function posText(pos?: CodeLocation): string {
   return `${pos.file}:${pos.start.line}`;
 }
 
+/**
+ * Height left for the panels under the editor's header. The editor measures it
+ * and sets it on their container; each panel caps itself with it. Declared
+ * here rather than in any of them, since the editor, the data panel and the
+ * tree view all need it.
+ */
+export const PANEL_HEIGHT_VAR = '--trace-panel-height';
+
 export function variableSegment(v: TraceVariable): string {
   return v.kind === 'step' && v.index !== undefined
     ? `${v.name}[${v.index}]`

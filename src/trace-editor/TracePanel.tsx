@@ -1,4 +1,10 @@
-import { type ReactElement, useMemo, useState } from 'react';
+import {
+  type ReactElement,
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
   VscodeButton,
@@ -39,12 +45,14 @@ export default function TracePanel({
   test,
   filters,
   setFilters,
+  onClose,
 }: {
   trace: TraceElement[];
   filters: Filter[];
   setFilters: SetFilter;
   cwd: string;
   test?: TraceTest;
+  onClose?: () => void;
 }): ReactElement {
   const intl = useIntl();
   const [view, setView] = useState<OutputView>('tree');
@@ -52,8 +60,17 @@ export default function TracePanel({
   const [filter, setFilter] = useState<string>('');
   const addFilter = createAddFilter(setFilters);
 
+  // Derived panel spawned by viewWithFilter command are stored here
+  const [derived, setDerived] = useState<{ id: number; filter: string }[]>([]);
+  const nextDerivedId = useRef(1);
+
+  const spawnPanel = useCallback((spawnFilter: string): void => {
+    const id = nextDerivedId.current++;
+    setDerived((old) => [...old, { id, filter: spawnFilter }]);
+  }, []);
+
   const menuProps = useTraceMenu(
-    useMemo(() => ({ spawnPanel: (): void => {}, addFilter }), [addFilter])
+    useMemo(() => ({ spawnPanel, addFilter }), [addFilter])
   );
 
   return (
@@ -84,6 +101,15 @@ export default function TracePanel({
             checked={view === 'json'}
           />
         </VscodeRadioGroup>
+        {onClose && (
+          <span
+            className="codicon codicon-close"
+            role="button"
+            title={intl.formatMessage({ id: 'trace.closePanel' })}
+            style={{ marginLeft: 'auto', cursor: 'pointer' }}
+            onClick={onClose}
+          />
+        )}
       </div>
       {view === 'tree' ? (
         <>
@@ -166,11 +192,31 @@ export default function TracePanel({
           <pre style={preStyle}>{JSON.stringify(trace, null, 2)}</pre>
         </>
       )}
+      {derived.map((d) => (
+        <div key={d.id} style={derivedPanelStyle}>
+          <TracePanel
+            trace={trace}
+            cwd={cwd}
+            filters={[]}
+            setFilters={(): void => {}}
+            test={test}
+            onClose={() =>
+              setDerived((old) => old.filter((o) => o.id !== d.id))
+            }
+          />
+        </div>
+      ))}
     </div>
   );
 }
 
 // -- Styles -------------------------------------------------------------------
+
+const derivedPanelStyle: React.CSSProperties = {
+  marginTop: 12,
+  paddingTop: 8,
+  borderTop: '1px solid var(--vscode-panel-border, transparent)',
+};
 
 /** Preformatted block, shared with the error report in `TraceEditor`. */
 export const preStyle: React.CSSProperties = {

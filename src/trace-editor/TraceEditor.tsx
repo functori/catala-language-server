@@ -1,4 +1,10 @@
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import {
+  type ReactElement,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { WebviewApi } from 'vscode-webview';
 import {
@@ -11,7 +17,7 @@ import {
 import { setVsCodeApi } from '../shared/webviewApi';
 import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { TraceElement, TraceTest } from './traceUtils';
-import { fieldValue, readTraceTest } from './traceUtils';
+import { fieldValue, PANEL_HEIGHT_VAR, readTraceTest } from './traceUtils';
 import { DataPanel } from './TraceData';
 import { type Filter } from '../FilterPin';
 import TracePanel, {
@@ -34,6 +40,8 @@ type ScopeWithInfo = [string, TraceTest | undefined];
 
 const PANE_LAYOUTS = ['data', 'both', 'trace'] as const;
 type PaneLayout = (typeof PANE_LAYOUTS)[number];
+
+const BOTTOM_MARGIN = 12;
 
 export default function TraceEditor({ vscode }: Props): ReactElement {
   const intl = useIntl();
@@ -127,6 +135,23 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
 
   const running = runState.status === 'running';
 
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const [panelHeight, setPanelHeight] = useState<string>();
+  useLayoutEffect(() => {
+    const element = resultsRef.current;
+    if (element === null) {
+      return;
+    }
+    const measure = (): void => {
+      const top = element.getBoundingClientRect().top + window.scrollY;
+      setPanelHeight(`calc(100vh - ${Math.round(top)}px - ${BOTTOM_MARGIN}px)`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    return (): void => observer.disconnect();
+  }, [initialized, scopePreset, scopes.size]);
+
   if (!initialized) {
     return (
       <div
@@ -188,35 +213,39 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         </label>
       )}
 
-      {scope[1] !== undefined ? (
-        <SplitPane
-          layout={layout}
-          left={
-            <DataPanel
-              addFilter={addFilter}
-              test={scope[1]}
-              trace={runState.status === 'success' ? runState.trace : undefined}
-              intl={intl}
-            />
-          }
-          right={
-            <TraceResult
-              filters={savedFilters}
-              setFilters={setSavedFilters}
-              runState={runState}
-              cwd={cwd}
-              test={scope[1]}
-            />
-          }
-        />
-      ) : (
-        <TraceResult
-          filters={savedFilters}
-          setFilters={setSavedFilters}
-          runState={runState}
-          cwd={cwd}
-        />
-      )}
+      <div style={{ [PANEL_HEIGHT_VAR]: panelHeight } as React.CSSProperties}>
+        {scope[1] !== undefined ? (
+          <SplitPane
+            layout={layout}
+            left={
+              <DataPanel
+                addFilter={addFilter}
+                test={scope[1]}
+                trace={
+                  runState.status === 'success' ? runState.trace : undefined
+                }
+                intl={intl}
+              />
+            }
+            right={
+              <TraceResult
+                filters={savedFilters}
+                setFilters={setSavedFilters}
+                runState={runState}
+                cwd={cwd}
+                test={scope[1]}
+              />
+            }
+          />
+        ) : (
+          <TraceResult
+            filters={savedFilters}
+            setFilters={setSavedFilters}
+            runState={runState}
+            cwd={cwd}
+          />
+        )}
+      </div>
     </div>
   );
 }
