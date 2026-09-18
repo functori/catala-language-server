@@ -795,7 +795,8 @@ let run_with_inputs
   let test_outputs = test_outputs_of dcalc_prg out_struct actual_results in
   let assert_failures = not (failed_asserts = []) in
   let test = O.{ test with test_outputs } in
-  write_stdout J.write_test_run O.{ test; assert_failures; diffs = [] }
+  write_stdout J.write_test_run
+    O.{ test; assert_failures; diffs = []; failed_trace_assert = [] }
 
 let run_test include_dirs options testing_scope =
   let desugared_prg, naming_ctx, testing_scope_name, dcalc_prg =
@@ -835,7 +836,9 @@ let run_test include_dirs options testing_scope =
     |> List.map (proj_diff (get_value dcalc_prg.lang dcalc_prg.decl_ctx))
   in
   let assert_failures = not (failed_asserts = []) in
-  let test_run = { O.test; O.assert_failures; O.diffs } in
+  let test_run =
+    { O.test; O.assert_failures; O.diffs; O.failed_trace_assert = [] }
+  in
   write_stdout J.write_test_run test_run
 
 let clerk_exe () =
