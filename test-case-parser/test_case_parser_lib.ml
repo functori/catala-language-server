@@ -26,6 +26,8 @@ module AssertTraceVar : sig
     current_value : string option;
   }
 
+  val read_trace : string -> Yojson.Safe.t option
+
   val check_failed_trace_var :
     trace_assert:Trace_assertion.trace_assertions ->
     tested_scope:string ->
@@ -37,6 +39,8 @@ end = struct
     expected : string;
     current_value : string option;
   }
+
+  let read_trace file = Trace_assertion.read_trace file
 
   let check_failed_trace_var ~trace_assert ~tested_scope json =
     List.map
@@ -990,8 +994,8 @@ let parse_expected_variable (s : string) :
     else Some (name, Some (runtime_value_of_string value))
 
 (* Splits a "name: payload" attribute payload, keeping [payload] exactly as
-   written in the source: [Expected.check_expected] needs the surface form to
-   re-render it through the trace's own encoder. *)
+   written in the source: [Expected.check_trace_assert] needs the surface form
+   to re-render it through the trace's own encoder. *)
 let split_expected_attr (s : string) : (string * string) option =
   match String.index_opt s ':' with
   | None -> None
@@ -1910,30 +1914,50 @@ let run_test ?build_dir include_dirs options testing_scope check_trace =
     |> List.map (proj_diff (get_value dcalc_prg.lang dcalc_prg.decl_ctx))
   in
   let assert_failures = not (failed_asserts = []) in
+  (* [check_trace_assert] derives the tested scope by dropping the last 5
+     characters of the name it is given, so it only makes sense on a
+     "<Scope>_test" name. The editor also generates "<Scope>_test_1" and the
+     like when a test is duplicated; checking anyway would resolve no path at
+     all and report every variable as missing. *)
+  let checkable_scope_name =
+    String.length testing_scope > 5
+    && String.sub testing_scope (String.length testing_scope - 5) 5 = "_test"
+    && String.sub testing_scope 0 (String.length testing_scope - 5)
+       = test.O.tested_scope.O.name
+  in
   (* Same check as `interpret --check-trace-assertion`, reported as data instead
      of raising: this command hands failures back to the editor, and its error
-     absorber only catches assertion failures. An unreadable trace therefore
-     leaves the variables unchecked with a warning. *)
+     absorber only catches assertion failures. Anything unexpected therefore
+     leaves the variables unchecked with a warning rather than failing the run.
+     The [try] has to cover [check_trace_assertion] too, not just the file
+     read. *)
   let failed_trace_assert =
     match check_trace with
-    | Some file when not (Trace_assertion.M.is_empty trace_assert) -> (
-      match Yojson.Safe.from_file file with
-      | trace ->
+    | Some _ when Trace_assertion.M.is_empty trace_assert -> []
+    | Some _ when not checkable_scope_name ->
+      Message.warning
+        "Scope @{<bold>%s@} is not named after the scope it tests, trace \
+         assertions on variables are left unchecked."
+        testing_scope;
+      []
+    | Some file -> (
+      try
         AssertTraceVar.check_failed_trace_var ~trace_assert
-          ~tested_scope:testing_scope (Some trace)
+          ~tested_scope:testing_scope
+          (AssertTraceVar.read_trace file)
         |> List.map (fun e : O.failed_trace_assert ->
             {
               name = e.AssertTraceVar.name;
               expected = e.AssertTraceVar.expected;
               current_value = e.AssertTraceVar.current_value;
             })
-      | exception e ->
+      with e ->
         Message.warning
-          "Could not read the trace @{<bold>%s@} of @{<bold>%s@}, assertions \
-           on variables using the trace are left unchecked:@ %s"
-          file testing_scope (Printexc.to_string e);
+          "Could not check the assertion on variables of @{<bold>%s@} against \
+           the trace @{<bold>%s@}:@ %s"
+          testing_scope file (Printexc.to_string e);
         [])
-    | _ -> []
+    | None -> []
   in
   let test_run =
     { O.test; O.assert_failures; O.diffs; O.failed_trace_assert }
