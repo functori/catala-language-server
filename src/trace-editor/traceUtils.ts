@@ -904,3 +904,83 @@ export function indexedSegment(
   const index = stepIndices.get(el);
   return index !== undefined ? `${name}[${index}]` : name;
 }
+
+function stepInto(
+  te: TraceElement,
+  prefix: string,
+  testedScope: string | undefined,
+  stepIndices: Map<TraceElement, number>
+): {
+  children: TraceElement[];
+  prefix: string;
+  testedScope: string | undefined;
+} {
+  const merged =
+    te.element.kind === 'scope_var' &&
+    typeof te.element.name === 'string' &&
+    te.trace?.length === 1 &&
+    te.trace[0].element.kind === 'scope_call' &&
+    typeof te.trace[0].element.name === 'string';
+  const node = merged && te.trace ? te.trace[0] : te;
+  const displayName = merged
+    ? `${te.element.name as string}.${node.element.name as string}`
+    : (te.element.name as string);
+  let childPrefix = prefix;
+  let nextTestedScope = testedScope;
+  if (
+    (node.element.kind === 'scope_call' ||
+      node.element.kind === 'scope_var' ||
+      node.element.kind === 'local_var') &&
+    typeof node.element.name === 'string'
+  ) {
+    if (node.element.name === testedScope) {
+      nextTestedScope = undefined;
+    } else {
+      const segment = indexedSegment(node, displayName, stepIndices);
+      childPrefix = prefix ? `${prefix}.${segment}` : segment;
+    }
+  }
+  return {
+    children: node.trace ?? [],
+    prefix: childPrefix,
+    testedScope: nextTestedScope,
+  };
+}
+
+export function closestFilterMatch(
+  roots: TraceElement[],
+  filters: Filter[],
+  intl: IntlShape,
+  stepIndices: Map<TraceElement, number>,
+  testedScope: string | undefined
+): {
+  roots: TraceElement[];
+  prefix: string;
+  testedScope: string | undefined;
+} {
+  let level = roots;
+  let prefix = '';
+  let scope = testedScope;
+  let active = filters;
+  let closest = { roots, prefix, testedScope: scope };
+  for (;;) {
+    const matching = level.filter((el) => subtreeMatches(el, active, intl));
+    if (matching.length !== 1) {
+      return closest;
+    }
+    const [only] = matching;
+    closest = { roots: [only], prefix, testedScope: scope };
+    const [remaining, excluded] = filterMatches(only, active, intl);
+    if (excluded || remaining.every((pin) => pin.option === 'exclude')) {
+      return closest;
+    }
+    const stepped = stepInto(only, prefix, scope, stepIndices);
+    if (stepped.children.length === 0) {
+      return closest;
+    }
+    level = stepped.children;
+    active = remaining;
+    prefix = stepped.prefix;
+    scope = stepped.testedScope;
+  }
+}
