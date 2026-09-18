@@ -14,7 +14,9 @@ import type {
   RuntimeValue,
   SourcePosition,
   TestOutputs,
+  TestRunOutput,
   TestRunResults,
+  FailedTraceAssert,
 } from '../generated/catala_types';
 import path from 'path';
 
@@ -26,6 +28,8 @@ type ClerkLocation = {
 type ClerkScopeTestResult = {
   scope_name: string;
   success: boolean;
+  /** Absent from the results of a clerk that does not report them. */
+  failed_trace_assert?: FailedTraceAssert[];
   errors: Array<{
     // Absent when the failure does not come from clerk, e.g. one synthesized
     // by `ResultController.record`. Already read behind a guard.
@@ -110,7 +114,7 @@ export class ResultController {
   constructor(
     private readonly storage: vscode.Memento,
     private readonly language: string
-  ) {}
+  ) { }
 
   getResult(testId: TestId): ResultType | undefined {
     let result: ResultType | undefined = this.storage.get(
@@ -130,11 +134,14 @@ export class ResultController {
     if (results.kind === 'Cancelled') return;
     const failures =
       results.kind === 'Ok'
-        ? results.value.assert_failures || results.value.diffs.length > 0
+        ? results.value.assert_failures ||
+        results.value.diffs.length > 0 ||
+        results.value.failed_trace_assert.length > 0
         : true;
     this.storage.update(`${LAST_TEST_RESULT_KEY}:${testId.id}`, {
       scope_name,
       success: !failures,
+      failed_trace_assert: results.kind === 'Ok' ? results.value.failed_trace_assert : [],
       errors: results.kind === 'Error' ? [{ message: results.value }] : [],
       time: 0,
       date: new Date().toLocaleDateString('fr'),
@@ -293,6 +300,28 @@ function formatDiffs(diffs: Diff[]): string {
     .join('\n\n');
 }
 
+// Already-rendered strings: the comparison was done by the compiler, against
+// the trace, so nothing is re-formatted here.
+function formatVariableFailures(failures: FailedTraceAssert[]): string {
+  return failures
+    .map(
+      (f) =>
+        `Variable ${f.name}:\n  expected: ${f.expected}\n  actual:   ${f.current_value ?? '<not found in trace>'
+        }`
+    )
+    .join('\n\n');
+}
+
+// A run counts as failed if an assertion failed, an output differs from what
+// was expected, or an auxiliary variable does not match its expected value.
+function hasTestFailures(out: TestRunOutput): boolean {
+  return (
+    out.assert_failures ||
+    (out.diffs ?? []).length > 0 ||
+    (out.failed_trace_assert ?? []).length > 0
+  );
+}
+
 // Shared helper to apply results to a single TestItem and report to a TestRun
 function applyResultsToTestItem(
   tr: vscode.TestRun,
@@ -303,11 +332,15 @@ function applyResultsToTestItem(
   if (results.kind === 'Ok') {
     const out = results.value;
     const diffs = out.diffs ?? [];
-    const hasFailures = out.assert_failures || diffs.length > 0;
-    if (hasFailures) {
+    const variableFailures = out.failed_trace_assert ?? [];
+    if (hasTestFailures(out)) {
       // Prefer focusing the custom editor and displaying diffs there when
       // run from controller; location still attached for Test Explorer
-      const msg = new vscode.TestMessage(formatDiffs(diffs));
+      const msg = new vscode.TestMessage(
+        [formatDiffs(diffs), formatVariableFailures(variableFailures)]
+          .filter((str) => str !== '')
+          .join('\n\n')
+      );
       const loc = firstDiffLocation(diffs, out.test_outputs, file);
       if (loc) msg.location = loc;
       tr.failed(item, msg);
@@ -331,10 +364,7 @@ async function processGUITest(
     const uri = vscode.Uri.file(file);
     const res: TestRunResults = await runTestScope(file, scope);
     if (res.kind === 'Ok') {
-      const out = res.value;
-      const diffs = out.diffs ?? [];
-      const hasFailures = out.assert_failures || diffs.length > 0;
-      if (hasFailures) {
+      if (hasTestFailures(res.value)) {
         // Prefer focusing the custom editor and displaying diffs there
         // TODO: SHOULD WE?
         await focusDiffInCustomEditor(uri, scope, res);
@@ -470,7 +500,8 @@ function updateTestItemWithClerkResult(
   run: vscode.TestRun,
   scopeTest: ClerkScopeTestResult
 ): void {
-  if (scopeTest.success) {
+  const failed_trace_assert = scopeTest.failed_trace_assert ?? [];
+  if (scopeTest.success && failed_trace_assert.length === 0) {
     run.passed(test_item, scopeTest.time);
   } else {
     const messages = scopeTest.errors.map((error) => {
@@ -484,6 +515,11 @@ function updateTestItemWithClerkResult(
       }
       return msg;
     });
+    // A scope can succeed and still have mismatching variables, in which case
+    // clerk reports no error: without this the test would fail with no message.
+    if (failed_trace_assert.length > 0) {
+      messages.push(new vscode.TestMessage(formatVariableFailures(failed_trace_assert)));
+    }
     if (scopeTest.scope_name == 'compilation')
       test_item.children.forEach((item) =>
         run.failed(item, messages, scopeTest.time)
