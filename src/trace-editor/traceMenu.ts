@@ -2,8 +2,10 @@ import { type MouseEvent, useSyncExternalStore } from 'react';
 import type { TraceDownMessage } from './messages';
 
 export type AddFilter = (filter: string) => void;
+type SpawnPanel = (filter: string) => void;
 
 export type TraceMenuActions = {
+  spawnPanel: SpawnPanel;
   addFilter: AddFilter;
 };
 
@@ -76,7 +78,7 @@ function armMenu(actions: TraceMenuActions, event: Event): void {
   menuListenerAttached = true;
   window.addEventListener('message', (message: MessageEvent): void => {
     const m = message.data as TraceDownMessage;
-    if (m?.kind !== 'addToFilter') {
+    if (m?.kind !== 'viewWithFilter' && m?.kind !== 'addToFilter') {
       return;
     }
     const text = window.getSelection()?.toString().trim() ?? '';
@@ -85,6 +87,8 @@ function armMenu(actions: TraceMenuActions, event: Event): void {
     }
     if (m.kind === 'addToFilter') {
       menuTarget.addFilter(text);
+    } else {
+      menuTarget.spawnPanel(text);
     }
   });
 }
