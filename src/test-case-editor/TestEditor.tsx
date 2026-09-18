@@ -8,6 +8,7 @@ import {
   type TestInputs,
   type TestRunResults,
   type PathSegment,
+  type FailedTraceAssert,
 } from '../generated/catala_types';
 import TestInputsEditor from './TestInputsEditor';
 import TestOutputsEditor from './TestOutputsEditor';
@@ -92,10 +93,25 @@ export default function TestEditor(props: Props): ReactElement {
     props.onTestChange({ ...props.test, variables }, false);
   }
 
+  // Mismatches on the auxiliary variables, as reported by the compiler for the
+  // last run. Empty until a run happened.
+  const failedTraceAssert: FailedTraceAssert[] =
+    props.runState?.results?.kind === 'Ok'
+      ? props.runState.results.value.failed_trace_assert
+      : [];
+
   const expectedSectionRef = useRef<HTMLDivElement>(null);
   // Scope for searching the first '.value-editor.invalid' or '.value-editor.unset' before running; used to scroll into view
   const unsetElementRef = useRef<HTMLDivElement>(null);
   const expectedAnchorId = `expected-${encodeURIComponent(props.test.testing_scope)}`;
+
+  // A failing run sends the user to what went wrong, and the scope results come
+  // first: the expected variables only claim the focus when they are the sole
+  // culprit.
+  const focusFailedTrace =
+    props.runState?.results?.kind === 'Ok' &&
+    !props.runState.results.value.assert_failures &&
+    failedTraceAssert.length > 0;
 
   useEffect(() => {
     const runState = props.runState;
@@ -208,6 +224,8 @@ export default function TestEditor(props: Props): ReactElement {
           test={props.test}
           trace={props.trace}
           runTrace={props.runTrace}
+          failures={failedTraceAssert}
+          focusFailure={focusFailedTrace}
           onChange={onVariablesChange}
         />
         <div
@@ -251,7 +269,8 @@ export default function TestEditor(props: Props): ReactElement {
             <div className="test-result">
               {props.runState?.status === 'success' &&
                 props.runState?.results?.kind === 'Ok' &&
-                !props.runState.results.value.assert_failures && (
+                !props.runState.results.value.assert_failures &&
+                failedTraceAssert.length === 0 && (
                   <p className="test-run-result test-run-success body-1">
                     <span className="codicon codicon-check-all"></span>
                     <FormattedMessage
@@ -262,7 +281,8 @@ export default function TestEditor(props: Props): ReactElement {
                 )}
               {(props.runState?.status === 'error' ||
                 (props.runState?.results?.kind === 'Ok' &&
-                  props.runState.results.value.assert_failures)) && (
+                  (props.runState.results.value.assert_failures ||
+                    failedTraceAssert.length > 0))) && (
                 <div className="test-result-information">
                   <p className="test-run-result test-run-error body-1">
                     <span className="codicon codicon-warning"></span>

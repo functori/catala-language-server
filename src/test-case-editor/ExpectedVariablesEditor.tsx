@@ -1,4 +1,10 @@
-import { type ReactElement, useState } from 'react';
+import {
+  type ReactElement,
+  type Ref,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import type { IntlShape } from 'react-intl';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { VscodeButton, VscodeTextfield } from '@vscode-elements/react-elements';
@@ -20,6 +26,7 @@ import type {
   RuntimeValueRaw,
   Test,
   ValueDef,
+  FailedTraceAssert,
 } from '../generated/catala_types';
 import {
   BoolEditor,
@@ -34,6 +41,8 @@ type Props = {
   test: Test;
   trace?: TraceElement[];
   runTrace?: boolean;
+  failures?: FailedTraceAssert[];
+  focusFailure?: boolean;
   onChange(next: Map<string, TraceValue | null>): void;
 };
 
@@ -170,9 +179,14 @@ export default function ExpectedVariablesEditor({
   test,
   trace,
   runTrace,
+  failures,
+  focusFailure,
   onChange,
 }: Props): ReactElement {
   const [showCatalog, setShowCatalog] = useState(false);
+  const failureByName = new Map(
+    (failures ?? []).map((failure) => [failure.name, failure])
+  );
   const testVariables: Map<string, TraceValue | null> = new Map();
   test.variables.forEach((rv, name) => {
     const value = rv !== null ? traceValueFromRuntime(rv.value) : null;
@@ -180,6 +194,26 @@ export default function ExpectedVariablesEditor({
       testVariables.set(name, value);
     }
   });
+
+  // The first row the compiler reported a mismatch on, in display order.
+  const firstFailure = [...testVariables.keys()].find((path) =>
+    failureByName.has(path)
+  );
+  const firstFailureRef = useRef<HTMLDivElement>(null);
+
+  // `failures` is a fresh array on every run, so a variable that fails twice in
+  // a row is focused twice, while edits elsewhere do not steal the focus back.
+  useEffect(() => {
+    const row = firstFailureRef.current;
+    if (focusFailure !== true || row === null) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      row.focus();
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 0);
+    return (): void => clearTimeout(timer);
+  }, [failures, focusFailure]);
 
   const [trVariablesAux, outputs] = traceVariablesForTest(
     trace ?? [],
@@ -227,6 +261,8 @@ export default function ExpectedVariablesEditor({
                     expected={tv}
                     computed={computed}
                     missing={hasTraceVars && computed === undefined}
+                    failure={failureByName.get(path)}
+                    rowRef={path === firstFailure ? firstFailureRef : undefined}
                     onSet={setVar}
                     onRemove={remove}
                   />
@@ -281,6 +317,8 @@ function VariableRow({
   expected,
   computed,
   missing,
+  failure,
+  rowRef,
   onSet,
   onRemove,
 }: {
@@ -289,6 +327,8 @@ function VariableRow({
   computed?: TraceValue;
   /** Expected here, but absent from the trace that ran. */
   missing?: boolean;
+  failure?: FailedTraceAssert;
+  rowRef?: Ref<HTMLDivElement>;
   onSet(name: string, rv: TraceValue | null): void;
   onRemove(name: string): void;
 }): ReactElement {
@@ -300,10 +340,13 @@ function VariableRow({
   const computedStr =
     computed !== undefined ? formatTraceValue(computed, intl) : undefined;
 
+  // A reported failure wins over the local comparison: it was computed by the
+  // compiler against the trace, with the runtime's own formatting rules.
   const mismatch =
-    computed !== undefined &&
-    expected !== null &&
-    !traceValueEqual(expected, computed);
+    failure !== undefined ||
+    (computed !== undefined &&
+      expected !== null &&
+      !traceValueEqual(expected, computed));
 
   let comp = computed ? traceValueToRuntime(computed) : undefined;
   let compValu: RuntimeValue | undefined = comp
@@ -319,9 +362,13 @@ function VariableRow({
   }
 
   const inputStr = formatRuntimeValue(input, intl) ?? '';
-  return (
+  // `tabIndex` is what makes the row focusable at all; -1 keeps it out of the
+  // tab order, so it is only ever reached by the jump above.
+  const editor = (
     <div
       className="simple-item-vertical atomic-element"
+      ref={rowRef}
+      tabIndex={failure !== undefined ? -1 : undefined}
       style={
         missing
           ? {
@@ -339,6 +386,17 @@ function VariableRow({
           className="expected-variable-value body-1"
           style={
             mismatch ? { color: 'var(--vscode-errorForeground)' } : undefined
+          }
+          title={
+            failure !== undefined
+              ? intl.formatMessage(
+                  { id: 'testEditor.variableMismatch' },
+                  {
+                    expected: failure.expected,
+                    actual: failure.current_value ?? '--',
+                  }
+                )
+              : undefined
           }
         >
           {expectedStr}
@@ -385,6 +443,17 @@ function VariableRow({
         />
       </div>
     </div>
+  );
+
+  return failure !== undefined ? (
+    <div className="diff-highlight atomic-diff">
+      {editor}
+      <div className="diff-actual">
+        <FormattedMessage id="diff.actual" />: {failure.current_value ?? ''}
+      </div>
+    </div>
+  ) : (
+    editor
   );
 }
 
