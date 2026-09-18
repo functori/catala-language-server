@@ -1,12 +1,10 @@
-import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { WebviewApi } from 'vscode-webview';
 import {
   VscodeButton,
   VscodeOption,
   VscodeProgressRing,
-  VscodeRadio,
-  VscodeRadioGroup,
   VscodeSingleSelect,
   VscodeTextfield,
 } from '@vscode-elements/react-elements';
@@ -14,19 +12,19 @@ import { setVsCodeApi } from '../shared/webviewApi';
 import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { TraceElement, TraceTest } from './traceUtils';
 import { fieldValue, readTraceTest } from './traceUtils';
-import type { AddFilter } from './traceMenu';
 import { DataPanel } from './TraceData';
-import TraceTreeView from './TraceTreeView';
-import { FilterPins, type Filter } from '../FilterPin';
-import { useTraceMenu } from './traceMenu';
+import { type Filter } from '../FilterPin';
+import TracePanel, {
+  createAddFilter,
+  preStyle,
+  type SetFilter,
+} from './TracePanel';
 
 type RunState =
   | { status: 'idle' }
   | { status: 'running' }
   | { status: 'success'; trace: TraceElement[] }
   | { status: 'error'; message: string };
-
-type OutputView = 'tree' | 'json';
 
 type Props = {
   vscode: WebviewApi<unknown>;
@@ -36,24 +34,6 @@ type ScopeWithInfo = [string, TraceTest | undefined];
 
 const PANE_LAYOUTS = ['data', 'both', 'trace'] as const;
 type PaneLayout = (typeof PANE_LAYOUTS)[number];
-type SetFilter = React.Dispatch<React.SetStateAction<Filter[]>>;
-
-function createAddFilter(setFilters: SetFilter): AddFilter {
-  const addFilter: AddFilter = (filter) => {
-    let filterToAdd = filter.trim();
-    setFilters((savedFilters) => {
-      if (
-        filterToAdd == '' ||
-        savedFilters.some((elt: Filter) => elt.filter == filterToAdd)
-      ) {
-        return savedFilters;
-      } else {
-        return [...savedFilters, { filter: filterToAdd, option: 'include' }];
-      }
-    });
-  };
-  return addFilter;
-}
 
 export default function TraceEditor({ vscode }: Props): ReactElement {
   const intl = useIntl();
@@ -301,14 +281,6 @@ function TraceResult({
   cwd: string;
   test?: TraceTest;
 }): ReactElement | null {
-  const intl = useIntl();
-  const [view, setView] = useState<OutputView>('tree');
-  const [expand, setExpand] = useState<boolean | null>(null);
-  const [filter, setFilter] = useState<string>('');
-  const addFilter = createAddFilter(setFilters);
-
-  const menuProps = useTraceMenu(useMemo(() => ({ addFilter }), [addFilter]));
-
   switch (runState.status) {
     case 'idle':
       return null;
@@ -329,118 +301,13 @@ function TraceResult({
       );
     case 'success':
       return (
-        <div {...menuProps}>
-          <div
-            style={{
-              display: 'flex',
-              gap: 16,
-              alignItems: 'center',
-              margin: 0,
-            }}
-          >
-            <span style={{ fontWeight: 600 }}>
-              <FormattedMessage id="trace.label" />
-            </span>
-            <VscodeRadioGroup
-              variant="horizontal"
-              onChange={(e) => setView(fieldValue(e) as OutputView)}
-            >
-              <VscodeRadio
-                value="tree"
-                label={intl.formatMessage({ id: 'trace.view.tree' })}
-                checked={view === 'tree'}
-              />
-              <VscodeRadio
-                value="json"
-                label={intl.formatMessage({ id: 'trace.view.json' })}
-                checked={view === 'json'}
-              />
-            </VscodeRadioGroup>
-          </div>
-          {view === 'tree' ? (
-            <>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                  alignItems: 'center',
-                  margin: '8px 0',
-                }}
-              >
-                <VscodeTextfield
-                  placeholder={intl.formatMessage({
-                    id: 'trace.filterPlaceholder',
-                  })}
-                  value={filter}
-                  onInput={(e) => setFilter(fieldValue(e))}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      addFilter(filter);
-                      setFilter('');
-                    }
-                  }}
-                  style={{ flex: 1 }}
-                >
-                  <span
-                    style={{ cursor: 'pointer' }}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      addFilter(filter);
-                      setFilter('');
-                    }}
-                    className="codicon codicon-save"
-                    slot="content-after"
-                  />
-                </VscodeTextfield>
-                <VscodeButton
-                  icon="expand-all"
-                  secondary
-                  title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
-                  onClick={() => setExpand(true)}
-                >
-                  <FormattedMessage id="trace.expandAll" />
-                </VscodeButton>
-                <VscodeButton
-                  icon="collapse-all"
-                  secondary
-                  title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
-                  onClick={() => setExpand(false)}
-                >
-                  <FormattedMessage id="trace.collapseAll" />
-                </VscodeButton>
-              </div>
-              <FilterPins filters={filters} setFilters={setFilters} />
-              <TraceTreeView
-                trace={runState.trace}
-                filters={filters}
-                cwd={cwd}
-                expand={expand}
-                test={test}
-              />
-            </>
-          ) : (
-            <>
-              <div style={{ margin: '8px 0' }}>
-                <VscodeButton
-                  icon="copy"
-                  secondary
-                  title={intl.formatMessage({ id: 'trace.copyJson' })}
-                  onClick={() => {
-                    void navigator.clipboard.writeText(
-                      JSON.stringify(runState.trace, null, 2)
-                    );
-                  }}
-                >
-                  <FormattedMessage id="trace.copyJson" />
-                </VscodeButton>
-              </div>
-              <pre style={preStyle}>
-                {JSON.stringify(runState.trace, null, 2)}
-              </pre>
-            </>
-          )}
-        </div>
+        <TracePanel
+          trace={runState.trace}
+          filters={filters}
+          setFilters={setFilters}
+          cwd={cwd}
+          test={test}
+        />
       );
   }
 }
@@ -550,16 +417,4 @@ const fieldStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 4,
-};
-
-const preStyle: React.CSSProperties = {
-  background:
-    'var(--vscode-textCodeBlock-background, var(--vscode-editor-background))',
-  border: '1px solid var(--vscode-panel-border, transparent)',
-  padding: 10,
-  borderRadius: 2,
-  overflow: 'auto',
-  maxHeight: '70vh',
-  whiteSpace: 'pre-wrap',
-  wordBreak: 'break-word',
 };
