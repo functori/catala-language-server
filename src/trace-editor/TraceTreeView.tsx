@@ -22,6 +22,7 @@ import type {
 } from './traceUtils';
 import {
   type TraceTest,
+  closestFilterMatch,
   describeKind,
   detail,
   filterMatches,
@@ -156,12 +157,14 @@ export default function TraceTreeView({
   cwd,
   expand,
   test,
+  fromClosestMatch = false,
 }: {
   trace: TraceElement[];
   filters?: Filter[];
   cwd?: string;
   expand?: boolean | null;
   test?: TraceTest;
+  fromClosestMatch?: boolean;
 }): ReactElement {
   const intl = useIntl();
 
@@ -220,7 +223,20 @@ export default function TraceTreeView({
     expected = { variables: test.variables, output };
   }
 
-  const testedScope = test ? test.tested_scope.name : undefined;
+  let testedScope = test ? test.tested_scope.name : undefined;
+  let rootPrefix = '';
+  if (fromClosestMatch && f.length > 0) {
+    const closest = closestFilterMatch(
+      roots,
+      f,
+      intl,
+      stepIndices,
+      testedScope
+    );
+    roots = closest.roots;
+    rootPrefix = closest.prefix;
+    testedScope = closest.testedScope;
+  }
 
   return (
     <CwdContext.Provider value={cwd ?? ''}>
@@ -234,7 +250,7 @@ export default function TraceTreeView({
                   te={el}
                   depth={0}
                   filters={f}
-                  prefix=""
+                  prefix={rootPrefix}
                   tested_scope={testedScope}
                 />
               ))}
