@@ -3,6 +3,7 @@
   "command.catala.debugAllTests.title": "Debug Catala tests",
   "command.catala.openWithTraceEditor.title": "Open Catala trace debugger",
   "command.catala.trace.addToFilter.title": "Add to filter",
+  "command.catala.trace.viewWithFilter.title": "View with filter",
   "command.catala.showExceptions.title": "Show definition tree",
   "command.catala.rescanProjects.title": "Scan all files of every project",
   "command.catala.showExceptionsAtCursor.title": "Show definition tree",
