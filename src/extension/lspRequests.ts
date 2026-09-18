@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type { LanguageClient } from 'vscode-languageclient/node';
+import { logger } from './logger';
 
 import type {
   Entrypoint,
@@ -52,14 +53,27 @@ export async function listEntrypoints(
 
 export type CheckTraceAssert = (clerk_toml_dir: string) => Promise<boolean>;
 
-export function checkTraceAssert(client: LanguageClient): CheckTraceAssert {
+/**
+ * `getClient` is a thunk: the client is only assigned when an LSP binary was
+ * found, and the editor providers are registered either way.
+ *
+ * The server answers `null` whenever it has no clerk.toml to read the setting
+ * from, which is not an error: the check is simply off.
+ */
+export function checkTraceAssert(
+  getClient: () => LanguageClient | undefined
+): CheckTraceAssert {
   return async (clerk_toml_dir: string): Promise<boolean> => {
-    let x: JSON = await client.sendRequest('catala.getExpected', {
-      clerk_toml_dir,
-    });
-    if (typeof x === 'boolean') return x;
-    else {
-      throw new Error('Bad json for checkTraceAssert');
+    const client = getClient();
+    if (client === undefined) return false;
+    try {
+      const answer = await client.sendRequest('catala.getTraceAssert', {
+        clerk_toml_dir,
+      });
+      return answer === true;
+    } catch (err) {
+      logger.log(`catala.getTraceAssert failed: ${String(err)}`);
+      return false;
     }
   };
 }

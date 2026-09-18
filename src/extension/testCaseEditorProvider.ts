@@ -218,13 +218,13 @@ export class TestCaseEditorProvider
     context: vscode.ExtensionContext,
     resultController: ResultController,
     codiconsCssPath: string,
-    checkExpected: CheckTraceAssert
+    checkTraceAssert: CheckTraceAssert
   ): vscode.Disposable {
     const provider = new TestCaseEditorProvider(
       context,
       resultController,
       codiconsCssPath,
-      checkExpected
+      checkTraceAssert
     );
     logger.log(`Registering ${TestCaseEditorProvider.viewType}`);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
@@ -245,7 +245,7 @@ export class TestCaseEditorProvider
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
-    const checkVariable = await this.checkTraceAssert(
+    const checkTraceAssert = await this.checkTraceAssert(
       getCwd(document.uri.fsPath) ?? path.dirname(document.uri.fsPath)
     );
     const config = vscode.workspace.getConfiguration('catala');
@@ -408,7 +408,7 @@ export class TestCaseEditorProvider
           // it out of the project.
           let traceDir: string | undefined;
           let traceFile: string | undefined;
-          if (has_trace_assert && checkVariable) {
+          if (has_trace_assert && checkTraceAssert) {
             try {
               traceDir = mkdtempSync(path.join(tmpdir(), 'catala-test-trace-'));
               traceFile = path.join(traceDir, 'trace.json');
