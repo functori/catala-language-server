@@ -97,7 +97,9 @@ export default function TestEditor(props: Props): ReactElement {
   // last run. Empty until a run happened.
   const failedTraceAssert: FailedTraceAssert[] =
     props.runState?.results?.kind === 'Ok'
-      ? props.runState.results.value.failed_trace_assert
+      ? props.runState.results.value.failed_trace_assert.filter((failure) =>
+          props.test.variables.has(failure.name)
+        )
       : [];
 
   const expectedSectionRef = useRef<HTMLDivElement>(null);

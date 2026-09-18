@@ -419,28 +419,32 @@ export class TestCaseEditorProvider
             }
           }
 
-          const results = await this.testQueue.add(() =>
-            runTest(document.uri.fsPath, scope, traceFile)
-          );
+          let results;
+          try {
+            results = await this.testQueue.add(() =>
+              runTest(document.uri.fsPath, scope, traceFile)
+            );
 
-          if (traceFile !== undefined) {
-            const trace = readTraceFile(traceFile);
-            if (trace.ok) {
-              // Hand-written message, like `sendTrace` above: the webview
-              // intercepts this kind before the strict ATD `readDownMessage`.
-              webviewPanel.webview.postMessage({
-                kind: 'trace',
-                scope,
-                trace: trace.trace,
-              });
-            } else {
-              logger.log(
-                `Could not read the trace of scope ${scope}: ${trace.error}`
-              );
+            if (traceFile !== undefined) {
+              const trace = readTraceFile(traceFile);
+              if (trace.ok) {
+                // Hand-written message, like `sendTrace` above: the webview
+                // intercepts this kind before the strict ATD `readDownMessage`.
+                webviewPanel.webview.postMessage({
+                  kind: 'trace',
+                  scope,
+                  trace: trace.trace,
+                });
+              } else {
+                logger.log(
+                  `Could not read the trace of scope ${scope}: ${trace.error}`
+                );
+              }
             }
-          }
-          if (traceDir !== undefined) {
-            rmSync(traceDir, { recursive: true, force: true });
+          } finally {
+            if (traceDir !== undefined) {
+              rmSync(traceDir, { recursive: true, force: true });
+            }
           }
 
           // This run does not go through clerk, so nothing else would record
