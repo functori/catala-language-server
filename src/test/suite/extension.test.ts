@@ -14,6 +14,10 @@ const dummyStorage: vscode.Memento = {
   update: () => Promise.resolve(),
 };
 
+/** The provider only stores this collaborator; it is never called here. */
+const checkTraceAssert = (_clerk_toml_dir: string): Promise<boolean> =>
+  Promise.resolve(false);
+
 suite('Extension Test Suite', () => {
   suiteTeardown(() => {
     vscode.window.showInformationMessage('All tests done!');
@@ -27,7 +31,8 @@ suite('Extension Test Suite', () => {
     const disposable = TestCaseEditorProvider.register(
       context,
       resultController,
-      'codicon.css'
+      'codicon.css',
+      checkTraceAssert
     );
     assert.ok(disposable);
     disposable.dispose();

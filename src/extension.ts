@@ -34,7 +34,7 @@ import {
 import type { Binary, RunArgs } from './shared/util_client';
 import { initTests, ResultController } from './extension/testAndCoverage';
 import type { CatalaEntrypoint } from './extension/lspRequests';
-import { listEntrypoints } from './extension/lspRequests';
+import { checkTraceAssert, listEntrypoints } from './extension/lspRequests';
 import { ScopeInputController } from './scope-editor/ScopeInputController';
 import path from 'path';
 import { TestMacroController } from './test-case-editor/TestMacroController';
@@ -764,7 +764,12 @@ export async function activate(
 
   // Always register the custom editor providers
   context.subscriptions.push(
-    TestCaseEditorProvider.register(context, resultController, codiconsCssPath)
+    TestCaseEditorProvider.register(
+      context,
+      resultController,
+      codiconsCssPath,
+      checkTraceAssert(client)
+    )
   );
   context.subscriptions.push(
     TraceEditorProvider.register(context, () => client, codiconsCssPath)

@@ -25,8 +25,12 @@ import { renameIfNeeded } from '../test-case-editor/testCaseUtils';
 import { CatalaTestCaseDocument } from '../shared/CatalaTestCaseDocument';
 import type { ResultController } from './testAndCoverage';
 import { TestId } from './testAndCoverage';
+import type { CheckTraceAssert } from './lspRequests';
+import { getCwd } from '../shared/util_client';
 import { TraceEditorProvider } from './traceEditorProvider';
-import { runTrace } from '../trace-editor/traceRunner';
+import { runTrace, readTraceFile } from '../trace-editor/traceRunner';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
 import type { TraceElement } from '../trace-editor/traceUtils';
 
 export function parseContents(
@@ -152,7 +156,8 @@ export class TestCaseEditorProvider
     private readonly context: vscode.ExtensionContext,
     private resultController: ResultController,
     /** dist-relative path to the emitted `codicon.css`. */
-    private readonly codiconsCssPath: string
+    private readonly codiconsCssPath: string,
+    private readonly checkTraceAssert: CheckTraceAssert
   ) {
     this.testQueue = new PQueue({ concurrency: 1 });
     this.resultController = resultController;
@@ -212,12 +217,14 @@ export class TestCaseEditorProvider
   public static register(
     context: vscode.ExtensionContext,
     resultController: ResultController,
-    codiconsCssPath: string
+    codiconsCssPath: string,
+    checkExpected: CheckTraceAssert
   ): vscode.Disposable {
     const provider = new TestCaseEditorProvider(
       context,
       resultController,
-      codiconsCssPath
+      codiconsCssPath,
+      checkExpected
     );
     logger.log(`Registering ${TestCaseEditorProvider.viewType}`);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
@@ -238,6 +245,9 @@ export class TestCaseEditorProvider
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    const checkVariable = await this.checkTraceAssert(
+      getCwd(document.uri.fsPath) ?? path.dirname(document.uri.fsPath)
+    );
     const config = vscode.workspace.getConfiguration('catala');
     const isCustomEditorEnabled = config.get<boolean>(
       'enableCustomTestCaseEditor'
@@ -268,9 +278,10 @@ export class TestCaseEditorProvider
 
     async function runTest(
       fileName: string,
-      scope: string
+      scope: string,
+      traceFile?: string
     ): Promise<TestRunResults> {
-      return runTestScope(fileName, scope);
+      return runTestScope(fileName, scope, undefined, traceFile);
     }
 
     function applyGuiEdit(
@@ -363,7 +374,7 @@ export class TestCaseEditorProvider
             return;
           }
 
-          const { scope, reset_outputs } = typed_msg.value;
+          const { scope, reset_outputs, has_trace_assert } = typed_msg.value;
           if (reset_outputs) {
             const confirmation = await vscode.window.showInformationMessage(
               vscode.l10n.t(
@@ -392,9 +403,45 @@ export class TestCaseEditorProvider
             }
           }
 
+          // The trace is what the compiler checks the expected variables
+          // against, and what the webview displays. A temporary directory keeps
+          // it out of the project.
+          let traceDir: string | undefined;
+          let traceFile: string | undefined;
+          if (has_trace_assert && checkVariable) {
+            try {
+              traceDir = mkdtempSync(path.join(tmpdir(), 'catala-test-trace-'));
+              traceFile = path.join(traceDir, 'trace.json');
+            } catch (err) {
+              logger.log(
+                `Could not create a temporary trace file, running without a trace: ${String(err)}`
+              );
+            }
+          }
+
           const results = await this.testQueue.add(() =>
-            runTest(document.uri.fsPath, scope)
+            runTest(document.uri.fsPath, scope, traceFile)
           );
+
+          if (traceFile !== undefined) {
+            const trace = readTraceFile(traceFile);
+            if (trace.ok) {
+              // Hand-written message, like `sendTrace` above: the webview
+              // intercepts this kind before the strict ATD `readDownMessage`.
+              webviewPanel.webview.postMessage({
+                kind: 'trace',
+                scope,
+                trace: trace.trace,
+              });
+            } else {
+              logger.log(
+                `Could not read the trace of scope ${scope}: ${trace.error}`
+              );
+            }
+          }
+          if (traceDir !== undefined) {
+            rmSync(traceDir, { recursive: true, force: true });
+          }
 
           // This run does not go through clerk, so nothing else would record
           // it: without this the General Tests view would keep showing the
