@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   type CSSProperties,
   type ReactElement,
@@ -37,9 +38,12 @@ import { FilterPins, type Filter } from '../FilterPin';
 import TraceNode from './TraceNode';
 
 type OutputView = 'tree' | 'json';
-export type SetFilter = React.Dispatch<React.SetStateAction<Filter[]>>;
+type SetFilter = React.Dispatch<React.SetStateAction<Filter[]>>;
 
-export function createAddFilter(setFilters: SetFilter): AddFilter {
+/** A filter pushed into a panel from the outside (data panel, context menu). */
+export type FilterCommand = { filter: string; nonce: number };
+
+function createAddFilter(setFilters: SetFilter): AddFilter {
   const addFilter: AddFilter = (filter) => {
     let filterToAdd = filter.trim();
     setFilters((savedFilters) => {
@@ -167,28 +171,41 @@ function TraceTreeView({
   );
 }
 
+function asPin(filter: string | undefined): Filter[] {
+  const trimmed = filter?.trim() ?? '';
+  return trimmed === '' ? [] : [{ filter: trimmed, option: 'include' }];
+}
+
 export default function TracePanel({
   trace,
   cwd,
   test,
-  filters,
-  setFilters,
+  label,
+  filterRequest,
+  initialFilter,
   onClose,
   focusOnMount,
+  fromClosestMatch,
 }: {
   trace: TraceElement[];
-  filters: Filter[];
-  setFilters: SetFilter;
   cwd: string;
   test?: TraceTest;
+  label?: ReactNode;
+  filterRequest?: FilterCommand | null;
+  initialFilter?: string;
   onClose?: () => void;
   focusOnMount?: boolean;
+  fromClosestMatch?: boolean;
 }): ReactElement {
   const intl = useIntl();
   const [view, setView] = useState<OutputView>('tree');
   const [expand, setExpand] = useState<boolean | null>(null);
   const [filter, setFilter] = useState<string>('');
-  const addFilter = createAddFilter(setFilters);
+
+  const [savedFilters, setSavedFilters] = useState<Filter[]>(() =>
+    asPin(initialFilter)
+  );
+  const addFilter = createAddFilter(setSavedFilters);
 
   // Derived panel spawned by viewWithFilter command are stored here
   const [derived, setDerived] = useState<{ id: number; filter: string }[]>([]);
@@ -202,6 +219,12 @@ export default function TracePanel({
   const menuProps = useTraceMenu(
     useMemo(() => ({ spawnPanel, addFilter }), [addFilter])
   );
+
+  useEffect(() => {
+    if (filterRequest) {
+      addFilter(filterRequest.filter);
+    }
+  }, [filterRequest]);
 
   const rootRef = useRef<HTMLDivElement>(null);
   const treeRef = useRef<HTMLUListElement>(null);
@@ -232,7 +255,7 @@ export default function TracePanel({
         }}
       >
         <span style={{ fontWeight: 600 }}>
-          <FormattedMessage id="trace.label" />
+          {label ?? <FormattedMessage id="trace.label" />}
         </span>
         <VscodeRadioGroup
           variant="horizontal"
@@ -312,12 +335,13 @@ export default function TracePanel({
               <FormattedMessage id="trace.collapseAll" />
             </VscodeButton>
           </div>
-          <FilterPins filters={filters} setFilters={setFilters} />
+          <FilterPins filters={savedFilters} setFilters={setSavedFilters} />
           <TraceTreeView
             trace={trace}
-            filters={filters}
+            filters={savedFilters}
             cwd={cwd}
             expand={expand}
+            fromClosestMatch={fromClosestMatch}
             test={test}
           />
         </>
@@ -345,13 +369,19 @@ export default function TracePanel({
           <TracePanel
             trace={trace}
             cwd={cwd}
-            filters={[]}
-            setFilters={(): void => {}}
             test={test}
+            fromClosestMatch
+            focusOnMount
+            initialFilter={d.filter}
+            label={
+              <FormattedMessage
+                id="trace.filteredView"
+                values={{ filter: d.filter }}
+              />
+            }
             onClose={() =>
               setDerived((old) => old.filter((o) => o.id !== d.id))
             }
-            focusOnMount
           />
         </div>
       ))}
