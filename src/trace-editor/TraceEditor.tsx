@@ -19,12 +19,7 @@ import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { TraceElement, TraceTest } from './traceUtils';
 import { fieldValue, PANEL_HEIGHT_VAR, readTraceTest } from './traceUtils';
 import { DataPanel } from './TraceData';
-import { type Filter } from '../FilterPin';
-import TracePanel, {
-  createAddFilter,
-  preStyle,
-  type SetFilter,
-} from './TracePanel';
+import TracePanel, { preStyle, type FilterCommand } from './TracePanel';
 
 type RunState =
   | { status: 'idle' }
@@ -53,8 +48,13 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   const [scopePreset, setScopePreset] = useState(false);
   const [runState, setRunState] = useState<RunState>({ status: 'idle' });
   const [initialized, setInitialized] = useState(false);
-  const [savedFilters, setSavedFilters] = useState<Filter[]>([]);
   const [layout, setLayout] = useState<PaneLayout>('both');
+  const [filterRequest, setFilterRequest] = useState<FilterCommand | null>(
+    null
+  );
+
+  const requestFilter = (filter: string): void =>
+    setFilterRequest((prev) => ({ filter, nonce: (prev?.nonce ?? 0) + 1 }));
 
   useEffect(() => {
     setVsCodeApi(vscode);
@@ -163,7 +163,6 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     );
   }
 
-  const addFilter = createAddFilter(setSavedFilters);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={titleRowStyle}>
@@ -219,7 +218,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
             layout={layout}
             left={
               <DataPanel
-                addFilter={addFilter}
+                addFilter={requestFilter}
                 test={scope[1]}
                 trace={
                   runState.status === 'success' ? runState.trace : undefined
@@ -229,8 +228,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
             }
             right={
               <TraceResult
-                filters={savedFilters}
-                setFilters={setSavedFilters}
+                filterRequest={filterRequest}
                 runState={runState}
                 cwd={cwd}
                 test={scope[1]}
@@ -239,8 +237,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           />
         ) : (
           <TraceResult
-            filters={savedFilters}
-            setFilters={setSavedFilters}
+            filterRequest={filterRequest}
             runState={runState}
             cwd={cwd}
           />
@@ -298,17 +295,15 @@ function LayoutSlider({
 }
 
 function TraceResult({
-  filters,
   runState,
-  setFilters,
   cwd,
   test,
+  filterRequest,
 }: {
   runState: RunState;
-  filters: Filter[];
-  setFilters: SetFilter;
   cwd: string;
   test?: TraceTest;
+  filterRequest: FilterCommand | null;
 }): ReactElement | null {
   switch (runState.status) {
     case 'idle':
@@ -332,10 +327,9 @@ function TraceResult({
       return (
         <TracePanel
           trace={runState.trace}
-          filters={filters}
-          setFilters={setFilters}
           cwd={cwd}
           test={test}
+          filterRequest={filterRequest}
         />
       );
   }
