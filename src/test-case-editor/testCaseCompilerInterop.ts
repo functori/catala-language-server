@@ -242,7 +242,9 @@ export type ScopeRunResult =
 export function runTestScope(
   filename: string,
   testScope: string,
-  inputs?: TestInputs
+  inputs?: TestInputs,
+  /** Absolute path of the JSON file the trace should be written to. */
+  traceFile?: string
 ): TestRunResults {
   /*
    * Notes:
@@ -259,6 +261,22 @@ export function runTestScope(
     ? JSON.stringify(writeTestInputs(inputs))
     : undefined;
   const inputArgs = inputs ? ['--input=-'] : [];
+  // Dependencies are built in a separate directory so that the instrumented
+  // artifacts do not evict the plain ones from the main build dir.
+  const clerkTraceArgs = traceFile
+    ? [
+        '--trace',
+        traceFile,
+        '--build-dir',
+        '_build/_trace',
+        '--ninja-output-file',
+        '_build/_trace/clerk.ninja',
+      ]
+    : [];
+  // The trace is produced by the clerk run below, not here: `testcase run`
+  // wraps every evaluation in a dummy scope call, so the trace it could emit
+  // carries only "<function>" as its root value.
+  const catalaTraceArgs = traceFile ? [`--check-trace=${traceFile}`] : [];
   const args = [
     'testcase',
     'run',
@@ -266,19 +284,26 @@ export function runTestScope(
     testScope,
     filename,
     ...inputArgs,
+    ...catalaTraceArgs,
   ];
-  // Runtime plugins are prepared by the testcase backend itself
-  // (`prepare_runtime_plugins`); no clerk invocation is needed here.
   const cwd = getCwd(filename);
   if (cwd) {
     const relFilename = path.relative(cwd, filename);
-    //compile dependencies (hack), do not fail on asserts
+    // Two jobs at once: compile the dependencies the run below needs, and --
+    // when a trace was asked for -- produce it. `-c--no-fail-on-assert` matters
+    // in both cases: a test whose expectations do not match must still get its
+    // dependencies built and its trace written.
     const clerkResult = execBinary(
       clerkPath,
-      ['run', '-c--no-fail-on-assert', relFilename],
-      {
-        cwd,
-      }
+      [
+        'run',
+        ...clerkTraceArgs,
+        '-c--no-fail-on-assert',
+        relFilename,
+        '--scope',
+        testScope,
+      ],
+      { cwd }
     );
     if (!clerkResult.ok) {
       window.showErrorMessage(clerkResult.stderr);

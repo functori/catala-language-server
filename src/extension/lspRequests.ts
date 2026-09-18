@@ -50,6 +50,20 @@ export async function listEntrypoints(
   return entrypoints;
 }
 
+export type CheckTraceAssert = (clerk_toml_dir: string) => Promise<boolean>;
+
+export function checkTraceAssert(client: LanguageClient): CheckTraceAssert {
+  return async (clerk_toml_dir: string): Promise<boolean> => {
+    let x: JSON = await client.sendRequest('catala.getExpected', {
+      clerk_toml_dir,
+    });
+    if (typeof x === 'boolean') return x;
+    else {
+      throw new Error('Bad json for checkTraceAssert');
+    }
+  };
+}
+
 export type ExceptionsArgs = {
   uri: string;
   scope: string;
