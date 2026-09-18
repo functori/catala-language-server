@@ -22,6 +22,7 @@ import type {
 } from './traceUtils';
 import {
   type TraceTest,
+  PANEL_HEIGHT_VAR,
   closestFilterMatch,
   describeKind,
   detail,
@@ -577,6 +578,7 @@ const rootListStyle: CSSProperties = {
   padding: 0,
   fontFamily: 'var(--vscode-editor-font-family, monospace)',
   fontSize: 'var(--vscode-editor-font-size, 13px)',
+  maxHeight: `var(${PANEL_HEIGHT_VAR}, 70vh)`,
   overflow: 'auto',
 };
 

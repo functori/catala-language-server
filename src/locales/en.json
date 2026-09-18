@@ -176,6 +176,7 @@
   "trace.view.tree": "Tree",
   "trace.view.json": "JSON",
   "trace.copyJson": "Copy",
+  "trace.closePanel": "Close this view",
   "trace.filterPlaceholder": "Filter trace…",
   "trace.expandAll": "Expand",
   "trace.expandAllTitle": "Expand all branches",
