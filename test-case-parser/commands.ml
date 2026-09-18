@@ -77,10 +77,12 @@ let write_stdout f arg =
 
 let print_test test = write_stdout J.write_test test
 let print_tests test = write_stdout J.write_test_list test
+let default_build_dir = "_build"
 
-let read_program includes path_to_build options =
+let read_program ?(build_dir = default_build_dir) includes path_to_build options
+    =
   let stdlib =
-    Some (Global.raw_file File.(path_to_build / "_build" / "libcatala"))
+    Some (Global.raw_file File.(path_to_build / build_dir / "libcatala"))
   in
   let prg, ctx = Driver.Passes.desugared options ~stdlib ~includes in
   let prg = Desugared.Disambiguate.program prg in
@@ -576,21 +578,25 @@ let retrieve_assertions_values
           scope_lets)
     [] code_items
 
-let retrieve_program include_dirs options scope_name =
+let retrieve_program
+    ?(build_dir = default_build_dir)
+    include_dirs
+    options
+    scope_name =
   let path_to_build, include_dirs =
     if include_dirs = [] then
       let path_to_build, include_dirs = lookup_include_dirs options in
       let build_include_dirs =
         List.map
           (fun (p : Global.raw_file) ->
-            File.(path_to_build / "_build" / (p :> string)) |> Global.raw_file)
+            File.(path_to_build / build_dir / (p :> string)) |> Global.raw_file)
           include_dirs
       in
       path_to_build, build_include_dirs @ include_dirs
     else ".", []
   in
   let desugared_prg, naming_ctx =
-    read_program include_dirs path_to_build options
+    read_program ~build_dir include_dirs path_to_build options
   in
   let testing_scope_name =
     match
@@ -724,12 +730,13 @@ let rec convert_to_json_input ({ value; _ } : O.runtime_value) : Yojson.Safe.t =
   convert_runtime_raw value
 
 let run_with_inputs
+    ?build_dir
     include_dirs
     options
     tested_scope_name
     (scope_input : Yojson.Safe.t) =
   let desugared_prg, _naming_ctx, scope_name, dcalc_prg =
-    retrieve_program include_dirs options tested_scope_name
+    retrieve_program ?build_dir include_dirs options tested_scope_name
   in
   let test =
     get_scope_test desugared_prg "<abstract>" scope_name
@@ -801,9 +808,9 @@ let run_with_inputs
   write_stdout J.write_test_run
     O.{ test; assert_failures; diffs = []; failed_trace_assert = [] }
 
-let run_test include_dirs options testing_scope =
+let run_test ?build_dir include_dirs options testing_scope =
   let desugared_prg, naming_ctx, testing_scope_name, dcalc_prg =
-    retrieve_program include_dirs options testing_scope
+    retrieve_program ?build_dir include_dirs options testing_scope
   in
   let test = get_catala_test (desugared_prg, naming_ctx) testing_scope_name in
   let build_term program_fun =
@@ -934,6 +941,7 @@ let run_test_cmd
     options
     test_scope_name
     scope_input_opt
+    build_dir
     buffer_path =
   let options =
     match options.Global.input_src, buffer_path with
@@ -958,8 +966,9 @@ let run_test_cmd
       options
   in
   match scope_input_opt with
-  | None -> run_test include_dirs options test_scope_name
-  | Some json -> run_with_inputs include_dirs options test_scope_name json
+  | None -> run_test ?build_dir include_dirs options test_scope_name
+  | Some json ->
+    run_with_inputs ?build_dir include_dirs options test_scope_name json
 
 let print_scopes scopes = write_stdout J.write_scope_def_list scopes
 
