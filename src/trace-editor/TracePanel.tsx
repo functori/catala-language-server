@@ -52,7 +52,9 @@ export default function TracePanel({
   const [filter, setFilter] = useState<string>('');
   const addFilter = createAddFilter(setFilters);
 
-  const menuProps = useTraceMenu(useMemo(() => ({ addFilter }), [addFilter]));
+  const menuProps = useTraceMenu(
+    useMemo(() => ({ spawnPanel: (): void => {}, addFilter }), [addFilter])
+  );
 
   return (
     <div {...menuProps}>
