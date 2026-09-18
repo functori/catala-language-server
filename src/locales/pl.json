@@ -133,6 +133,7 @@
   "trace.view.tree": "Drzewo",
   "trace.view.json": "JSON",
   "trace.copyJson": "Kopiuj",
+  "trace.filteredView": "Ślad przefiltrowany według „{filter}”",
   "trace.closePanel": "Zamknij ten widok",
   "trace.filterPlaceholder": "Filtruj ślad…",
   "trace.expandAll": "Rozwiń",

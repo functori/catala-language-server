@@ -133,6 +133,7 @@
   "trace.view.tree": "Arbre",
   "trace.view.json": "JSON",
   "trace.copyJson": "Copier",
+  "trace.filteredView": "Trace filtrée sur « {filter} »",
   "trace.closePanel": "Fermer cette vue",
   "trace.filterPlaceholder": "Filtrer la trace…",
   "trace.expandAll": "Déplier",
