@@ -14,16 +14,11 @@ import { isSelectingText } from './traceMenu';
 import type {
   CodeLocation,
   Described,
-  Expected,
-  Match,
   TraceElement,
   TraceKind,
   Tone,
 } from './traceUtils';
 import {
-  type TraceTest,
-  PANEL_HEIGHT_VAR,
-  closestFilterMatch,
   describeKind,
   detail,
   filterMatches,
@@ -31,12 +26,8 @@ import {
   indexedSegment,
   nodeMatchState,
   posText,
-  stepIndexMap,
   subtreeHasMismatch,
   subtreeMatches,
-  traceValueEqual,
-  traceValueFromRuntime,
-  traceVariablesForTest,
 } from './traceUtils';
 import {
   CwdContext,
@@ -152,118 +143,7 @@ function asCodeLocation(v: JsonValue | undefined): CodeLocation | undefined {
 
 // -- Components ---------------------------------------------------------------
 
-export default function TraceTreeView({
-  trace,
-  filters,
-  cwd,
-  expand,
-  test,
-  fromClosestMatch = false,
-}: {
-  trace: TraceElement[];
-  filters?: Filter[];
-  cwd?: string;
-  expand?: boolean | null;
-  test?: TraceTest;
-  fromClosestMatch?: boolean;
-}): ReactElement {
-  const intl = useIntl();
-
-  let roots: TraceElement[] = trace;
-  if (test !== undefined) {
-    const testingScope = trace.find(
-      (te) =>
-        te.element.kind === 'scope_call' &&
-        typeof te.element.name === 'string' &&
-        test.testing_scope == te.element.name
-    );
-    if (testingScope !== undefined) {
-      roots = testingScope.trace ?? [];
-    }
-  }
-
-  if (roots.length === 0) {
-    return (
-      <p style={{ color: 'var(--vscode-descriptionForeground)' }}>
-        <FormattedMessage id="trace.empty" />
-      </p>
-    );
-  }
-
-  const f = (filters ?? [])
-    .map((filter) => {
-      return {
-        filter: filter.filter.trim().toLowerCase(),
-        option: filter.option,
-      };
-    })
-    .filter((filter) => filter.filter.length > 0);
-  const anyVisible = f ? roots.some((el) => subtreeMatches(el, f, intl)) : true;
-  if (!anyVisible) {
-    return (
-      <p style={{ color: 'var(--vscode-descriptionForeground)' }}>
-        <FormattedMessage id="trace.noMatches" />
-      </p>
-    );
-  }
-
-  let expected: Expected | null = null;
-  let stepIndices: Map<TraceElement, number> = new Map();
-  if (test !== undefined) {
-    stepIndices = stepIndexMap(trace);
-    const [, outputs] = traceVariablesForTest(trace, test.tested_scope.name);
-    const output: Map<string, Match> = new Map();
-    for (const [name, io] of test.test_outputs.entries()) {
-      const exp = io?.value ? traceValueFromRuntime(io.value.value) : undefined;
-      const computed = outputs[name];
-      if (exp !== undefined && computed !== undefined) {
-        const match = traceValueEqual(exp, computed) ? 'match' : 'mismatch';
-        output.set(name, match);
-      }
-    }
-    expected = { variables: test.variables, output };
-  }
-
-  let testedScope = test ? test.tested_scope.name : undefined;
-  let rootPrefix = '';
-  if (fromClosestMatch && f.length > 0) {
-    const closest = closestFilterMatch(
-      roots,
-      f,
-      intl,
-      stepIndices,
-      testedScope
-    );
-    roots = closest.roots;
-    rootPrefix = closest.prefix;
-    testedScope = closest.testedScope;
-  }
-
-  return (
-    <CwdContext.Provider value={cwd ?? ''}>
-      <ExpandContext.Provider value={expand ?? null}>
-        <ExpectedContext.Provider value={expected}>
-          <IndexContext.Provider value={stepIndices}>
-            <ul style={rootListStyle}>
-              {roots.map((el, i) => (
-                <TraceNode
-                  key={i}
-                  te={el}
-                  depth={0}
-                  filters={f}
-                  prefix={rootPrefix}
-                  tested_scope={testedScope}
-                />
-              ))}
-            </ul>
-          </IndexContext.Provider>
-        </ExpectedContext.Provider>
-      </ExpandContext.Provider>
-    </CwdContext.Provider>
-  );
-}
-
-function TraceNode({
+export default function TraceNode({
   te,
   depth,
   filters,
@@ -571,16 +451,6 @@ function ValueView({
 }
 
 // -- Styles -------------------------------------------------------------------
-
-const rootListStyle: CSSProperties = {
-  listStyle: 'none',
-  margin: 0,
-  padding: 0,
-  fontFamily: 'var(--vscode-editor-font-family, monospace)',
-  fontSize: 'var(--vscode-editor-font-size, 13px)',
-  maxHeight: `var(${PANEL_HEIGHT_VAR}, 70vh)`,
-  overflow: 'auto',
-};
 
 const childListStyle: CSSProperties = {
   listStyle: 'none',
