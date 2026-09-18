@@ -212,7 +212,10 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         </label>
       )}
 
-      <div style={{ [PANEL_HEIGHT_VAR]: panelHeight } as React.CSSProperties}>
+      <div
+        ref={resultsRef}
+        style={{ [PANEL_HEIGHT_VAR]: panelHeight } as React.CSSProperties}
+      >
         {scope[1] !== undefined ? (
           <SplitPane
             layout={layout}
@@ -382,14 +385,11 @@ function SplitPane({
     };
   }, []);
 
-  if (layout !== 'both') {
-    return (
-      <div style={{ width: '100%', minWidth: 0 }}>
-        {layout === 'data' ? left : right}
-      </div>
-    );
-  }
+  const split = layout === 'both';
 
+  // The inactive pane is hidden rather than dropped: changing the shape of the
+  // tree would remount the panels and wipe their filters, view mode and
+  // expansion state.
   return (
     <div
       ref={containerRef}
@@ -397,9 +397,11 @@ function SplitPane({
     >
       <div
         style={{
-          width: leftWidth ?? '25%',
-          flex: '0 0 auto',
+          width: split ? (leftWidth ?? '25%') : '100%',
+          flex: split ? '0 0 auto' : '1 1 auto',
+          minWidth: 0,
           overflow: 'auto',
+          display: layout === 'trace' ? 'none' : undefined,
         }}
       >
         {left}
@@ -416,9 +418,18 @@ function SplitPane({
           cursor: 'col-resize',
           background: 'var(--vscode-panel-border, transparent)',
           borderRadius: 2,
+          display: split ? undefined : 'none',
         }}
       />
-      <div style={{ flex: 1, minWidth: 0 }}>{right}</div>
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: layout === 'data' ? 'none' : undefined,
+        }}
+      >
+        {right}
+      </div>
     </div>
   );
 }
