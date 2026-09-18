@@ -804,19 +804,27 @@ class catala_lsp_server =
 
     method private get_trace_assert (params : Yojson.Safe.t option) :
         Yojson.Safe.t Lwt.t =
-      match params with
-      | None -> Lwt.return `Null
-      | Some json -> (
-        let clerk_toml_dir =
-          Yojson.Safe.Util.(json |> member "clerk_toml_dir" |> to_string)
-        in
-        match process_clerk_toml clerk_toml_dir with
-        | None -> Lwt.return `Null
-        | Some (config, _) ->
-          Lwt.return
-          @@ Option.fold ~none:(`Bool false)
-               ~some:(fun b -> `Bool b)
-               config.global.check_trace_assertion)
+      Lwt.catch
+        (fun () ->
+          match params with
+          | None -> Lwt.return `Null
+          | Some json -> (
+            let clerk_toml_dir =
+              Yojson.Safe.Util.(json |> member "clerk_toml_dir" |> to_string)
+            in
+            (* [process_clerk_toml] only absorbs [Message.CompilerError]: a
+               missing or unreadable directory still raises [Sys_error]. *)
+            match process_clerk_toml clerk_toml_dir with
+            | None -> Lwt.return `Null
+            | Some (config, _) ->
+              Lwt.return
+              @@ Option.fold ~none:(`Bool false)
+                   ~some:(fun b -> `Bool b)
+                   config.global.check_trace_assertion))
+        (fun exn ->
+          Log.err (fun m ->
+              m "catala.getTraceAssert failed: %s" (Printexc.to_string exn));
+          Lwt.return `Null)
 
     method private list_entrypoints (params : Yojson.Safe.t option) :
         Yojson.Safe.t Lwt.t =
