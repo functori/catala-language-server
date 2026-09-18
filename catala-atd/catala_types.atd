@@ -148,6 +148,7 @@ type test_run = {
   test: test;
   assert_failures: bool;
   diffs: diff list;
+  failed_trace_assert: failed_trace_assert list;
 }
 
 type file_test = {
@@ -215,6 +216,16 @@ type diff = {
   actual: runtime_value;
 }
 
+(* One auxiliary variable whose value in the trace does not match the one
+   declared by its [#[testcase.variable]] attribute. Values are the rendered
+   strings the checker compares, not [runtime_value]s. [current_value] is
+   absent when the trace carries no value for the variable. *)
+type failed_trace_assert = {
+  name: string;
+  expected: string;
+  ?current_value: string option;
+}
+
 (* Message exchange within extension (shell <-> webview) *)
 
 type parse_results = [
@@ -227,6 +238,7 @@ type test_run_output = { (* do we need that type at all when the difference with
   test_outputs: test_outputs;
   assert_failures: bool;
   diffs: diff list;
+  failed_trace_assert: failed_trace_assert list;
 }
 
 type test_run_results = [
@@ -245,6 +257,9 @@ type test_run_request = {
   reset_outputs: bool;
   in_shell: bool;
   debug: bool;
+  (* Whether the test declares trace assertions: only then is the run worth
+     instrumenting with "--trace". *)
+  has_trace_assert: bool;
 }
 
 type test_generate_request = {

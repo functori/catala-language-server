@@ -129,8 +129,11 @@ export default function TestFileEditor({
     [state, vscode]
   );
 
+  // `has_trace_assert` is a parameter rather than something read from `state`: the
+  // callbacks below are memoized on `[vscode]`, so a closure over `state` would
+  // stay frozen at the first render.
   const _onTestRun = (resetOutputs: boolean) => {
-    return (testScope: string): void => {
+    return (testScope: string, has_trace_assert: boolean): void => {
       setTestRunState((prev) => ({
         ...prev,
         [testScope]: { status: 'running' },
@@ -143,6 +146,7 @@ export default function TestFileEditor({
             reset_outputs: resetOutputs,
             in_shell: false,
             debug: false,
+            has_trace_assert,
           },
         })
       );

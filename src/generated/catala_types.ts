@@ -144,6 +144,7 @@ export type TestRun = {
   test: Test;
   assert_failures: boolean;
   diffs: Diff[];
+  failed_trace_assert: FailedTraceAssert[];
 }
 
 export type FileTest = {
@@ -208,7 +209,7 @@ export type Diff = {
   actual: RuntimeValue;
 }
 
-export type VariableFailure = {
+export type FailedTraceAssert = {
   name: string;
   expected: string;
   current_value?: string;
@@ -223,6 +224,7 @@ export type TestRunOutput = {
   test_outputs: TestOutputs;
   assert_failures: boolean;
   diffs: Diff[];
+  failed_trace_assert: FailedTraceAssert[];
 }
 
 export type TestRunResults =
@@ -239,6 +241,7 @@ export type TestRunRequest = {
   reset_outputs: boolean;
   in_shell: boolean;
   debug: boolean;
+  has_trace_assert: boolean;
 }
 
 export type TestGenerateRequest = {
@@ -783,6 +786,7 @@ export function writeTestRun(x: TestRun, context: any = x): any {
     'test': _atd_write_required_field('TestRun', 'test', writeTest, x.test, x),
     'assert_failures': _atd_write_required_field('TestRun', 'assert_failures', _atd_write_bool, x.assert_failures, x),
     'diffs': _atd_write_required_field('TestRun', 'diffs', _atd_write_array(writeDiff), x.diffs, x),
+    'failed_trace_assert': _atd_write_required_field('TestRun', 'failed_trace_assert', _atd_write_array(writeFailedTraceAssert), x.failed_trace_assert, x),
   };
 }
 
@@ -791,6 +795,7 @@ export function readTestRun(x: any, context: any = x): TestRun {
     test: _atd_read_required_field('TestRun', 'test', readTest, x['test'], x),
     assert_failures: _atd_read_required_field('TestRun', 'assert_failures', _atd_read_bool, x['assert_failures'], x),
     diffs: _atd_read_required_field('TestRun', 'diffs', _atd_read_array(readDiff), x['diffs'], x),
+    failed_trace_assert: _atd_read_required_field('TestRun', 'failed_trace_assert', _atd_read_array(readFailedTraceAssert), x['failed_trace_assert'], x),
   };
 }
 
@@ -984,18 +989,18 @@ export function readDiff(x: any, context: any = x): Diff {
   };
 }
 
-export function writeVariableFailure(x: VariableFailure, context: any = x): any {
+export function writeFailedTraceAssert(x: FailedTraceAssert, context: any = x): any {
   return {
-    'name': _atd_write_required_field('VariableFailure', 'name', _atd_write_string, x.name, x),
-    'expected': _atd_write_required_field('VariableFailure', 'expected', _atd_write_string, x.expected, x),
+    'name': _atd_write_required_field('FailedTraceAssert', 'name', _atd_write_string, x.name, x),
+    'expected': _atd_write_required_field('FailedTraceAssert', 'expected', _atd_write_string, x.expected, x),
     'current_value': _atd_write_optional_field(_atd_write_string, x.current_value, x),
   };
 }
 
-export function readVariableFailure(x: any, context: any = x): VariableFailure {
+export function readFailedTraceAssert(x: any, context: any = x): FailedTraceAssert {
   return {
-    name: _atd_read_required_field('VariableFailure', 'name', _atd_read_string, x['name'], x),
-    expected: _atd_read_required_field('VariableFailure', 'expected', _atd_read_string, x['expected'], x),
+    name: _atd_read_required_field('FailedTraceAssert', 'name', _atd_read_string, x['name'], x),
+    expected: _atd_read_required_field('FailedTraceAssert', 'expected', _atd_read_string, x['expected'], x),
     current_value: _atd_read_optional_field(_atd_read_string, x['current_value'], x),
   };
 }
@@ -1040,6 +1045,7 @@ export function writeTestRunOutput(x: TestRunOutput, context: any = x): any {
     'test_outputs': _atd_write_required_field('TestRunOutput', 'test_outputs', writeTestOutputs, x.test_outputs, x),
     'assert_failures': _atd_write_required_field('TestRunOutput', 'assert_failures', _atd_write_bool, x.assert_failures, x),
     'diffs': _atd_write_required_field('TestRunOutput', 'diffs', _atd_write_array(writeDiff), x.diffs, x),
+    'failed_trace_assert': _atd_write_required_field('TestRunOutput', 'failed_trace_assert', _atd_write_array(writeFailedTraceAssert), x.failed_trace_assert, x),
   };
 }
 
@@ -1048,6 +1054,7 @@ export function readTestRunOutput(x: any, context: any = x): TestRunOutput {
     test_outputs: _atd_read_required_field('TestRunOutput', 'test_outputs', readTestOutputs, x['test_outputs'], x),
     assert_failures: _atd_read_required_field('TestRunOutput', 'assert_failures', _atd_read_bool, x['assert_failures'], x),
     diffs: _atd_read_required_field('TestRunOutput', 'diffs', _atd_read_array(readDiff), x['diffs'], x),
+    failed_trace_assert: _atd_read_required_field('TestRunOutput', 'failed_trace_assert', _atd_read_array(readFailedTraceAssert), x['failed_trace_assert'], x),
   };
 }
 
@@ -1114,6 +1121,7 @@ export function writeTestRunRequest(x: TestRunRequest, context: any = x): any {
     'reset_outputs': _atd_write_required_field('TestRunRequest', 'reset_outputs', _atd_write_bool, x.reset_outputs, x),
     'in_shell': _atd_write_required_field('TestRunRequest', 'in_shell', _atd_write_bool, x.in_shell, x),
     'debug': _atd_write_required_field('TestRunRequest', 'debug', _atd_write_bool, x.debug, x),
+    'has_trace_assert': _atd_write_required_field('TestRunRequest', 'has_trace_assert', _atd_write_bool, x.has_trace_assert, x),
   };
 }
 
@@ -1123,6 +1131,7 @@ export function readTestRunRequest(x: any, context: any = x): TestRunRequest {
     reset_outputs: _atd_read_required_field('TestRunRequest', 'reset_outputs', _atd_read_bool, x['reset_outputs'], x),
     in_shell: _atd_read_required_field('TestRunRequest', 'in_shell', _atd_read_bool, x['in_shell'], x),
     debug: _atd_read_required_field('TestRunRequest', 'debug', _atd_read_bool, x['debug'], x),
+    has_trace_assert: _atd_read_required_field('TestRunRequest', 'has_trace_assert', _atd_read_bool, x['has_trace_assert'], x),
   };
 }
 

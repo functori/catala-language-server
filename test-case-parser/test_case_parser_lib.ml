@@ -1776,7 +1776,8 @@ let run_with_inputs
   in
   let assert_failures = not (failed_asserts = []) in
   let test = O.{ test with test_outputs } in
-  write_stdout J.write_test_run O.{ test; assert_failures; diffs = [] }
+  write_stdout J.write_test_run
+    O.{ test; assert_failures; diffs = []; failed_trace_assert = [] }
 
 let run_test include_dirs options testing_scope =
   let desugared_prg, naming_ctx, testing_scope_name, dcalc_prg =
@@ -1831,7 +1832,9 @@ let run_test include_dirs options testing_scope =
     |> List.map (proj_diff (get_value dcalc_prg.lang dcalc_prg.decl_ctx))
   in
   let assert_failures = not (failed_asserts = []) in
-  let test_run = { O.test; O.assert_failures; O.diffs } in
+  let test_run =
+    { O.test; O.assert_failures; O.diffs; O.failed_trace_assert = [] }
+  in
   write_stdout J.write_test_run test_run
 
 let run_test_cmd include_dirs options test_scope_name scope_input_opt =

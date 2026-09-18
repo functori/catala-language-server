@@ -177,6 +177,7 @@ export function runTestScope(
       test: { test_outputs },
       assert_failures,
       diffs,
+      failed_trace_assert,
     } = readTestRun(parsed);
     return {
       kind: 'Ok',
@@ -185,6 +186,7 @@ export function runTestScope(
         test_outputs,
         assert_failures,
         diffs,
+        failed_trace_assert,
       },
     };
   } catch (error) {
