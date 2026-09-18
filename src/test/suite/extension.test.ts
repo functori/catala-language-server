@@ -23,6 +23,10 @@ const dummyStorage: vscode.Memento = {
   update: () => Promise.resolve(),
 };
 
+/** The provider only stores this collaborator; it is never called here. */
+const checkTraceAssert = (_clerk_toml_dir: string): Promise<boolean> =>
+  Promise.resolve(false);
+
 const fixtures = path.resolve(__dirname, '../../../tests/round_trip');
 
 function within<T>(ms: number, what: string, p: Thenable<T>): Promise<T> {
@@ -39,6 +43,9 @@ function within<T>(ms: number, what: string, p: Thenable<T>): Promise<T> {
 
 suite('Extension, end to end', function () {
   this.timeout(180_000);
+  suiteTeardown(() => {
+    vscode.window.showInformationMessage('All tests done!');
+  });
 
   test('starts, and opens a test in the test case editor', async () => {
     const ext = vscode.extensions.getExtension('catalalang.catala');
@@ -85,7 +92,8 @@ suite('Extension, end to end', function () {
     const disposable = TestCaseEditorProvider.register(
       context,
       resultController,
-      'codicon.css'
+      'codicon.css',
+      checkTraceAssert
     );
     assert.ok(disposable);
     disposable.dispose();
