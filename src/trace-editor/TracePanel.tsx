@@ -1,6 +1,7 @@
 import {
   type ReactElement,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -46,6 +47,7 @@ export default function TracePanel({
   filters,
   setFilters,
   onClose,
+  focusOnMount,
 }: {
   trace: TraceElement[];
   filters: Filter[];
@@ -53,6 +55,7 @@ export default function TracePanel({
   cwd: string;
   test?: TraceTest;
   onClose?: () => void;
+  focusOnMount?: boolean;
 }): ReactElement {
   const intl = useIntl();
   const [view, setView] = useState<OutputView>('tree');
@@ -73,8 +76,26 @@ export default function TracePanel({
     useMemo(() => ({ spawnPanel, addFilter }), [addFilter])
   );
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const treeRef = useRef<HTMLUListElement>(null);
+  useEffect(() => {
+    const target = treeRef.current ?? rootRef.current;
+    if (focusOnMount !== true || target === null) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      target.focus();
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 0);
+    return (): void => clearTimeout(timer);
+  }, [focusOnMount]);
+
   return (
-    <div {...menuProps}>
+    <div
+      {...menuProps}
+      ref={rootRef}
+      tabIndex={focusOnMount === true ? -1 : undefined}
+    >
       <div
         style={{
           display: 'flex',
@@ -203,6 +224,7 @@ export default function TracePanel({
             onClose={() =>
               setDerived((old) => old.filter((o) => o.id !== d.id))
             }
+            focusOnMount
           />
         </div>
       ))}
