@@ -10,7 +10,7 @@ import type { IntlShape } from 'react-intl';
 import { FormattedMessage } from 'react-intl';
 import { VscodeButton } from '@vscode-elements/react-elements';
 import type { TestIo } from '../generated/catala_types';
-import type { ExpandCommand } from './TraceTreeView';
+import type { ExpandCommand } from './traceContexts';
 import {
   type TraceElement,
   type TraceTest,
