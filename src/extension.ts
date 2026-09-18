@@ -768,7 +768,7 @@ export async function activate(
       context,
       resultController,
       codiconsCssPath,
-      checkTraceAssert(client)
+      checkTraceAssert(() => client)
     )
   );
   context.subscriptions.push(
