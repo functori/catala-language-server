@@ -3,7 +3,6 @@ import {
   type MouseEvent,
   type ReactElement,
   type ReactNode,
-  createContext,
   useContext,
   useEffect,
   useState,
@@ -13,8 +12,8 @@ import { getVsCodeApi } from '../shared/webviewApi';
 import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { CodeLocation } from './traceUtils';
 import { posText } from './traceUtils';
+import { CwdContext } from './traceContexts';
 
-export const CwdContext = createContext<string>('');
 export function resolvePath(cwd: string, file: string): string {
   if (!cwd || file.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(file)) {
     return file;
