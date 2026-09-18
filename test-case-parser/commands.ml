@@ -20,6 +20,44 @@ module J = Catala_types_j
 open Project
 open Model
 
+let check_failed_trace_var ~trace_assert ~tested_scope json =
+  List.map
+    (fun e ->
+      O.
+        {
+          name = Trace_assertion.(asserted_trace_variable_to_string e.name);
+          expected = Trace_assertion.(value_to_string e.expected);
+          current_value =
+            Trace_assertion.(Option.map value_to_string e.current_value);
+        })
+    (Trace_assertion.check ~asserted_trace_variables:trace_assert ~tested_scope
+       json)
+
+(* Splits a "name: payload" attribute payload, keeping [payload] exactly as
+   written in the source: [Expected.check_expected] needs the surface form to
+   re-render it through the trace's own encoder. *)
+let split_expected_attr (s : string) : (string * string) option =
+  match String.index_opt s ':' with
+  | None -> None
+  | Some i ->
+    let name = String.trim (String.sub s 0 i) in
+    let payload =
+      String.trim (String.sub s (i + 1) (String.length s - i - 1))
+    in
+    if name = "" || payload = "" then None else Some (name, payload)
+
+(* Read from the scope's own attributes rather than through [Scan.catala_file],
+   which gathers a single map for a whole file: a file may hold several test
+   scopes, and `testcase run` runs exactly one. *)
+let expected_variables info : Trace_assertion.trace_assertions =
+  List.fold_left
+    (fun acc (name, value) ->
+      Trace_assertion.add_asserted_trace_variable name value acc)
+    Trace_assertion.M.empty
+    (Pos.get_attrs info (function
+      | ExpectedVariable s -> split_expected_attr s
+      | _ -> None))
+
 let get_scope_test
     (prg : I.program)
     (testing_scope : string)
@@ -554,10 +592,22 @@ let read_tests_of_file ~(lang : Global.backend_lang) (file : string) :
 let retrieve_assertions_values
     (dcalc_prg : typed Dcalc.Ast.program)
     (scope : ScopeName.t) : (StructField.t * (dcalc, typed) gexpr) list =
+  (* With the trace on, the compiler wraps sub-expressions in [Tag] operator
+     applications; they carry no value and have to be seen through. *)
+  let rec strip_tags (e : (dcalc, typed) gexpr) : (dcalc, typed) gexpr =
+    match Mark.remove e with
+    | EAppOp { op = Op.Tag _, _; args = [e]; _ } -> strip_tags e
+    | _ -> e
+  in
   let get_expected_value (assert_e : (dcalc, typed) gexpr) =
-    match Mark.remove assert_e with
-    | EAssert (EAppOp { args = [(EStructAccess { field; _ }, _); v]; _ }, _) ->
-      field, v
+    match Mark.remove (strip_tags assert_e) with
+    | EAssert equality -> (
+      match Mark.remove (strip_tags equality) with
+      | EAppOp { args = [lhs; v]; _ } -> (
+        match Mark.remove (strip_tags lhs) with
+        | EStructAccess { field; _ } -> field, strip_tags v
+        | _ -> assert false)
+      | _ -> assert false)
     | _ -> assert false
   in
   let code_items = dcalc_prg.code_items |> BoundList.to_seq |> List.of_seq in
@@ -808,7 +858,7 @@ let run_with_inputs
   write_stdout J.write_test_run
     O.{ test; assert_failures; diffs = []; failed_trace_assert = [] }
 
-let run_test ?build_dir include_dirs options testing_scope =
+let run_test ?build_dir include_dirs options testing_scope check_trace =
   let desugared_prg, naming_ctx, testing_scope_name, dcalc_prg =
     retrieve_program ?build_dir include_dirs options testing_scope
   in
@@ -820,6 +870,9 @@ let run_test ?build_dir include_dirs options testing_scope =
       | _ -> assert false
     in
     program_expr
+  in
+  let trace_assert =
+    expected_variables (Mark.get (ScopeName.get_info testing_scope_name))
   in
   let result_struct, failed_asserts =
     interpret_program dcalc_prg testing_scope_name build_term
@@ -846,8 +899,27 @@ let run_test ?build_dir include_dirs options testing_scope =
     |> List.map (proj_diff (get_value dcalc_prg.lang dcalc_prg.decl_ctx))
   in
   let assert_failures = not (failed_asserts = []) in
+  (* Same check as `interpret --check-trace-assertion`, reported as data instead
+     of raising: this command hands failures back to the editor, and its error
+     absorber only catches assertion failures. An unreadable trace therefore
+     leaves the variables unchecked with a warning. *)
+  let failed_trace_assert =
+    match check_trace with
+    | Some file when not (Trace_assertion.M.is_empty trace_assert) -> (
+      match Yojson.Safe.from_file file with
+      | trace ->
+        check_failed_trace_var ~trace_assert ~tested_scope:testing_scope
+          (Some trace)
+      | exception e ->
+        Message.warning
+          "Could not read the trace @{<bold>%s@} of @{<bold>%s@}, assertions \
+           on variables using the trace are left unchecked:@ %s"
+          file testing_scope (Printexc.to_string e);
+        [])
+    | _ -> []
+  in
   let test_run =
-    { O.test; O.assert_failures; O.diffs; O.failed_trace_assert = [] }
+    { O.test; O.assert_failures; O.diffs; O.failed_trace_assert }
   in
   write_stdout J.write_test_run test_run
 
@@ -942,6 +1014,7 @@ let run_test_cmd
     test_scope_name
     scope_input_opt
     build_dir
+    check_trace
     buffer_path =
   let options =
     match options.Global.input_src, buffer_path with
@@ -966,7 +1039,7 @@ let run_test_cmd
       options
   in
   match scope_input_opt with
-  | None -> run_test ?build_dir include_dirs options test_scope_name
+  | None -> run_test ?build_dir include_dirs options test_scope_name check_trace
   | Some json ->
     run_with_inputs ?build_dir include_dirs options test_scope_name json
 

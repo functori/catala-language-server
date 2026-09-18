@@ -95,6 +95,21 @@ let cmd_partial_read =
            file, and it must agree with $(b,read) wherever both succeed.")
     Term.(const Recovery.read_partial_test $ Cli.Flags.Global.options)
 
+(* The trace cannot be produced by this command: [Interpreter.evaluate_expr]
+   wraps every evaluation in a dummy [ScopeCall], so its root value is only
+   "<function>". The caller runs the scope through clerk with [--trace] and
+   hands the resulting file over here. *)
+let check_trace =
+  Arg.(
+    value
+    & opt (some string) None
+    & info ["check-trace"] ~docv:"FILE"
+        ~doc:
+          "Check the values declared by the $(b,#[testcase.variable]) \
+           attributes against the JSON trace in $(i,FILE), looking each \
+           variable up by name. Without this option the expected variables are \
+           not checked.")
+
 (* Mirrors clerk's own [--build-dir]: the caller may have compiled the
    dependencies elsewhere than the default, and the interpretation here loads
    the standard library and the tested modules from that directory. *)
@@ -127,6 +142,7 @@ let cmd_run =
       $ Cli.Flags.ex_scope
       $ Cli.Flags.scope_input
       $ build_dir
+      $ check_trace
       $ buffer_path)
 
 let cmd_write =
