@@ -133,6 +133,7 @@
   "trace.view.tree": "Drzewo",
   "trace.view.json": "JSON",
   "trace.copyJson": "Kopiuj",
+  "trace.closePanel": "Zamknij ten widok",
   "trace.filterPlaceholder": "Filtruj ślad…",
   "trace.expandAll": "Rozwiń",
   "trace.expandAllTitle": "Rozwiń wszystkie gałęzie",
