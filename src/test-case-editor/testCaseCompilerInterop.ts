@@ -137,20 +137,25 @@ export function runTestScope(
   const inputArgs = inputs ? ['--input=-'] : [];
   // Dependencies are built in a separate directory so that the instrumented
   // artifacts do not evict the plain ones from the main build dir.
+  const TRACE_BUILD_DIR = '_build/_trace';
   const clerkTraceArgs = traceFile
     ? [
         '--trace',
         traceFile,
         '--build-dir',
-        '_build/_trace',
+        TRACE_BUILD_DIR,
         '--ninja-output-file',
-        '_build/_trace/clerk.ninja',
+        `${TRACE_BUILD_DIR}/clerk.ninja`,
       ]
     : [];
   // The trace is produced by the clerk run below, not here: `testcase run`
   // wraps every evaluation in a dummy scope call, so the trace it could emit
-  // carries only "<function>" as its root value.
-  const catalaTraceArgs = traceFile ? [`--check-trace=${traceFile}`] : [];
+  // carries only "<function>" as its root value. The build dir has to be
+  // repeated: this run loads the stdlib and the modules clerk just compiled
+  // there, and would otherwise look for them in the default `_build`.
+  const catalaTraceArgs = traceFile
+    ? [`--check-trace=${traceFile}`, '--build-dir', TRACE_BUILD_DIR]
+    : [];
   const args = [
     'testcase',
     'run',
