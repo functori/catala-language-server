@@ -16,6 +16,9 @@ import { Box, Checkbox, FormControlLabel, Grid } from '@mui/material';
 import { VscodeTextfield } from '@vscode-elements/react-elements';
 import { assertUnreachable } from './shared/util';
 import { setVsCodeApi } from './shared/webviewApi';
+import type { Filter } from './FilterPin';
+import { FilterPins } from './FilterPin';
+import { HighlightText } from './shared/Highlight';
 
 type TestGridArg = {
   vscode: WebviewApi<unknown>;
@@ -23,6 +26,7 @@ type TestGridArg = {
   grid: boolean;
   filterScope: string[];
   onRun: (id: number) => void;
+  filters: Filter[];
 };
 
 type GeneralTestsArg = {
@@ -40,6 +44,7 @@ type TestMacro = TestDebugger & TestState;
 type TestItemArg = {
   vscode: WebviewApi<unknown>;
   test: TestMacro;
+  filters: Filter[];
   onRun: (id: number) => void;
 };
 /**
@@ -48,10 +53,10 @@ type TestItemArg = {
  */
 type FilterArg = {
   tests: TestMacro[] | undefined;
-  filter: string;
+  filters: Filter[];
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
-  setFilter: React.Dispatch<React.SetStateAction<string>>;
+  setFilters: React.Dispatch<React.SetStateAction<Filter[]>>;
   filterGui: boolean;
   setFilterGui: React.Dispatch<React.SetStateAction<boolean>>;
 };
@@ -270,7 +275,7 @@ function OpenTextEditor({
  * mostly items with css to render them poperly
  *
  */
-function TestItem({ vscode, test, onRun }: TestItemArg): ReactElement {
+function TestItem({ vscode, test, filters, onRun }: TestItemArg): ReactElement {
   const intl = useIntl();
   return (
     <Box className="test-item">
@@ -282,7 +287,7 @@ function TestItem({ vscode, test, onRun }: TestItemArg): ReactElement {
             defaultMessage: 'Titre',
           })}
         >
-          {testTitle(test)}
+          <HighlightText filters={filters} text={testTitle(test)} />
         </b>
         <span
           className="test-number"
@@ -305,7 +310,7 @@ function TestItem({ vscode, test, onRun }: TestItemArg): ReactElement {
           defaultMessage: 'Description',
         })}
       >
-        {testDescription(test)}
+        <HighlightText filters={filters} text={testDescription(test)} />
       </span>
       <SeparationLine />
       <div className="footer">
@@ -355,6 +360,7 @@ function isOverflowActive(event: HTMLSpanElement): boolean {
 function TestLine({
   vscode,
   test,
+  filters,
   onRun,
 }: TestItemArg & { expected: string[] }): ReactElement {
   // This textRef is used on the description span, it will be set when
@@ -394,10 +400,14 @@ function TestLine({
   return (
     <tr>
       <th className="path-column">
-        <TestPath vscode={vscode} test={test} />
+        <TestPath vscode={vscode} test={test} filters={filters} />
       </th>
-      <td>{testTitle(test)}</td>
-      <td>{testingScope(test)}</td>
+      <td>
+        <HighlightText filters={filters} text={testDescription(test)} />
+      </td>
+      <td>
+        <HighlightText filters={filters} text={testingScope(test)} />
+      </td>
       <td
         className={overflowActive ? `descr-column` : ''}
         onClick={(event) => {
@@ -414,7 +424,7 @@ function TestLine({
           ref={textRef}
           className={`test-descr ${expanded ? 'text' : 'test-descr-hidden'}`}
         >
-          {description}
+          <HighlightText filters={filters} text={description} />
         </span>
         {overflowActive && (
           <span
@@ -551,30 +561,42 @@ function testMacro(test: TestDebugger): TestMacro {
  */
 function matchFilter(
   test: TestDebugger,
-  filterRaw: string,
+  filters: Filter[],
   filterScope: string[],
   filterGui: boolean
 ): boolean {
-  let filter = filterRaw.toLowerCase();
-  let searchBarFilter =
-    testTitle(test).toLowerCase().includes(filter) ||
-    testDescription(test).toLowerCase().includes(filter) ||
-    testingScope(test).toLowerCase().includes(filter) ||
-    (test.index + 1).toString().includes(filter);
+  let pinsMatch = true;
+  for (let filterPin of filters) {
+    if (filterPin.option != 'ignore') {
+      let filter = filterPin.filter.toLowerCase().trim();
+      let pinMatch =
+        testTitle(test).toLowerCase().includes(filter) ||
+        testDescription(test).toLowerCase().includes(filter) ||
+        testingScope(test).toLowerCase().includes(filter) ||
+        (test.index + 1).toString().includes(filter);
+      if (filterPin.option == 'include') {
+        pinsMatch = pinsMatch && pinMatch;
+      } else {
+        pinsMatch = pinsMatch && !pinMatch;
+      }
+    }
+  }
   let scopeFilter =
     filterScope.length == 0
       ? true
       : filterScope.some((value) => testingScope(test) == value);
   let guiFilter = filterGui ? isGui(test) : true;
-  return searchBarFilter && scopeFilter && guiFilter;
+  return pinsMatch && scopeFilter && guiFilter;
 }
 
 function TestPath({
   vscode,
   test,
+  filters,
 }: {
   vscode: WebviewApi<unknown>;
   test: TestMacro;
+  filters: Filter[];
 }): ReactElement {
   const displayed = test.relative_filename ?? test.filename;
   // `+ 1` keeps the separator on the directory side, and yields 0 (hence an
@@ -603,9 +625,11 @@ function TestPath({
       }}
     >
       {directory == '' ? null : (
-        <span className="test-path-directory">{directory}</span>
+        <span className="test-path-directory">
+          <HighlightText filters={filters} text={directory} />
+        </span>
       )}
-      {name}
+      <HighlightText filters={filters} text={name} />
     </a>
   );
 }
@@ -615,6 +639,7 @@ type CardGridArg = {
   filteredScope: string[];
   tests: TestMacro[];
   onRun: (id: number) => void;
+  filters: Filter[];
 };
 
 function CardGrid({
@@ -622,6 +647,7 @@ function CardGrid({
   tests,
   filteredScope,
   onRun,
+  filters,
 }: CardGridArg): ReactElement {
   let gridTests = new Map<string, TestMacro[]>();
   if (filteredScope.length != 0) {
@@ -650,7 +676,12 @@ function CardGrid({
               {tests.map((elt, index) => (
                 <Grid key={index} size={1}>
                   <div style={{ fontSize: '8px', height: '100%' }}>
-                    <TestItem vscode={vscode} test={elt} onRun={onRun} />
+                    <TestItem
+                      vscode={vscode}
+                      test={elt}
+                      onRun={onRun}
+                      filters={filters}
+                    />
                   </div>
                 </Grid>
               ))}
@@ -665,7 +696,12 @@ function CardGrid({
         {tests.map((elt, index) => (
           <Grid key={index} size={1}>
             <div style={{ fontSize: '8px', height: '100%' }}>
-              <TestItem vscode={vscode} test={elt} onRun={onRun} />
+              <TestItem
+                vscode={vscode}
+                test={elt}
+                onRun={onRun}
+                filters={filters}
+              />
             </div>
           </Grid>
         ))}
@@ -683,6 +719,7 @@ function TestList({
   onRun,
   tests,
   filteredScope,
+  filters,
 }: CardGridArg): ReactElement {
   let map = new Map<string, TestMacro[]>();
   let not_gui: TestMacro[] = [];
@@ -732,6 +769,7 @@ function TestList({
                     test={test}
                     onRun={onRun}
                     expected={[]}
+                    filters={filters}
                   />
                 ))}
               </tbody>
@@ -753,6 +791,7 @@ function TestList({
                     test={test}
                     onRun={onRun}
                     expected={[]}
+                    filters={filters}
                   />
                 );
               })}
@@ -769,6 +808,7 @@ function TestsGrid({
   filtered,
   grid,
   filterScope,
+  filters,
   onRun,
 }: TestGridArg): ReactElement {
   if (filtered == undefined || filtered.length == 0) {
@@ -797,6 +837,7 @@ function TestsGrid({
       vscode={vscode}
       tests={filtered}
       onRun={onRun}
+      filters={filters}
     />
   ) : (
     <TestList
@@ -804,6 +845,7 @@ function TestsGrid({
       vscode={vscode}
       tests={filtered}
       onRun={onRun}
+      filters={filters}
     />
   );
 }
@@ -875,27 +917,42 @@ function ScopeFilter({
   );
 }
 
-function Filter({
+function FilterPanel({
   tests,
-  filter,
+  filters,
   filterScope,
   setFilterScope,
-  setFilter,
+  setFilters,
   filterGui,
   setFilterGui,
 }: FilterArg): ReactElement {
   const intl = useIntl();
+  const [filter, setFilter] = useState<string>('');
   // Restore the default state: GUI-only checkbox checked, no scope selected,
   // empty search bar.
   const resetFilters = (): void => {
     setFilterGui(true);
     setFilterScope([]);
-    setFilter('');
+    setFilters([]);
   };
 
   const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filter, [], filterGui)
+    matchFilter(test, filters, [], filterGui)
   );
+
+  const addFilter = (filter: string): void => {
+    let filterToAdd = filter.trim();
+    setFilters((savedFilters) => {
+      if (
+        filterToAdd == '' ||
+        savedFilters.some((elt: Filter) => elt.filter == filterToAdd)
+      ) {
+        return savedFilters;
+      } else {
+        return [...savedFilters, { filter: filterToAdd, option: 'include' }];
+      }
+    });
+  };
 
   return (
     <div className="box-filter">
@@ -951,6 +1008,7 @@ function Filter({
             setFilterScope={setFilterScope}
           />
           <div style={{ marginLeft: 'auto' }}>
+            <FilterPins filters={filters} setFilters={setFilters} />
             <VscodeTextfield
               className="search-bar"
               value={filter}
@@ -958,11 +1016,28 @@ function Filter({
                 id: 'generalTests.searchPlaceholder',
                 defaultMessage: 'Rechercher un test…',
               })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addFilter(filter);
+                  setFilter('');
+                }
+              }}
               onInput={(e) => {
                 const value = (e.target as HTMLInputElement).value;
                 setFilter(value);
               }}
             >
+              <span
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  addFilter(filter);
+                  setFilter('');
+                }}
+                className="codicon codicon-save"
+                slot="content-after"
+              />
               <span className="codicon codicon-search" slot="content-before" />
             </VscodeTextfield>
           </div>
@@ -998,18 +1073,18 @@ function Loading({
 }
 
 function noFilter(
-  filter: string,
+  filters: Filter[],
   filterScope: string[],
   filterGui: boolean
 ): boolean {
-  return filter.trim() == '' && filterScope.length == 0 && filterGui == false;
+  return filters.length == 0 && filterScope.length == 0 && filterGui == false;
 }
 
 export default function GeneralTests({
   vscode,
 }: GeneralTestsArg): ReactElement {
   const intl = useIntl();
-  const [filter, setFilter] = useState<string>('');
+  const [filters, setFilters] = useState<Filter[]>([]);
   const [filterScope, setFilterScope] = useState<string[]>([]);
   const [filterGui, setFilterGui] = useState<boolean>(true);
   // Whether failures are brought to the front. Not a user preference any more:
@@ -1120,7 +1195,7 @@ export default function GeneralTests({
   };
 
   const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filter, filterScope, filterGui)
+    matchFilter(test, filters, filterScope, filterGui)
   );
 
   return (
@@ -1142,7 +1217,7 @@ export default function GeneralTests({
           <RunAllTests
             onRun={() => {
               if (tests) {
-                if (noFilter(filter, filterScope, filterGui)) {
+                if (noFilter(filters, filterScope, filterGui)) {
                   setTests((oldTests) =>
                     oldTests?.map((test) => {
                       return { ...test, state: 'Loading' };
@@ -1171,14 +1246,14 @@ export default function GeneralTests({
           />{' '}
         </div>
       </div>
-      <Filter
+      <FilterPanel
         tests={tests}
         setFilterScope={setFilterScope}
         filterScope={filterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
-        filter={filter}
-        setFilter={setFilter}
+        filters={filters}
+        setFilters={setFilters}
       />
       <div className="select-test-print">
         <FormattedMessage
@@ -1251,6 +1326,7 @@ export default function GeneralTests({
           grid={grid}
           filterScope={filterScope}
           onRun={onRun}
+          filters={filters}
         />
       )}
     </div>

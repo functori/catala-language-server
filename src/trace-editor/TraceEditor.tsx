@@ -1,4 +1,4 @@
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { WebviewApi } from 'vscode-webview';
 import {
@@ -14,8 +14,11 @@ import { setVsCodeApi } from '../shared/webviewApi';
 import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { TraceElement, TraceTest } from './traceUtils';
 import { fieldValue, readTraceTest } from './traceUtils';
+import type { AddFilter } from './traceMenu';
 import { DataPanel } from './TraceData';
 import TraceTreeView from './TraceTreeView';
+import { FilterPins, type Filter } from '../FilterPin';
+import { useTraceMenu } from './traceMenu';
 
 type RunState =
   | { status: 'idle' }
@@ -33,6 +36,24 @@ type ScopeWithInfo = [string, TraceTest | undefined];
 
 const PANE_LAYOUTS = ['data', 'both', 'trace'] as const;
 type PaneLayout = (typeof PANE_LAYOUTS)[number];
+type SetFilter = React.Dispatch<React.SetStateAction<Filter[]>>;
+
+function createAddFilter(setFilters: SetFilter): AddFilter {
+  const addFilter: AddFilter = (filter) => {
+    let filterToAdd = filter.trim();
+    setFilters((savedFilters) => {
+      if (
+        filterToAdd == '' ||
+        savedFilters.some((elt: Filter) => elt.filter == filterToAdd)
+      ) {
+        return savedFilters;
+      } else {
+        return [...savedFilters, { filter: filterToAdd, option: 'include' }];
+      }
+    });
+  };
+  return addFilter;
+}
 
 export default function TraceEditor({ vscode }: Props): ReactElement {
   const intl = useIntl();
@@ -44,7 +65,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   const [scopePreset, setScopePreset] = useState(false);
   const [runState, setRunState] = useState<RunState>({ status: 'idle' });
   const [initialized, setInitialized] = useState(false);
-  const [filter, setFilter] = useState('');
+  const [savedFilters, setSavedFilters] = useState<Filter[]>([]);
   const [layout, setLayout] = useState<PaneLayout>('both');
 
   useEffect(() => {
@@ -137,6 +158,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     );
   }
 
+  const addFilter = createAddFilter(setSavedFilters);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={titleRowStyle}>
@@ -191,7 +213,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           layout={layout}
           left={
             <DataPanel
-              setFilter={setFilter}
+              addFilter={addFilter}
               test={scope[1]}
               trace={runState.status === 'success' ? runState.trace : undefined}
               intl={intl}
@@ -199,8 +221,8 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           }
           right={
             <TraceResult
-              filter={filter}
-              setFilter={setFilter}
+              filters={savedFilters}
+              setFilters={setSavedFilters}
               runState={runState}
               cwd={cwd}
               test={scope[1]}
@@ -209,8 +231,8 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         />
       ) : (
         <TraceResult
-          filter={filter}
-          setFilter={setFilter}
+          filters={savedFilters}
+          setFilters={setSavedFilters}
           runState={runState}
           cwd={cwd}
         />
@@ -267,21 +289,25 @@ function LayoutSlider({
 }
 
 function TraceResult({
-  filter,
-  setFilter,
+  filters,
   runState,
+  setFilters,
   cwd,
   test,
 }: {
   runState: RunState;
-  filter: string;
-  setFilter: (filter: string) => void;
+  filters: Filter[];
+  setFilters: SetFilter;
   cwd: string;
   test?: TraceTest;
 }): ReactElement | null {
   const intl = useIntl();
   const [view, setView] = useState<OutputView>('tree');
   const [expand, setExpand] = useState<boolean | null>(null);
+  const [filter, setFilter] = useState<string>('');
+  const addFilter = createAddFilter(setFilters);
+
+  const menuProps = useTraceMenu(useMemo(() => ({ addFilter }), [addFilter]));
 
   switch (runState.status) {
     case 'idle':
@@ -303,7 +329,7 @@ function TraceResult({
       );
     case 'success':
       return (
-        <div>
+        <div {...menuProps}>
           <div
             style={{
               display: 'flex',
@@ -347,8 +373,26 @@ function TraceResult({
                   })}
                   value={filter}
                   onInput={(e) => setFilter(fieldValue(e))}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addFilter(filter);
+                      setFilter('');
+                    }
+                  }}
                   style={{ flex: 1 }}
-                />
+                >
+                  <span
+                    style={{ cursor: 'pointer' }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      addFilter(filter);
+                      setFilter('');
+                    }}
+                    className="codicon codicon-save"
+                    slot="content-after"
+                  />
+                </VscodeTextfield>
                 <VscodeButton
                   icon="expand-all"
                   secondary
@@ -366,9 +410,10 @@ function TraceResult({
                   <FormattedMessage id="trace.collapseAll" />
                 </VscodeButton>
               </div>
+              <FilterPins filters={filters} setFilters={setFilters} />
               <TraceTreeView
                 trace={runState.trace}
-                filter={filter}
+                filters={filters}
                 cwd={cwd}
                 expand={expand}
                 test={test}

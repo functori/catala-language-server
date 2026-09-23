@@ -22,6 +22,7 @@ import {
   variablePath,
   variableSegment,
 } from './traceUtils';
+import type { AddFilter } from './traceMenu';
 
 const ExpandContext = createContext<ExpandCommand | null>(null);
 
@@ -281,17 +282,15 @@ function typeIcon(kind?: string): string {
 
 // -- Components ----------------------------------------------------------------
 
-type SetFilter = (filter: string) => void;
-
 export function DataPanel({
   test,
   trace,
   intl,
-  setFilter,
+  addFilter,
   showContainers = false,
 }: {
   test: TraceTest;
-  setFilter: SetFilter;
+  addFilter: AddFilter;
   trace?: TraceElement[];
   intl: IntlShape;
   showContainers?: boolean;
@@ -366,7 +365,7 @@ export function DataPanel({
                 node={node}
                 crumbs={[]}
                 noExpected
-                setFilter={setFilter}
+                addFilter={addFilter}
               />
             ))}
           </Section>
@@ -376,7 +375,7 @@ export function DataPanel({
                 key={`int-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
-                setFilter={setFilter}
+                addFilter={addFilter}
               />
             ))}
           </Section>
@@ -386,7 +385,7 @@ export function DataPanel({
                 key={`out-${node.path}-${i}`}
                 node={node}
                 crumbs={[]}
-                setFilter={setFilter}
+                addFilter={addFilter}
               />
             ))}
           </Section>
@@ -482,12 +481,12 @@ function NodeRow({
   node,
   crumbs,
   noExpected,
-  setFilter,
+  addFilter,
 }: {
   node: DataNode;
   crumbs: string[];
   noExpected?: boolean;
-  setFilter: SetFilter;
+  addFilter: AddFilter;
 }): ReactElement {
   const [open, setOpen] = useState(false);
   useExpandAll(setOpen);
@@ -529,7 +528,7 @@ function NodeRow({
               node={child}
               crumbs={selfCrumbs}
               noExpected={noExpected}
-              setFilter={setFilter}
+              addFilter={addFilter}
             />
           ))}
       </>
@@ -558,7 +557,7 @@ function NodeRow({
             style={{ cursor: 'pointer' }}
             onClick={(e) => {
               e.preventDefault();
-              setFilter(node.label);
+              addFilter(node.label);
             }}
           >
             {node.label}
@@ -572,7 +571,7 @@ function NodeRow({
           style={tdStyle}
           onClick={(e) => {
             e.preventDefault();
-            setFilter(node.expected ?? '');
+            addFilter(node.expected ?? '');
           }}
         >
           {node.expected}
@@ -582,7 +581,7 @@ function NodeRow({
         style={tdStyle}
         onClick={(e) => {
           e.preventDefault();
-          setFilter(node.value ?? '');
+          addFilter(node.value ?? '');
         }}
       >
         {node.value ?? ''}
