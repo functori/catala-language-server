@@ -13,6 +13,7 @@ import {
   readTestOutputs,
 } from '../generated/catala_types';
 import type { IntlShape } from 'react-intl';
+import type { Filter } from '../FilterPin';
 
 export type CodeLocation = {
   file: string;
@@ -524,6 +525,14 @@ export function posText(pos?: CodeLocation): string {
   return `${pos.file}:${pos.start.line}`;
 }
 
+/**
+ * Height left for the panels under the editor's header. The editor measures it
+ * and sets it on their container; each panel caps itself with it. Declared
+ * here rather than in any of them, since the editor, the data panel and the
+ * tree view all need it.
+ */
+export const PANEL_HEIGHT_VAR = '--trace-panel-height';
+
 export function variableSegment(v: TraceVariable): string {
   return v.kind === 'step' && v.index !== undefined
     ? `${v.name}[${v.index}]`
@@ -613,4 +622,352 @@ export function readTraceTest(x: JsonValue): TraceTest {
     description: o['description'] as string,
     title: o['title'] as string,
   };
+}
+
+// -- Trace kind description ---------------------------------------------------
+
+export type Tone = 'scope' | 'branch' | 'error' | 'plain';
+
+export type Described = {
+  symbol: string;
+  label: string;
+  detail?: string;
+  tone: Tone;
+  showsValue: boolean;
+  showsCode: boolean;
+};
+
+export function detail(x: JsonValue): string {
+  return typeof x === 'string' ? x : '';
+}
+
+export function describeKind(kind: TraceKind, intl: IntlShape): Described {
+  const t = (id: string): string => intl.formatMessage({ id });
+  switch (kind.kind) {
+    case 'scope_call':
+      return {
+        symbol: '→',
+        label: t('trace.kind.scope'),
+        detail: detail(kind.name),
+        tone: 'scope',
+        showsValue: true,
+        showsCode: true,
+      };
+    case 'scope_var': {
+      const label =
+        kind.input === 'reentrant'
+          ? t('trace.kind.scopeContextVariable')
+          : kind.input === 'only_input'
+            ? t('trace.kind.scopeInputVariable')
+            : t('trace.kind.scopeVariable');
+      return {
+        symbol: '≔',
+        label,
+        detail: detail(kind.name),
+        tone: 'plain',
+        showsValue: true,
+        showsCode: kind.input !== 'only_input',
+      };
+    }
+    case 'local_var':
+      return {
+        symbol: '≔',
+        label: t('trace.kind.localVariable'),
+        detail: detail(kind.name),
+        tone: 'plain',
+        showsValue: true,
+        showsCode: true,
+      };
+    case 'local_tup':
+      return {
+        symbol: '≔',
+        label: t('trace.kind.localVariables'),
+        detail: Array.isArray(kind.names)
+          ? (kind.names as unknown[]).map(String).join(', ')
+          : undefined,
+        tone: 'plain',
+        showsValue: true,
+        showsCode: true,
+      };
+    case 'function_call':
+      return {
+        symbol: '→',
+        label: t('trace.kind.function'),
+        detail: detail(kind.name),
+        tone: 'scope',
+        showsValue: true,
+        showsCode: true,
+      };
+    case 'branch_condition':
+      return {
+        symbol: '⊡',
+        label: t('trace.kind.condition'),
+        tone: 'branch',
+        showsValue: true,
+        showsCode: true,
+      };
+    case 'if_branching':
+      return {
+        symbol: '⊸',
+        label: t('trace.kind.branchTaken'),
+        tone: 'branch',
+        showsValue: false,
+        showsCode: true,
+      };
+    case 'match_branching':
+      return {
+        symbol: '⊸',
+        label: t('trace.kind.branchCase'),
+        detail: detail(kind.constructor as unknown as JsonValue),
+        tone: 'branch',
+        showsValue: false,
+        showsCode: true,
+      };
+    case 'assertion':
+      return {
+        symbol: '⊹',
+        label: t('trace.kind.assertion'),
+        tone: 'plain',
+        showsValue: false,
+        showsCode: true,
+      };
+    case 'exception':
+      return {
+        symbol: '⊕',
+        label: t('trace.kind.definition'),
+        detail: kind.label !== undefined ? detail(kind.label) : undefined,
+        tone: 'plain',
+        showsValue: false,
+        showsCode: true,
+      };
+    case 'error':
+      return {
+        symbol: '⨉',
+        label: t('trace.kind.error'),
+        detail: [detail(kind.type), detail(kind.message)]
+          .filter(Boolean)
+          .join(': '),
+        tone: 'error',
+        showsValue: false,
+        showsCode: true,
+      };
+    default:
+      return {
+        symbol: '•',
+        label: kind.kind,
+        tone: 'plain',
+        showsValue: false,
+        showsCode: true,
+      };
+  }
+}
+
+// -- Expected vs. computed values ---------------------------------------------
+
+export type Match = 'match' | 'mismatch' | undefined;
+
+export type Expected = {
+  variables: Map<string, TraceValue | null>;
+  output: Map<string, Match>;
+};
+
+export function nodeMatchState(
+  expected: Expected,
+  path: string,
+  value: TraceValue
+): Match {
+  const varExp = expected.variables.get(path);
+  if (varExp !== undefined && varExp !== null) {
+    return traceValueEqual(varExp, value) ? 'match' : 'mismatch';
+  }
+  return expected.output.get(path);
+}
+
+export function subtreeHasMismatch(
+  el: TraceElement,
+  childPrefix: string,
+  expected: Expected,
+  stepIndices: Map<TraceElement, number>
+): boolean {
+  const newPrefix = (c: TraceElement): string => {
+    if (
+      (c.element.kind === 'scope_call' ||
+        c.element.kind === 'scope_var' ||
+        c.element.kind === 'local_var') &&
+      typeof c.element.name === 'string'
+    ) {
+      const segment = indexedSegment(c, c.element.name, stepIndices);
+      return childPrefix ? `${childPrefix}.${segment}` : segment;
+    } else {
+      return childPrefix;
+    }
+  };
+  if (
+    (el.element.kind === 'scope_call' ||
+      el.element.kind === 'scope_var' ||
+      el.element.kind === 'local_var') &&
+    el.trace !== undefined
+  ) {
+    const scopeMismatch = el.trace.some((c) =>
+      subtreeHasMismatch(c, newPrefix(c), expected, stepIndices)
+    );
+    if (scopeMismatch) return true;
+  }
+  if (
+    (el.element.kind === 'scope_var' || el.element.kind === 'local_var') &&
+    el.value !== undefined
+  ) {
+    if (nodeMatchState(expected, childPrefix, el.value) === 'mismatch') {
+      return true;
+    }
+  }
+  if (el.trace !== undefined) {
+    return el.trace.some((c) =>
+      subtreeHasMismatch(c, newPrefix(c), expected, stepIndices)
+    );
+  }
+  return false;
+}
+
+// -- Filtering ----------------------------------------------------------------
+
+export function filterMatches(
+  el: TraceElement,
+  filters: Filter[],
+  intl: IntlShape
+): [Filter[], boolean] {
+  const { label, detail } = describeKind(el.element, intl);
+  const value =
+    el.value !== undefined ? formatTraceValue(el.value, intl) : undefined;
+  const text = [
+    label,
+    detail ?? '',
+    value ?? '',
+    posText(el.pos),
+    JSON.stringify(el.element),
+  ]
+    .join(' ')
+    .toLowerCase();
+  let remaining_filters = [];
+  let exclusion = false;
+  for (let filter of filters) {
+    if (text.includes(filter.filter) && filter.option == 'include') {
+      continue;
+    } else if (filter.option == 'ignore') {
+      continue;
+    } else if (text.includes(filter.filter) && filter.option == 'exclude') {
+      exclusion = true;
+    } else {
+      remaining_filters.push(filter);
+    }
+  }
+  return [remaining_filters, exclusion];
+}
+
+export function subtreeMatches(
+  el: TraceElement,
+  filters: Filter[],
+  intl: IntlShape
+): boolean {
+  let [remaining_filters, forbidden] = filterMatches(el, filters, intl);
+  if (forbidden) {
+    return false;
+  }
+  // If the only remaining filters are exclude type and that there are no more
+  // children, filter matches
+  let without_exclude = remaining_filters.filter((f) => f.option != 'exclude');
+  const children = Array.isArray(el.trace) ? el.trace : [];
+  if (without_exclude.length == 0 && children.length == 0) {
+    return true;
+  }
+  return children.some((c) => subtreeMatches(c, remaining_filters, intl));
+}
+
+export function indexedSegment(
+  el: TraceElement,
+  name: string,
+  stepIndices: Map<TraceElement, number>
+): string {
+  const index = stepIndices.get(el);
+  return index !== undefined ? `${name}[${index}]` : name;
+}
+
+function stepInto(
+  te: TraceElement,
+  prefix: string,
+  testedScope: string | undefined,
+  stepIndices: Map<TraceElement, number>
+): {
+  children: TraceElement[];
+  prefix: string;
+  testedScope: string | undefined;
+} {
+  const merged =
+    te.element.kind === 'scope_var' &&
+    typeof te.element.name === 'string' &&
+    te.trace?.length === 1 &&
+    te.trace[0].element.kind === 'scope_call' &&
+    typeof te.trace[0].element.name === 'string';
+  const node = merged && te.trace ? te.trace[0] : te;
+  const displayName = merged
+    ? `${te.element.name as string}.${node.element.name as string}`
+    : (te.element.name as string);
+  let childPrefix = prefix;
+  let nextTestedScope = testedScope;
+  if (
+    (node.element.kind === 'scope_call' ||
+      node.element.kind === 'scope_var' ||
+      node.element.kind === 'local_var') &&
+    typeof node.element.name === 'string'
+  ) {
+    if (node.element.name === testedScope) {
+      nextTestedScope = undefined;
+    } else {
+      const segment = indexedSegment(node, displayName, stepIndices);
+      childPrefix = prefix ? `${prefix}.${segment}` : segment;
+    }
+  }
+  return {
+    children: node.trace ?? [],
+    prefix: childPrefix,
+    testedScope: nextTestedScope,
+  };
+}
+
+export function closestFilterMatch(
+  roots: TraceElement[],
+  filters: Filter[],
+  intl: IntlShape,
+  stepIndices: Map<TraceElement, number>,
+  testedScope: string | undefined
+): {
+  roots: TraceElement[];
+  prefix: string;
+  testedScope: string | undefined;
+} {
+  let level = roots;
+  let prefix = '';
+  let scope = testedScope;
+  let active = filters;
+  let closest = { roots, prefix, testedScope: scope };
+  for (;;) {
+    const matching = level.filter((el) => subtreeMatches(el, active, intl));
+    if (matching.length !== 1) {
+      return closest;
+    }
+    const [only] = matching;
+    closest = { roots: [only], prefix, testedScope: scope };
+    const [remaining, excluded] = filterMatches(only, active, intl);
+    if (excluded || remaining.every((pin) => pin.option === 'exclude')) {
+      return closest;
+    }
+    const stepped = stepInto(only, prefix, scope, stepIndices);
+    if (stepped.children.length === 0) {
+      return closest;
+    }
+    level = stepped.children;
+    active = remaining;
+    prefix = stepped.prefix;
+    scope = stepped.testedScope;
+  }
 }

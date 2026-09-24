@@ -50,12 +50,12 @@
         {
           "id": "catala.openAllTests",
           "name": "%view.catala.openAllTests.title%",
-          "icon": "$(beaker)"
+          "icon": "$(menu)"
         },
         {
           "id": "catala.switches",
           "name": "%view.catala.switches.title%",
-          "icon": "$(menu)"
+          "icon": "$(info)"
         },
         {
           "id": "catala.help",
@@ -123,6 +123,10 @@
         "icon": "$(sync-compact)"
       },
       {
+        "command": "catala.trace.viewWithFilter",
+        "title": "%command.catala.trace.viewWithFilter.title%"
+      },
+      {
         "command": "catala.trace.addToFilter",
         "title": "%command.catala.trace.addToFilter.title%"
       }
@@ -135,6 +139,10 @@
         },
         {
           "command": "catala.refreshSwitches",
+          "when": "false"
+        },
+        {
+          "command": "catala.trace.viewWithFilter",
           "when": "false"
         },
         {
@@ -191,6 +199,10 @@
         }
       ],
       "webview/context": [
+        {
+          "command": "catala.trace.viewWithFilter",
+          "when": "webviewSection == 'tracePanelSelection'"
+        },
         {
           "command": "catala.trace.addToFilter",
           "when": "webviewSection == 'tracePanelSelection'"

@@ -10,7 +10,7 @@ import type { IntlShape } from 'react-intl';
 import { FormattedMessage } from 'react-intl';
 import { VscodeButton } from '@vscode-elements/react-elements';
 import type { TestIo } from '../generated/catala_types';
-import type { ExpandCommand } from './TraceTreeView';
+import type { ExpandCommand } from './traceContexts';
 import {
   type TraceElement,
   type TraceTest,
@@ -21,6 +21,7 @@ import {
   traceValueFromRuntime,
   variablePath,
   variableSegment,
+  PANEL_HEIGHT_VAR,
 } from './traceUtils';
 import type { AddFilter } from './traceMenu';
 
@@ -598,6 +599,7 @@ const ioPanelStyle: CSSProperties = {
   border: '1px solid var(--vscode-panel-border, transparent)',
   borderRadius: 2,
   fontSize: '0.9em',
+  maxHeight: `var(${PANEL_HEIGHT_VAR}, 70vh)`,
   overflow: 'auto',
 };
 
