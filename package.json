@@ -353,12 +353,14 @@
             "default",
             "en",
             "fr",
+            "pl",
             "file"
           ],
           "enumDescriptions": [
             "Let each editor pick, as it did before there was a setting",
             "English, whatever is being edited",
             "French, whatever is being edited",
+            "Polish, whatever is being edited",
             "The language of the file itself, from its .catala_xx suffix"
           ],
           "default": "default",
