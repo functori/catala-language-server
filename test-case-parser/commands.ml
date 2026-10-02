@@ -20,8 +20,6 @@ module J = Catala_types_j
 open Project
 open Model
 
-let read_trace file = Trace_assertion.read_trace file
-
 let check_failed_trace_var ~trace_assert ~tested_scope json =
   List.map
     (fun e ->
@@ -34,31 +32,6 @@ let check_failed_trace_var ~trace_assert ~tested_scope json =
         })
     (Trace_assertion.check ~asserted_trace_variables:trace_assert ~tested_scope
        json)
-
-(* Splits a "name: payload" attribute payload, keeping [payload] exactly as
-   written in the source: [Expected.check_trace_assert] needs the surface form
-   to re-render it through the trace's own encoder. *)
-let split_expected_attr (s : string) : (string * string) option =
-  match String.index_opt s ':' with
-  | None -> None
-  | Some i ->
-    let name = String.trim (String.sub s 0 i) in
-    let payload =
-      String.trim (String.sub s (i + 1) (String.length s - i - 1))
-    in
-    if name = "" || payload = "" then None else Some (name, payload)
-
-(* Read from the scope's own attributes rather than through [Scan.catala_file],
-   which gathers a single map for a whole file: a file may hold several test
-   scopes, and `testcase run` runs exactly one. *)
-let expected_variables info : Trace_assertion.trace_assertions =
-  List.fold_left
-    (fun acc (name, value) ->
-      Trace_assertion.add_asserted_trace_variable name value acc)
-    Trace_assertion.M.empty
-    (Pos.get_attrs info (function
-      | ExpectedVariable s -> split_expected_attr s
-      | _ -> None))
 
 let get_scope_test
     (prg : I.program)
@@ -723,11 +696,12 @@ let interpret_program dcalc_prg scope_name build_term_to_interp =
     |> Interpreter.evaluate_expr dcalc_prg.decl_ctx dcalc_prg.lang
   in
   let to_interp = build_term_to_interp program_fun in
-  let results =
-    Interpreter.evaluate_expr dcalc_prg.decl_ctx dcalc_prg.lang to_interp
+  let results, trace_asserts =
+    Interpreter.evaluate_expr_with_trace dcalc_prg.decl_ctx dcalc_prg.lang
+      scope_name to_interp
   in
   Message.report_delayed_errors_if_any ();
-  results, !failed_asserts
+  results, !failed_asserts, trace_asserts
 
 (* A run's results, as the test's outputs typed by the output struct. *)
 let test_outputs_of dcalc_prg out_struct actual_results =
@@ -780,6 +754,17 @@ let rec convert_to_json_input ({ value; _ } : O.runtime_value) : Yojson.Safe.t =
     | Empty -> failwith "convert_to_json_input: cannot convert 'empty' values"
   in
   convert_runtime_raw value
+
+let translate_failed_assert failed_assert =
+  O.
+    {
+      name = failed_assert.Trace_assertion.name;
+      expected =
+        Trace_assertion.value_to_string failed_assert.Trace_assertion.expected;
+      current_value =
+        Option.map Trace_assertion.value_to_string
+          failed_assert.Trace_assertion.current_value;
+    }
 
 let run_with_inputs
     ?build_dir
@@ -842,7 +827,7 @@ let run_with_inputs
       (Expr.pos program_fun)
     |> Expr.unbox
   in
-  let result_struct, failed_asserts =
+  let result_struct, failed_asserts, failed_trace_assert =
     interpret_program dcalc_prg scope_name build_term
   in
   let (actual_results : (StructField.t * (dcalc, typed) gexpr) list), out_struct
@@ -858,9 +843,16 @@ let run_with_inputs
   let assert_failures = not (failed_asserts = []) in
   let test = O.{ test with test_outputs } in
   write_stdout J.write_test_run
-    O.{ test; assert_failures; diffs = []; failed_trace_assert = [] }
+    O.
+      {
+        test;
+        assert_failures;
+        diffs = [];
+        failed_trace_assert =
+          List.map translate_failed_assert failed_trace_assert;
+      }
 
-let run_test ?build_dir include_dirs options testing_scope check_trace =
+let run_test ?build_dir include_dirs options testing_scope =
   let desugared_prg, naming_ctx, testing_scope_name, dcalc_prg =
     retrieve_program ?build_dir include_dirs options testing_scope
   in
@@ -873,10 +865,7 @@ let run_test ?build_dir include_dirs options testing_scope check_trace =
     in
     program_expr
   in
-  let trace_assert =
-    expected_variables (Mark.get (ScopeName.get_info testing_scope_name))
-  in
-  let result_struct, failed_asserts =
+  let result_struct, failed_asserts, failed_trace_assert =
     interpret_program dcalc_prg testing_scope_name build_term
   in
   let (actual_results : (StructField.t * (dcalc, typed) gexpr) list), out_struct
@@ -901,46 +890,14 @@ let run_test ?build_dir include_dirs options testing_scope check_trace =
     |> List.map (proj_diff (get_value dcalc_prg.lang dcalc_prg.decl_ctx))
   in
   let assert_failures = not (failed_asserts = []) in
-  (* [check_trace_assert] derives the tested scope by dropping the last 5
-     characters of the name it is given, so it only makes sense on a
-     "<Scope>_test" name. The editor also generates "<Scope>_test_1" and the
-     like when a test is duplicated; checking anyway would resolve no path at
-     all and report every variable as missing. *)
-  let checkable_scope_name =
-    String.length testing_scope > 5
-    && String.sub testing_scope (String.length testing_scope - 5) 5 = "_test"
-    && String.sub testing_scope 0 (String.length testing_scope - 5)
-       = test.O.tested_scope.O.name
-  in
-  (* Same check as `interpret --check-trace-assertion`, reported as data instead
-     of raising: this command hands failures back to the editor, and its error
-     absorber only catches assertion failures. Anything unexpected therefore
-     leaves the variables unchecked with a warning rather than failing the run.
-     The [try] has to cover [check_trace_assertion] too, not just the file
-     read. *)
-  let failed_trace_assert =
-    match check_trace with
-    | Some _ when Trace_assertion.M.is_empty trace_assert -> []
-    | Some _ when not checkable_scope_name ->
-      Message.warning
-        "Scope @{<bold>%s@} is not named after the scope it tests, trace \
-         assertions on variables are left unchecked."
-        testing_scope;
-      []
-    | Some file -> (
-      try
-        check_failed_trace_var ~trace_assert ~tested_scope:testing_scope
-          (read_trace file)
-      with e ->
-        Message.warning
-          "Could not read the trace @{<bold>%s@} of @{<bold>%s@}, assertions \
-           on variables using the trace are left unchecked:@ %s"
-          file testing_scope (Printexc.to_string e);
-        [])
-    | None -> []
-  in
   let test_run =
-    { O.test; O.assert_failures; O.diffs; O.failed_trace_assert }
+    {
+      O.test;
+      O.assert_failures;
+      O.diffs;
+      O.failed_trace_assert =
+        List.map translate_failed_assert failed_trace_assert;
+    }
   in
   write_stdout J.write_test_run test_run
 
@@ -1035,7 +992,6 @@ let run_test_cmd
     test_scope_name
     scope_input_opt
     build_dir
-    check_trace
     buffer_path =
   let options =
     match options.Global.input_src, buffer_path with
@@ -1060,7 +1016,7 @@ let run_test_cmd
       options
   in
   match scope_input_opt with
-  | None -> run_test ?build_dir include_dirs options test_scope_name check_trace
+  | None -> run_test ?build_dir include_dirs options test_scope_name
   | Some json ->
     run_with_inputs ?build_dir include_dirs options test_scope_name json
 
