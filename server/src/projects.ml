@@ -645,7 +645,7 @@ let eq_item (i : Scan.item) (i' : Scan.item) =
     has_inline_tests = _;
     has_scope_tests = _;
     is_stdlib = _;
-    asserted_trace_variables = _;
+    has_trace_assertions = _;
   } =
     i
   in
@@ -658,7 +658,7 @@ let eq_item (i : Scan.item) (i' : Scan.item) =
     has_inline_tests = _;
     has_scope_tests = _;
     is_stdlib = _;
-    asserted_trace_variables = _;
+    has_trace_assertions = _;
   } =
     i'
   in
