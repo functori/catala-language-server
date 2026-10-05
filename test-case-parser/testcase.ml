@@ -209,21 +209,13 @@ let register () =
   match value with
   | Shared_ast.String (s, _pos) -> Some (Model.TestTitle s)
   | _ -> failwith "unexpected test title");
-  (Driver.Plugin.register_attribute ~plugin:"testcase"
-     ~path:["array_item_label"] ~contexts:(function
-     | Desugared.Name_resolution.Expression _ -> true
-     | _ -> false)
-  @@ fun ~pos:_ value ->
-  match value with
-  | Shared_ast.String (s, _pos) -> Some (Model.ArrayItemLabel s)
-  | _ -> failwith "unexpected array item label");
-  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["variable"]
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["array_item_label"]
     ~contexts:(function
-    | Desugared.Name_resolution.ScopeDecl -> true
+    | Desugared.Name_resolution.Expression _ -> true
     | _ -> false)
   @@ fun ~pos:_ value ->
   match value with
-  | Shared_ast.String (s, _pos) -> Some (Model.ExpectedVariable s)
-  | _ -> failwith "unexpected variable label"
+  | Shared_ast.String (s, _pos) -> Some (Model.ArrayItemLabel s)
+  | _ -> failwith "unexpected array item label"
 
 let () = register ()

@@ -209,7 +209,7 @@ type diff = {
 }
 
 (* One auxiliary variable whose value in the trace does not match the one
-   declared by its [#[testcase.variable]] attribute. Values are the rendered
+   declared by its [#[trace.assert]] attribute. Values are the rendered
    strings the checker compares, not [runtime_value]s. [current_value] is
    absent when the trace carries no value for the variable. *)
 type failed_trace_assert = {
