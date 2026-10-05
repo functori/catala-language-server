@@ -332,16 +332,6 @@ let error_mixed_ownership (unowned : string list) =
     (Format.pp_print_list ~pp_sep:Format.pp_print_cut Format.pp_print_string)
     unowned
 
-let parse_expected_variable (s : string) :
-    (string * O.runtime_value option) option =
-  match String.index_opt s ':' with
-  | None -> Some (String.trim s, None)
-  | Some i ->
-    let name = String.trim (String.sub s 0 i) in
-    let value = String.trim (String.sub s (i + 1) (String.length s - i - 1)) in
-    if value = "" then Some (name, None)
-    else Some (name, Some (Model.runtime_value_of_string value))
-
 let get_catala_test (prg, naming_ctx) testing_scope_name =
   let testing_scope =
     ScopeName.Map.find testing_scope_name prg.I.program_root.module_scopes
@@ -509,7 +499,8 @@ let get_catala_test (prg, naming_ctx) testing_scope_name =
   in
   let variables =
     Pos.get_attrs info (function
-      | ExpectedVariable s -> parse_expected_variable s
+      | TraceAssert (path, expected) ->
+        Some (path, Option.map Model.translate_runtime_value expected)
       | _ -> None)
   in
   { base_test with O.test_inputs; test_outputs; description; title; variables }
