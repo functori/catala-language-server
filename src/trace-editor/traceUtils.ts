@@ -266,7 +266,7 @@ export function formatTraceValue(
     case 'decimal':
       return String(v.value);
     case 'date': {
-      const d = new Date(v.value.year, v.value.month, v.value.day);
+      const d = new Date(v.value.year, v.value.month - 1, v.value.day);
       return intl.formatDate(d);
     }
     case 'duration': {
