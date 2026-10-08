@@ -27,7 +27,10 @@ export class SettingsStore implements SettingsSource {
 
   public get(): CatalaSettings {
     const configuration = vscode.workspace.getConfiguration(SECTION);
-    return readSettings({ language: configuration.get('language') });
+    return readSettings({
+      language: configuration.get('language'),
+      traceView: configuration.get('traceView'),
+    });
   }
 
   public follow(webview: vscode.Webview, file?: string): vscode.Disposable {
