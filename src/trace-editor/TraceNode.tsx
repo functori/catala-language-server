@@ -23,6 +23,7 @@ import {
   detail,
   filterMatches,
   formatTraceValue,
+  inlineTraceValue,
   indexedSegment,
   nodeMatchState,
   posText,
@@ -195,7 +196,7 @@ export default function TraceNode({
     te.element.kind !== 'if_branching' &&
     te.element.kind !== 'scope_call' &&
     te.value !== undefined &&
-    formatTraceValue(te.value, intl) === undefined
+    inlineTraceValue(te.value, intl) === undefined
       ? formatTraceValue(te.value, intl, 'en', true)
       : undefined;
   const onlyContainerValue =
@@ -439,7 +440,7 @@ function ValueView({
       </span>
     );
   }
-  const fv = formatTraceValue(te.value, intl);
+  const fv = inlineTraceValue(te.value, intl);
   if (fv === undefined) {
     return null;
   }
