@@ -2,6 +2,7 @@ import {
   type ReactElement,
   type ReactNode,
   createContext,
+  useContext,
   useEffect,
   useState,
 } from 'react';
@@ -19,6 +20,10 @@ const allMessages: Record<string, Record<string, string>> = {
 };
 
 const SettingsContext = createContext<CatalaSettings>(defaultSettings);
+
+export function useCatalaSettings(): CatalaSettings {
+  return useContext(SettingsContext);
+}
 
 export function CatalaSettingsProvider({
   language,

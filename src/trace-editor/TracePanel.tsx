@@ -20,6 +20,7 @@ import {
   PANEL_HEIGHT_VAR,
   closestFilterMatch,
   fieldValue,
+  flattenHiddenKinds,
   stepIndexMap,
   subtreeMatches,
   traceValueEqual,
@@ -36,6 +37,8 @@ import type { AddFilter } from './traceMenu';
 import { useTraceMenu } from './traceMenu';
 import { FilterPins, type Filter } from '../FilterPin';
 import TraceNode from './TraceNode';
+import { useCatalaSettings } from '../shared/useSettings';
+import { showsTraceKind } from '../shared/settings';
 
 type OutputView = 'tree' | 'json';
 type SetFilter = React.Dispatch<React.SetStateAction<Filter[]>>;
@@ -76,6 +79,9 @@ function TraceTreeView({
   fromClosestMatch?: boolean;
 }): ReactElement {
   const intl = useIntl();
+  const settings = useCatalaSettings();
+
+  trace = flattenHiddenKinds(trace, (kind) => showsTraceKind(settings, kind));
 
   let roots: TraceElement[] = trace;
   if (test !== undefined) {
