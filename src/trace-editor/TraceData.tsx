@@ -98,16 +98,11 @@ function sortTree(nodes: DataNode[]): DataNode[] {
   );
 }
 
-function isContainer(node: DataNode): boolean {
-  return node.kind === 'struct' || node.kind === 'array';
-}
-
 function nodesFromTrace(
   variables: TraceVariable[],
   prefix: string,
   expected: Map<string, TraceValue | null>,
   matched: Set<string>,
-  showContainers: boolean,
   intl: IntlShape
 ): DataNode[] {
   return leavesFirst(
@@ -127,7 +122,6 @@ function nodesFromTrace(
               path,
               expected,
               matched,
-              showContainers,
               intl
             ),
           },
@@ -140,7 +134,7 @@ function nodesFromTrace(
         variable.value,
         intl
       );
-      return showContainers || !isContainer(node) ? [node] : [];
+      return [node];
     })
   );
 }
@@ -171,55 +165,11 @@ function buildNode(
   const shape = expected ?? computed;
 
   if (isStruct(expected) || isStruct(computed)) {
-    const fields = [
-      ...new Set([
-        ...(isStruct(expected) ? Object.keys(expected.fields) : []),
-        ...(isStruct(computed) ? Object.keys(computed.fields) : []),
-      ]),
-    ];
-    if (fields.length === 0) {
-      return { label, path, kind: 'struct', value: '{}' };
-    }
-    return {
-      label,
-      path,
-      kind: 'struct',
-      children: leavesFirst(
-        fields.map((field) =>
-          buildNode(
-            field,
-            `${path}.${field}`,
-            isStruct(expected) ? expected.fields[field] : undefined,
-            isStruct(computed) ? computed.fields[field] : undefined,
-            intl
-          )
-        )
-      ),
-    };
+    return { label, path, kind: 'struct' };
   }
 
   if (isArray(expected) || isArray(computed)) {
-    const exp = isArray(expected) ? expected.values : [];
-    const comp = isArray(computed) ? computed.values : [];
-    const length = Math.max(exp.length, comp.length);
-    if (length === 0) {
-      return { label, path, kind: 'array', value: '[]' };
-    }
-    return {
-      label,
-      path,
-      kind: 'array',
-      children: Array.from({ length }, (_, i) => {
-        const item = exp[i]?.[1] ?? comp[i]?.[1] ?? String(i);
-        return buildNode(
-          `[${item}]`,
-          `${path}[${item}]`,
-          exp[i]?.[0],
-          comp[i]?.[0],
-          intl
-        );
-      }),
-    };
+    return { label, path, kind: 'array' };
   }
 
   const sameCtor =
@@ -292,7 +242,6 @@ export function DataPanel({
   trace,
   intl,
   addFilter,
-  showContainers = false,
 }: {
   testing_scope: string;
   vscode: WebviewApi<unknown>;
@@ -300,7 +249,6 @@ export function DataPanel({
   addFilter: AddFilter;
   trace?: TraceElement[];
   intl: IntlShape;
-  showContainers?: boolean;
 }): ReactElement {
   const [trVariables, trOutputs] = traceVariablesForTest(
     trace ?? [],
@@ -324,7 +272,6 @@ export function DataPanel({
     '',
     test.variables,
     matched,
-    showContainers,
     intl
   );
   for (const [name, expected] of test.variables) {
@@ -335,9 +282,6 @@ export function DataPanel({
       ...buildNode(name, name, expected ?? undefined, undefined, intl),
       missing: hasTraceVars,
     };
-    if (!showContainers && isContainer(leaf)) {
-      continue;
-    }
     internalNodes = insertAt(internalNodes, pathSegments(name), '', leaf);
   }
   internalNodes = sortTree(internalNodes);
@@ -483,7 +427,13 @@ function Section({
   );
 }
 
-function Breadcrumb({ crumbs }: { crumbs: string[] }): ReactElement {
+function Breadcrumb({
+  crumbs,
+  addFilter,
+}: {
+  crumbs: string[];
+  addFilter: AddFilter;
+}): ReactElement {
   const last = crumbs.length - 1;
   return (
     <>
@@ -492,7 +442,19 @@ function Breadcrumb({ crumbs }: { crumbs: string[] }): ReactElement {
           {i > 0 && !crumb.startsWith('[') && (
             <span style={crumbSeparatorStyle}>/</span>
           )}
-          <span style={i === last ? crumbLastStyle : crumbStyle}>{crumb}</span>
+          <span
+            style={{
+              ...(i === last ? crumbLastStyle : crumbStyle),
+              cursor: 'pointer',
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              addFilter(crumb);
+            }}
+          >
+            {crumb}
+          </span>
         </span>
       ))}
     </>
@@ -544,7 +506,7 @@ function NodeRow({
                 {typeIcon(node.kind)}
               </span>
               <span>
-                <Breadcrumb crumbs={selfCrumbs} />
+                <Breadcrumb crumbs={selfCrumbs} addFilter={addFilter} />
               </span>
             </span>
           </td>
