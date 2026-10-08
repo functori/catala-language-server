@@ -27,7 +27,7 @@ import type { WebviewApi } from 'vscode-webview';
 import { setVsCodeApi } from '../shared/webviewApi';
 import { confirm, resolveConfirmResult } from '../messaging/confirm';
 import { replaceLosses } from './testCaseUtils';
-import { focusTargetId } from '../shared/focusTarget';
+import { focusExpectedVariables, focusTargetId } from '../shared/focusTarget';
 import type { TraceElement } from '../trace-editor/traceUtils';
 
 /**
@@ -111,6 +111,29 @@ export default function TestFileEditor({
     setVsCodeApi(vscode);
   }, [vscode]);
 
+  const onTestChange = useCallback(
+    (newValue: Test, mayBeBatched: boolean): void => {
+      if (state.state === 'success') {
+        const idx = state.tests.findIndex(
+          (tst) => tst.testing_scope === newValue.testing_scope
+        );
+        const newTestState = [...state.tests];
+        newTestState[idx] = newValue; //we can do away with this when array.with() becomes widely available
+
+        // optimistic update
+        setState({ state: 'success', tests: newTestState });
+
+        vscode.postMessage(
+          writeUpMessage({
+            kind: 'GuiEdit',
+            value: [newTestState, mayBeBatched],
+          })
+        );
+      }
+    },
+    [state, vscode, setTestRunState]
+  );
+
   // Focus is an imperative DOM action, so the request is resolved here rather
   // than passed down to the field as a prop: the field only has to carry the
   // matching id. Clearing the request once handled is what makes a second
@@ -119,17 +142,43 @@ export default function TestFileEditor({
     if (focusOnData === undefined) return;
     const testing_scope = focusOnData[0];
     const traceData = focusOnData[1];
-    const element = document.getElementById(
-      focusTargetId(traceData, testing_scope)
-    );
+    let element: HTMLElement | null;
+    if (traceData.kind == 'Internal' && state.state == 'success') {
+      let test = state.tests.find(
+        (test) => test.testing_scope == testing_scope
+      );
+      if (test !== undefined && !test.variables.has(traceData.value)) {
+        // The variable doesn't exist
+        let newTest = {
+          ...test,
+          variables: new Map(test.variables).set(traceData.value, null),
+        };
+        onTestChange(newTest, false);
+        // Focus on the global variable editor as the element doesn't exist in the document
+        element = document.getElementById(
+          focusExpectedVariables(testing_scope)
+        );
+      } else {
+        element = document.getElementById(
+          focusTargetId(traceData, testing_scope)
+        );
+      }
+    } else {
+      element = document.getElementById(
+        focusTargetId(traceData, testing_scope)
+      );
+    }
     if (element !== null) {
       // `tabIndex` is what makes a plain container focusable at all; -1 keeps
       // it out of the tab order, so it is only ever reached this way.
       if (!element.hasAttribute('tabindex')) {
         element.tabIndex = -1;
       }
+      // `focus` scrolls on its own, instantly, which would cut the smooth
+      // scroll short; and it does not scroll at all when the element is
+      // already partly visible, as a whole section often is.
+      element.focus({ preventScroll: true });
       element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      element.focus();
       const pending = flashing.current;
       if (pending !== undefined) {
         clearTimeout(pending.timer);
@@ -154,29 +203,6 @@ export default function TestFileEditor({
     }
     setFocusOnData(undefined);
   }, [focusOnData]);
-
-  const onTestChange = useCallback(
-    (newValue: Test, mayBeBatched: boolean): void => {
-      if (state.state === 'success') {
-        const idx = state.tests.findIndex(
-          (tst) => tst.testing_scope === newValue.testing_scope
-        );
-        const newTestState = [...state.tests];
-        newTestState[idx] = newValue; //we can do away with this when array.with() becomes widely available
-
-        // optimistic update
-        setState({ state: 'success', tests: newTestState });
-
-        vscode.postMessage(
-          writeUpMessage({
-            kind: 'GuiEdit',
-            value: [newTestState, mayBeBatched],
-          })
-        );
-      }
-    },
-    [state, vscode, setTestRunState]
-  );
 
   const onTestDelete = useCallback(
     (testScope: string): void => {
