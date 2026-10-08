@@ -5,7 +5,7 @@ node_modules
 *.vsix
 .aider*
 .envrc
-
+_local
 _build
 src/.DS_Store
 test-case-parser/examples/.DS_Store
