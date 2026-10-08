@@ -421,8 +421,6 @@ function mergeSteps(l: TraceVariable[]): TraceVariable[] {
           (tv) =>
             tv.kind === 'step' ||
             (tv.value !== undefined &&
-              tv.value.kind !== 'struct' &&
-              tv.value.kind !== 'array' &&
               !(tv.value.kind === 'enum' && tv.value.value !== undefined))
         );
         if (vs.length !== 0) acc.push({ ...tv, variables });
