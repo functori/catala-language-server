@@ -12,6 +12,7 @@ import { getDefaultValue } from '../editors/ValueEditors';
 import { Identifier } from '../editors/Identifier';
 
 type Props = {
+  testing_scope: string;
   test: Test;
   onTestChange(newValue: Test): void;
   diffs?: Diff[];
@@ -41,6 +42,7 @@ type Props = {
 */
 
 export default function TestOutputsEditor({
+  testing_scope,
   test,
   onTestChange: onTestAssertsChange,
   diffs = [],
@@ -113,6 +115,7 @@ export default function TestOutputsEditor({
               </div>
               {outputData?.value ? (
                 <AssertionValueEditor
+                  testing_scope={testing_scope}
                   testIO={outputData}
                   editable={!readOnly}
                   onValueChange={(newValue) =>
