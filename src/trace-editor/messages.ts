@@ -15,7 +15,7 @@ export type TraceUpMessage =
       file: string;
       line: number;
     }
-  | { kind: 'updateData'; value: TraceData };
+  | { kind: 'updateData'; value: [string, TraceData] };
 
 export type TraceDownMessage =
   | {
