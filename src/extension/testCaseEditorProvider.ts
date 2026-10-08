@@ -842,7 +842,7 @@ export class TestCaseEditorProvider
 
   public static async focusDataInput(
     uri: vscode.Uri,
-    input_field: TraceData
+    input_field: [string, TraceData]
   ): Promise<boolean> {
     const panel = TestCaseEditorProvider.webviews.get(uri.toString())?.panel;
     if (panel !== undefined) {
@@ -872,7 +872,7 @@ export class TestCaseEditorProvider
       value: input_field,
     });
     logger.log(
-      `Focus request for ${input_field.kind} ${input_field.value}: ` +
+      `Focus request for ${input_field[1].kind} ${input_field[1].value}: ` +
         `${panel !== undefined ? 'revealed the open editor' : 'opened the editor'}, ` +
         `${delivered ? 'message sent' : 'message queued'}`
     );

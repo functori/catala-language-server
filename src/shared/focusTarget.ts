@@ -8,8 +8,9 @@ import type { PathSegment, TraceData } from '../generated/catala_types';
  * this function and the handler of the request resolves it with the same one,
  * so the two cannot drift apart.
  */
-export function focusTargetId(data: TraceData): string {
-  return `focus-${data.kind.toLowerCase()}-${data.value}`;
+export function focusTargetId(data: TraceData, testing_scope?: string): string {
+  const prefix = testing_scope !== undefined ? `${testing_scope}-` : '';
+  return `${prefix}focus-${data.kind.toLowerCase()}-${data.value}`;
 }
 
 /**

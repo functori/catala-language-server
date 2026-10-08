@@ -99,9 +99,9 @@ export default function TestFileEditor({
   // Trace computed per test scope (from running the scope with tracing).
   const [traces, setTraces] = useState<Record<string, TraceElement[]>>({});
   // Pending focus request from the trace editor, if any.
-  const [focusOnData, setFocusOnData] = useState<TraceData | undefined>(
-    undefined
-  );
+  const [focusOnData, setFocusOnData] = useState<
+    [string, TraceData] | undefined
+  >(undefined);
   // Field flashed by the last focus request, with the timer that ends its
   // flash; see the effect below.
   const flashing = useRef<
@@ -117,7 +117,11 @@ export default function TestFileEditor({
   // click on the same trace value focus again.
   useEffect(() => {
     if (focusOnData === undefined) return;
-    const element = document.getElementById(focusTargetId(focusOnData));
+    const testing_scope = focusOnData[0];
+    const traceData = focusOnData[1];
+    const element = document.getElementById(
+      focusTargetId(traceData, testing_scope)
+    );
     if (element !== null) {
       // `tabIndex` is what makes a plain container focusable at all; -1 keeps
       // it out of the tab order, so it is only ever reached this way.
@@ -145,7 +149,7 @@ export default function TestFileEditor({
       // (nested fields currently reuse their parent's id). Logged rather than
       // ignored, or the focus silently does nothing.
       console.warn(
-        `No field to focus for ${focusTargetId(focusOnData)} (${focusOnData.kind} ${focusOnData.value})`
+        `No field to focus for ${focusTargetId(traceData, testing_scope)} (${traceData.kind} ${traceData.value})`
       );
     }
     setFocusOnData(undefined);
@@ -465,6 +469,7 @@ export default function TestFileEditor({
         <div className="test-editor-container">
           {state.tests.map((test) => (
             <TestEditor
+              testing_scope={test.testing_scope}
               test={test}
               key={test.testing_scope}
               onTestChange={onTestChange}
