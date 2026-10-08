@@ -22,6 +22,7 @@ import {
   describeKind,
   detail,
   filterMatches,
+  elementCodeSpan,
   formatTraceValue,
   inlineTraceValue,
   indexedSegment,
@@ -285,7 +286,9 @@ export default function TraceNode({
         showsCode: true,
       }
     : describeKind(node.element, intl);
-  const snippetPos = described.showsCode ? te.pos : undefined;
+  const snippetPos = described.showsCode
+    ? (te.codeSpan ?? elementCodeSpan(te))
+    : undefined;
   const accentColor =
     node.element.kind === 'assertion'
       ? !node.trace

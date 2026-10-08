@@ -21,6 +21,7 @@ import {
   closestFilterMatch,
   fieldValue,
   flattenHiddenKinds,
+  withCodeSpans,
   stepIndexMap,
   subtreeMatches,
   traceValueEqual,
@@ -81,6 +82,7 @@ function TraceTreeView({
   const intl = useIntl();
   const settings = useCatalaSettings();
 
+  trace = withCodeSpans(trace);
   trace = flattenHiddenKinds(trace, (kind) => showsTraceKind(settings, kind));
 
   let roots: TraceElement[] = trace;
