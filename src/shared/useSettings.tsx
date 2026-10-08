@@ -39,11 +39,12 @@ export function CatalaSettingsProvider({
     window.addEventListener('message', handleMessage);
     return (): void => window.removeEventListener('message', handleMessage);
   }, []);
+  const resolved = locale in allMessages ? locale : 'en';
   return (
     <SettingsContext.Provider value={settings}>
       <IntlProvider
-        locale={locale}
-        messages={allMessages[locale] ?? enMessages}
+        locale={resolved}
+        messages={allMessages[resolved]}
         defaultLocale="en"
       >
         {children}
