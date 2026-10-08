@@ -36,7 +36,7 @@ import {
   MoneyEditor,
   RatEditor,
 } from '../editors/ValueEditors';
-import { focusTargetId } from '../shared/focusTarget';
+import { focusExpectedVariables, focusTargetId } from '../shared/focusTarget';
 
 type Props = {
   testing_scope: string;
@@ -292,7 +292,7 @@ export default function ExpectedVariablesEditor({
   }
 
   return (
-    <div className="test-section">
+    <div id={focusExpectedVariables(testing_scope)} className="test-section">
       <h2 className="test-section-title heading-h2">
         <FormattedMessage id="testEditor.variables" />
       </h2>
