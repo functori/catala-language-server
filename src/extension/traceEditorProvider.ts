@@ -237,6 +237,13 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
           postToWebView({ kind: 'result', ...readTraceFile(path) });
           break;
         }
+        case 'openInTestEditor':
+          await vscode.commands.executeCommand(
+            'vscode.openWith',
+            document.uri,
+            'catala.testCaseEditor'
+          );
+          break;
         case 'openLocation': {
           const range = new vscode.Range(
             new vscode.Position(

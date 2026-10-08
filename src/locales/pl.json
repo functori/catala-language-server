@@ -147,7 +147,7 @@
   "generalTests.tooltip.reload": "Odśwież listę testów",
   "generalTests.tooltip.reloading": "Odświeżanie…",
   "generalTests.tooltip.filterScope": "Filtruj testy według zakresu „{scope}”",
-  "generalTests.tooltip.openGui": "Otwórz edytor Catala",
+  "tooltip.openGui": "Otwórz edytor Catala",
   "generalTests.tooltip.openTextEditor": "Otwórz edytor tekstu",
   "generalTests.tooltip.stateSuccess": "Test zaliczony",
   "generalTests.tooltip.stateFailed": "Test niezaliczony",
