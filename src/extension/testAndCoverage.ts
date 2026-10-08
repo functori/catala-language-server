@@ -114,7 +114,7 @@ export class ResultController {
   constructor(
     private readonly storage: vscode.Memento,
     private readonly language: string
-  ) { }
+  ) {}
 
   getResult(testId: TestId): ResultType | undefined {
     let result: ResultType | undefined = this.storage.get(
@@ -135,13 +135,14 @@ export class ResultController {
     const failures =
       results.kind === 'Ok'
         ? results.value.assert_failures ||
-        results.value.diffs.length > 0 ||
-        results.value.failed_trace_assert.length > 0
+          results.value.diffs.length > 0 ||
+          results.value.failed_trace_assert.length > 0
         : true;
     this.storage.update(`${LAST_TEST_RESULT_KEY}:${testId.id}`, {
       scope_name,
       success: !failures,
-      failed_trace_assert: results.kind === 'Ok' ? results.value.failed_trace_assert : [],
+      failed_trace_assert:
+        results.kind === 'Ok' ? results.value.failed_trace_assert : [],
       errors: results.kind === 'Error' ? [{ message: results.value }] : [],
       time: 0,
       date: new Date().toLocaleDateString('fr'),
@@ -306,7 +307,8 @@ function formatVariableFailures(failures: FailedTraceAssert[]): string {
   return failures
     .map(
       (f) =>
-        `Variable ${f.name}:\n  expected: ${f.expected}\n  actual:   ${f.current_value ?? '<not found in trace>'
+        `Variable ${f.name}:\n  expected: ${f.expected}\n  actual:   ${
+          f.current_value ?? '<not found in trace>'
         }`
     )
     .join('\n\n');
@@ -518,7 +520,9 @@ function updateTestItemWithClerkResult(
     // A scope can succeed and still have mismatching variables, in which case
     // clerk reports no error: without this the test would fail with no message.
     if (failed_trace_assert.length > 0) {
-      messages.push(new vscode.TestMessage(formatVariableFailures(failed_trace_assert)));
+      messages.push(
+        new vscode.TestMessage(formatVariableFailures(failed_trace_assert))
+      );
     }
     if (scopeTest.scope_name == 'compilation')
       test_item.children.forEach((item) =>

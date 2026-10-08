@@ -834,7 +834,7 @@ export async function activate(
           if (y == undefined) return;
           x = y;
         }
-        const inputWebView = new ScopeInputController();
+        const inputWebView = new ScopeInputController(settingsStore);
         inputWebView.createWebview(context, x.uri, x.scope);
       }
     )

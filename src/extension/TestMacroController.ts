@@ -18,6 +18,7 @@ import type { ResultController } from './testAndCoverage';
 import { runTestVscode, TestId, TestMap } from './testAndCoverage';
 import { getCwd } from '../shared/util_client';
 import type { SettingsSource } from '../extension/settingsStore';
+import { resolveLanguage } from '../shared/settings';
 
 // Path of a test file relative to the workspace folder it belongs to, which is
 // what the 'debug all tests' panel displays: an absolute path is both too long
@@ -369,7 +370,11 @@ export class TestMacroController {
       vscode.Uri.joinPath(context.extensionUri, 'dist', 'ui.js')
     );
 
-    const language = vscode.env.language;
+    const language = resolveLanguage(
+      this.settings.get(),
+      undefined,
+      vscode.env.language
+    );
 
     return `
             <!DOCTYPE html>
