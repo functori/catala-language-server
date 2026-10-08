@@ -31,7 +31,10 @@ type Props = {
   vscode: WebviewApi<unknown>;
 };
 
-type ScopeWithInfo = [string, TraceTest | undefined];
+type ScopeWithInfo = {
+  scopeName: string;
+  test: TraceTest | undefined;
+};
 
 const PANE_LAYOUTS = ['data', 'both', 'trace'] as const;
 type PaneLayout = (typeof PANE_LAYOUTS)[number];
@@ -44,7 +47,10 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   const [scopes, setScopes] = useState<Map<string, TraceTest | undefined>>(
     new Map()
   );
-  const [scope, setScope] = useState<ScopeWithInfo>(['', undefined]);
+  const [scope, setScope] = useState<ScopeWithInfo>({
+    scopeName: '',
+    test: undefined,
+  });
   const [scopePreset, setScopePreset] = useState(false);
   const [runState, setRunState] = useState<RunState>({ status: 'idle' });
   const [initialized, setInitialized] = useState(false);
@@ -76,15 +82,18 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           setScope((prev: ScopeWithInfo): ScopeWithInfo => {
             // Preselect the requested scope if one was provided.
             if (message.scope !== undefined) {
-              return [message.scope, scopeMap.get(message.scope)];
+              return {
+                scopeName: message.scope,
+                test: scopeMap.get(message.scope),
+              };
             }
-            if (prev[0] !== '') {
+            if (prev.scopeName !== '') {
               return prev;
             }
-            const first: ScopeWithInfo | undefined = scopeMap
-              .entries()
-              .next().value;
-            return first ?? ['', undefined];
+            const first = scopeMap.entries().next().value;
+            return first
+              ? { scopeName: first[0], test: first[1] }
+              : { scopeName: '', test: undefined };
           });
           setInitialized(true);
           // Show a pre-computed trace directly, if one was provided.
@@ -121,7 +130,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   }, [vscode]);
 
   const onRunScope = (): void => {
-    const trimmed = scope[0].trim();
+    const trimmed = scope.scopeName.trim();
     if (!trimmed) {
       setRunState({
         status: 'error',
@@ -168,12 +177,14 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
       <div style={titleRowStyle}>
         <h2 style={{ margin: 0 }}>
           <FormattedMessage id="trace.viewer.title" />
-          {(scopePreset || scopes.size === 1) && scope[0] && `  —  ${scope[0]}`}
+          {(scopePreset || scopes.size === 1) &&
+            scope.scopeName &&
+            `  —  ${scope.scopeName}`}
         </h2>
         <VscodeButton icon="play" disabled={running} onClick={onRunScope}>
           <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
         </VscodeButton>
-        {scope[1] !== undefined && (
+        {scope.test !== undefined && (
           <LayoutSlider layout={layout} onLayout={setLayout} />
         )}
       </div>
@@ -185,10 +196,10 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           </span>
           {scopes.size > 0 ? (
             <VscodeSingleSelect
-              value={scope[0]}
+              value={scope.scopeName}
               onChange={(e) => {
                 const s = fieldValue(e);
-                setScope([s, scopes.get(s)]);
+                setScope({ scopeName: s, test: scopes.get(s) });
               }}
               style={{ width: '100%' }}
             >
@@ -200,11 +211,11 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
             </VscodeSingleSelect>
           ) : (
             <VscodeTextfield
-              value={scope[0]}
+              value={scope.scopeName}
               placeholder={intl.formatMessage({ id: 'trace.scopePlaceholder' })}
               onInput={(e) => {
                 const s = fieldValue(e);
-                setScope([s, scopes.get(s)]);
+                setScope({ scopeName: s, test: scopes.get(s) });
               }}
               style={{ width: '100%' }}
             />
@@ -216,14 +227,15 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         ref={resultsRef}
         style={{ [PANEL_HEIGHT_VAR]: panelHeight } as React.CSSProperties}
       >
-        {scope[1] !== undefined ? (
+        {scope.test !== undefined ? (
           <SplitPane
             layout={layout}
             left={
               <DataPanel
+                testing_scope={scope.test.testing_scope}
                 vscode={vscode}
                 addFilter={requestFilter}
-                test={scope[1]}
+                test={scope.test}
                 trace={
                   runState.status === 'success' ? runState.trace : undefined
                 }
@@ -235,7 +247,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
                 filterRequest={filterRequest}
                 runState={runState}
                 cwd={cwd}
-                test={scope[1]}
+                test={scope.test}
               />
             }
           />

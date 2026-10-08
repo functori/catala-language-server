@@ -412,7 +412,7 @@ type down_message = [
   | TestScopeResult of test_scope_result
   | ConfirmResult of confirm_result
   | AllTests of test_debugger_list
-  | FocusData of trace_data
+  | FocusData of (string * trace_data)
 ]
 
 type scope_success = {

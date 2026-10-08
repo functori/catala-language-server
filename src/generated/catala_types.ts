@@ -375,7 +375,7 @@ export type DownMessage =
 | { kind: 'TestScopeResult'; value: TestScopeResult }
 | { kind: 'ConfirmResult'; value: ConfirmResult }
 | { kind: 'AllTests'; value: TestDebuggerList }
-| { kind: 'FocusData'; value: TraceData }
+| { kind: 'FocusData'; value: [string, TraceData] }
 
 export type ScopeSuccess = {
   success: boolean;
@@ -1701,7 +1701,7 @@ export function writeDownMessage(x: DownMessage, context: any = x): any {
     case 'AllTests':
       return ['AllTests', writeTestDebuggerList(x.value, x)]
     case 'FocusData':
-      return ['FocusData', writeTraceData(x.value, x)]
+      return ['FocusData', ((x, context) => [_atd_write_string(x[0], x), writeTraceData(x[1], x)])(x.value, x)]
   }
 }
 
@@ -1719,7 +1719,7 @@ export function readDownMessage(x: any, context: any = x): DownMessage {
     case 'AllTests':
       return { kind: 'AllTests', value: readTestDebuggerList(x[1], x) }
     case 'FocusData':
-      return { kind: 'FocusData', value: readTraceData(x[1], x) }
+      return { kind: 'FocusData', value: ((x, context): [string, TraceData] => { _atd_check_json_tuple(2, x, context); return [_atd_read_string(x[0], x), readTraceData(x[1], x)] })(x[1], x) }
     default:
       _atd_bad_json('DownMessage', x, context)
       throw new Error('impossible')

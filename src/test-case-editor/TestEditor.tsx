@@ -30,6 +30,7 @@ import {
 import { getVsCodeApi } from '../shared/webviewApi';
 
 type Props = {
+  testing_scope: string;
   test: Test;
   onTestChange(newValue: Test, mayBeBatched: boolean): void;
   onTestDelete(testScope: string): void;
@@ -225,6 +226,7 @@ export default function TestEditor(props: Props): ReactElement {
               <FormattedMessage id="testEditor.inputs" />
             </h2>
             <TestInputsEditor
+              testing_scope={props.testing_scope}
               test_inputs={props.test.test_inputs}
               tested_scope={props.test.tested_scope}
               onTestInputsChange={onTestInputsChange}
@@ -237,6 +239,7 @@ export default function TestEditor(props: Props): ReactElement {
             tabIndex={-1}
           >
             <ExpectedVariablesEditor
+              testing_scope={props.testing_scope}
               test={props.test}
               trace={props.trace}
               runTrace={props.runTrace}
@@ -319,6 +322,7 @@ export default function TestEditor(props: Props): ReactElement {
             </div>
 
             <TestOutputsEditor
+              testing_scope={props.testing_scope}
               test={props.test}
               onTestChange={(test) => {
                 props.onTestChange(test, true);

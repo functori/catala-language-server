@@ -39,6 +39,7 @@ import {
 import { focusTargetId } from '../shared/focusTarget';
 
 type Props = {
+  testing_scope: string;
   test: Test;
   trace?: TraceElement[];
   runTrace?: boolean;
@@ -84,12 +85,14 @@ function formatRuntimeValue(
 }
 
 function TraceValueEditor({
+  testing_scope,
   path,
   input,
   setInput,
   kind,
   intl,
 }: {
+  testing_scope: string;
   path: string;
   input: RuntimeValue | undefined;
   setInput: React.Dispatch<React.SetStateAction<RuntimeValue | undefined>>;
@@ -99,7 +102,7 @@ function TraceValueEditor({
   let rv: ValueDef | undefined = input ? { value: input } : undefined;
   // Carried by the editor's own root element rather than by a wrapper, so that
   // a focus request from the trace editor lands on the field itself.
-  const id = focusTargetId({ kind: 'Internal', value: path });
+  const id = focusTargetId({ kind: 'Internal', value: path }, testing_scope);
   let editor: ReactElement;
   switch (kind) {
     case 'money': {
@@ -220,6 +223,7 @@ function filterExpectedVariables(
 }
 
 export default function ExpectedVariablesEditor({
+  testing_scope,
   test,
   trace,
   runTrace,
@@ -300,6 +304,7 @@ export default function ExpectedVariablesEditor({
                 const computed = computedOf(path);
                 return (
                   <VariableRow
+                    testing_scope={testing_scope}
                     key={path}
                     name={path}
                     expected={tv}
@@ -343,6 +348,7 @@ export default function ExpectedVariablesEditor({
                   </div>
                 ) : trVariables.length > 0 ? (
                   <VariableCatalog
+                    testing_scope={testing_scope}
                     trVariables={trVariables}
                     outputs={outputs}
                     onAdd={setVar}
@@ -357,6 +363,7 @@ export default function ExpectedVariablesEditor({
 }
 
 function VariableRow({
+  testing_scope,
   name,
   expected,
   computed,
@@ -366,6 +373,7 @@ function VariableRow({
   onSet,
   onRemove,
 }: {
+  testing_scope: string;
   name: string;
   expected: TraceValue | null;
   computed?: TraceValue;
@@ -448,6 +456,7 @@ function VariableRow({
         <div style={{ margin: 'auto', width: '20em' }}>
           {computed !== undefined ? (
             <TraceValueEditor
+              testing_scope={testing_scope}
               path={name}
               input={input}
               setInput={setInput}
@@ -516,10 +525,12 @@ function filterByName(vars: TraceVariable[], q: string): TraceVariable[] {
 }
 
 function VariableCatalog({
+  testing_scope,
   trVariables,
   outputs,
   onAdd,
 }: {
+  testing_scope: string;
   trVariables: TraceVariable[];
   outputs: Record<string, TraceValue>;
   onAdd(path: string, tv: TraceValue | null): void;
@@ -555,6 +566,7 @@ function VariableCatalog({
         <tbody>
           {[...stateVariables.entries()].map(([stateName, nodes]) => (
             <StateRow
+              testing_scope={testing_scope}
               key={`st-${stateName}`}
               varName={stateName}
               nodes={nodes}
@@ -569,6 +581,7 @@ function VariableCatalog({
             )
             .map((v) => (
               <ValueRow
+                testing_scope={testing_scope}
                 key={`v-${v.name}`}
                 node={v}
                 crumbs={[]}
@@ -582,6 +595,7 @@ function VariableCatalog({
             )
             .map((v) => (
               <StepRow
+                testing_scope={testing_scope}
                 key={`s-${variableSegment(v)}`}
                 node={v}
                 crumbs={[]}
@@ -643,11 +657,13 @@ function Breadcrumb({ crumbs }: { crumbs: string[] }): ReactElement {
 }
 
 function StepRow({
+  testing_scope,
   node,
   crumbs,
   onAdd,
   filtering,
 }: {
+  testing_scope: string;
   node: Extract<TraceVariable, { kind: 'step' }>;
   crumbs: string[];
   onAdd(path: string, tv: TraceValue | null): void;
@@ -686,6 +702,7 @@ function StepRow({
             )
             .map((v) => (
               <ValueRow
+                testing_scope={testing_scope}
                 key={`v-${v.name}`}
                 node={v}
                 crumbs={selfCrumbs}
@@ -694,6 +711,7 @@ function StepRow({
             ))}
           {[...stateVariables.entries()].map(([stateName, nodes]) => (
             <StateRow
+              testing_scope={testing_scope}
               key={`st-${stateName}`}
               varName={stateName}
               nodes={nodes}
@@ -709,6 +727,7 @@ function StepRow({
             )
             .map((v) => (
               <StepRow
+                testing_scope={testing_scope}
                 key={`s-${variableSegment(v)}`}
                 node={v}
                 crumbs={selfCrumbs}
@@ -723,12 +742,14 @@ function StepRow({
 }
 
 function StateRow({
+  testing_scope,
   varName,
   nodes,
   crumbs,
   onAdd,
   filtering,
 }: {
+  testing_scope: string;
   varName: string;
   nodes: TraceVariable[];
   crumbs: string[];
@@ -763,6 +784,7 @@ function StateRow({
             )
             .map((v) => (
               <ValueRow
+                testing_scope={testing_scope}
                 padding={true}
                 key={`v-${v.name}`}
                 node={v}
@@ -777,11 +799,13 @@ function StateRow({
 }
 
 function ValueRow({
+  testing_scope,
   node,
   crumbs,
   padding,
   onAdd,
 }: {
+  testing_scope: string;
   node: Extract<TraceVariable, { kind: 'value' }>;
   crumbs: string[];
   padding?: boolean | undefined;
@@ -830,6 +854,7 @@ function ValueRow({
       </td>
       <td>
         <TraceValueEditor
+          testing_scope={testing_scope}
           path={path}
           kind={computed.kind}
           input={input}
