@@ -8,6 +8,7 @@ export type TraceUpMessage =
   | { kind: 'ready' }
   | { kind: 'run'; scope: string }
   | { kind: 'loadFile'; path: string }
+  | { kind: 'openInTestEditor' }
   | { kind: 'openLocation'; file: string; start: TracePos; end: TracePos }
   | {
       kind: 'requestExtract';
