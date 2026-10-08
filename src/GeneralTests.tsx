@@ -223,7 +223,7 @@ function OpenGUI({
   return (
     <span
       title={intl.formatMessage({
-        id: 'generalTests.tooltip.openGui',
+        id: 'tooltip.openGui',
         defaultMessage: "Ouvrir l'éditeur Catala",
       })}
       onClick={(event) => {
