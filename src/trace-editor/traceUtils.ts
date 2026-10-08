@@ -307,6 +307,15 @@ export function formatTraceValue(
   }
 }
 
+export function inlineTraceValue(
+  v: TraceValue,
+  intl: IntlShape,
+  lang = 'en'
+): string | undefined {
+  if (v.kind === 'array' && v.values.length === 0) return '[]';
+  return formatTraceValue(v, intl, lang);
+}
+
 export function traceValueEqual(a: TraceValue, b: TraceValue): boolean {
   if (a.kind !== b.kind) return false;
   switch (a.kind) {
@@ -498,6 +507,21 @@ function traceVariables(trace: TraceElement[]): TraceVariable[] {
   return indexDuplicateSteps(mergeSteps(traceVariablesAux(trace)));
 }
 
+export function flattenHiddenKinds(
+  trace: TraceElement[],
+  shows: (kind: string) => boolean
+): TraceElement[] {
+  return trace.flatMap((element) => {
+    const children =
+      element.trace === undefined
+        ? undefined
+        : flattenHiddenKinds(element.trace, shows);
+    return shows(element.element.kind)
+      ? [{ ...element, trace: children }]
+      : (children ?? []);
+  });
+}
+
 export function stepIndexMap(trace: TraceElement[]): Map<TraceElement, number> {
   const map = new Map<TraceElement, number>();
   const walk = (variables: TraceVariable[]): void => {
@@ -517,18 +541,11 @@ export function fieldValue(e: Event): string {
   return (e.target as { value?: string } | null)?.value ?? '';
 }
 
-/** A location as `file:line`, the way both the tree and a snippet name one. */
 export function posText(pos?: CodeLocation): string {
   if (!pos) return '';
   return `${pos.file}:${pos.start.line}`;
 }
 
-/**
- * Height left for the panels under the editor's header. The editor measures it
- * and sets it on their container; each panel caps itself with it. Declared
- * here rather than in any of them, since the editor, the data panel and the
- * tree view all need it.
- */
 export const PANEL_HEIGHT_VAR = '--trace-panel-height';
 
 export function variableSegment(v: TraceVariable): string {
@@ -657,7 +674,9 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
           ? t('trace.kind.scopeContextVariable')
           : kind.input === 'only_input'
             ? t('trace.kind.scopeInputVariable')
-            : t('trace.kind.scopeVariable');
+            : kind.output === true
+              ? t('trace.kind.scopeOutputVariable')
+              : t('trace.kind.scopeVariable');
       return {
         symbol: '≔',
         label,
