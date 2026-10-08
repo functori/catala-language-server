@@ -47,6 +47,7 @@ export type TraceElement = {
   pos?: CodeLocation;
   value?: TraceValue;
   trace?: TraceElement[];
+  codeSpan?: CodeLocation;
 };
 
 export type TraceVariable =
@@ -544,6 +545,101 @@ export function posText(pos?: CodeLocation): string {
   return `${pos.file}:${pos.start.line}`;
 }
 
+type Point = { line: number; character: number };
+
+function before(a: Point, b: Point): boolean {
+  return a.line !== b.line ? a.line < b.line : a.character < b.character;
+}
+
+function asLocation(v: JsonValue | undefined): CodeLocation | undefined {
+  return v !== null &&
+    typeof v === 'object' &&
+    !Array.isArray(v) &&
+    typeof (v as { file?: unknown }).file === 'string'
+    ? (v as unknown as CodeLocation)
+    : undefined;
+}
+
+export function definitionLocations(te: TraceElement): CodeLocation[] {
+  return (te.trace ?? [])
+    .filter((child) => child.element.kind === 'exception')
+    .flatMap((child) =>
+      [child.pos, asLocation(child.element.cons_pos)].filter(
+        (p): p is CodeLocation => p !== undefined
+      )
+    );
+}
+
+export function definitionSpan(te: TraceElement): CodeLocation | undefined {
+  const locations = definitionLocations(te);
+  const first = locations[0];
+  if (first === undefined) return undefined;
+  const sameFile = locations.filter((p) => p.file === first.file);
+  return sameFile.reduce(
+    (span, p) => ({
+      file: span.file,
+      start: before(p.start, span.start) ? p.start : span.start,
+      end: before(span.end, p.end) ? p.end : span.end,
+      law_headings: span.law_headings,
+    }),
+    first
+  );
+}
+
+function samePoint(a: Point, b: Point): boolean {
+  return a.line === b.line && a.character === b.character;
+}
+
+function bindingLocations(kind: TraceKind): CodeLocation[] {
+  if (kind.kind === 'local_var') {
+    const decl = asLocation(kind.decl_pos);
+    return decl === undefined ? [] : [decl];
+  }
+  if (kind.kind !== 'local_tup' || !Array.isArray(kind.names)) {
+    return [];
+  }
+  return (kind.names as { decl_pos?: JsonValue }[])
+    .map((n) => asLocation(n?.decl_pos))
+    .filter((p): p is CodeLocation => p !== undefined);
+}
+
+export function elementCodeSpan(te: TraceElement): CodeLocation | undefined {
+  const decl = te.element.decl_pos;
+  const ownIsDeclaration =
+    te.pos !== undefined &&
+    decl !== undefined &&
+    te.pos.file === decl.file &&
+    samePoint(te.pos.start, decl.start) &&
+    samePoint(te.pos.end, decl.end);
+  const locations = [
+    ...(te.pos !== undefined && !ownIsDeclaration ? [te.pos] : []),
+    ...bindingLocations(te.element),
+    ...definitionLocations(te),
+  ];
+  const first = locations[0];
+  if (first === undefined) return te.pos;
+  return locations
+    .filter((p) => p.file === first.file)
+    .reduce(
+      (span, p) => ({
+        file: span.file,
+        start: before(p.start, span.start) ? p.start : span.start,
+        end: before(span.end, p.end) ? p.end : span.end,
+        law_headings: span.law_headings,
+      }),
+      first
+    );
+}
+
+export function withCodeSpans(trace: TraceElement[]): TraceElement[] {
+  return trace.map((element) => ({
+    ...element,
+    codeSpan: elementCodeSpan(element),
+    trace:
+      element.trace === undefined ? undefined : withCodeSpans(element.trace),
+  }));
+}
+
 export const PANEL_HEIGHT_VAR = '--trace-panel-height';
 
 export function variableSegment(v: TraceVariable): string {
@@ -698,7 +794,9 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
         symbol: '≔',
         label: t('trace.kind.localVariables'),
         detail: Array.isArray(kind.names)
-          ? (kind.names as unknown[]).map(String).join(', ')
+          ? (kind.names as { name?: unknown }[])
+              .map((n) => String(n?.name ?? n))
+              .join(', ')
           : undefined,
         tone: 'plain',
         showsValue: true,
