@@ -13,6 +13,10 @@ export function focusTargetId(data: TraceData, testing_scope?: string): string {
   return `${prefix}focus-${data.kind.toLowerCase()}-${data.value}`;
 }
 
+export function focusExpectedVariables(testing_scope: string): string {
+  return `${testing_scope}-expected-variables`;
+}
+
 /**
  * Dotted rendering of a value path, in the spelling the rest of the editors
  * already use: struct fields and enum payloads are joined with `.`, as
