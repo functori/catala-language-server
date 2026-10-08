@@ -13,6 +13,7 @@ import type {
 } from '../trace-editor/messages';
 import { readTraceFile, runTrace } from '../trace-editor/traceRunner';
 import type { SettingsSource } from './settingsStore';
+import { resolveLanguage } from '../shared/settings';
 import type { TraceElement } from '../trace-editor/traceUtils';
 import type { Test } from '../generated/catala_types';
 import { writeTest } from '../generated/catala_types';
@@ -138,8 +139,7 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
 
     const language =
       inputs?.language ??
-      file.match(/\.catala_(\w+)/)?.[1] ??
-      vscode.env.language;
+      resolveLanguage(this.settings.get(), file, vscode.env.language);
     webview.html = this.getHtmlForWebview(webview, language);
 
     let following: vscode.Disposable = new vscode.Disposable(() => {});

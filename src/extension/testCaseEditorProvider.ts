@@ -26,6 +26,7 @@ import {
 import { renameIfNeeded } from '../test-case-editor/testCaseUtils';
 import { CatalaTestCaseDocument } from '../shared/CatalaTestCaseDocument';
 import type { SettingsSource } from './settingsStore';
+import { resolveLanguage } from '../shared/settings';
 import type { ResultController } from './testAndCoverage';
 import { TestId } from './testAndCoverage';
 import type { CheckTraceAssert } from './lspRequests';
@@ -292,7 +293,10 @@ export class TestCaseEditorProvider
       enableScripts: true,
     };
 
-    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
+    webviewPanel.webview.html = this.getHtmlForWebview(
+      webviewPanel.webview,
+      document.uri.fsPath
+    );
 
     // We want to restrict shell -> webview messages to instances
     // of DownMessage
@@ -862,7 +866,7 @@ export class TestCaseEditorProvider
     return true;
   }
 
-  private getHtmlForWebview(webview: vscode.Webview): string {
+  private getHtmlForWebview(webview: vscode.Webview, file: string): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'ui.js')
     );
@@ -876,7 +880,11 @@ export class TestCaseEditorProvider
       )
     );
 
-    const language = vscode.env.language;
+    const language = resolveLanguage(
+      this.settings.get(),
+      file,
+      vscode.env.language
+    );
 
     return `
           <!DOCTYPE html>
