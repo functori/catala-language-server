@@ -176,7 +176,7 @@
       "explorer/context": [
         {
           "command": "catala.openWithTestEditor",
-          "when": "config.catala.enableCustomTestCaseEditor && resourceFilename =~ /.*test.*\\.catala_(en|fr|pl)$/",
+          "when": "config.catala.enableCustomTestCaseEditor && resourceFilename =~ /.*[tT][eE][sS][tT].*\\.catala_(en|fr|pl)$/",
           "group": "navigation@2"
         },
         {
@@ -205,7 +205,7 @@
         },
         {
           "command": "catala.openWithTestEditor",
-          "when": "config.catala.enableCustomTestCaseEditor && (editorLangId == catala_en || editorLangId == catala_fr || editorLangId == catala_pl) && resourceFilename =~ /.*test.*\\.catala_(en|fr|pl)$/",
+          "when": "config.catala.enableCustomTestCaseEditor && (editorLangId == catala_en || editorLangId == catala_fr || editorLangId == catala_pl) && resourceFilename =~ /.*[tT][eE][sS][tT].*\\.catala_(en|fr|pl)$/",
           "group": "navigation@2"
         },
         {
