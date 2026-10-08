@@ -14,8 +14,10 @@ import { CompositeEditor, type EditorItem } from '../editors/CompositeEditor';
 import { countUnsetIn } from '../editors/unsetValidation';
 import { confirm } from '../messaging/confirm';
 import { Identifier } from '../editors/Identifier';
+import { focusTargetId } from '../shared/focusTarget';
 
 type InputFieldProps = {
+  testing_scope?: string;
   inputName: string;
   testIo: TestIo;
   isContext: boolean;
@@ -25,6 +27,7 @@ type InputFieldProps = {
 };
 
 function InputField({
+  testing_scope,
   inputName,
   testIo,
   isContext,
@@ -64,7 +67,10 @@ function InputField({
 
   if (!overriding) {
     return (
-      <div className="context-var-placeholder">
+      <div
+        id={focusTargetId({ kind: 'Input', value: inputName }, testing_scope)}
+        className="context-var-placeholder"
+      >
         <span className="context-var-default-text">
           {intl.formatMessage({ id: 'testEditor.usingComputedDefault' })}
         </span>
@@ -80,6 +86,7 @@ function InputField({
   return (
     <div className={isContext ? 'context-var-editor' : undefined}>
       <ValueEditor
+        id={focusTargetId({ kind: 'Input', value: inputName }, testing_scope)}
         testIO={testIo}
         onValueChange={onTestInputChange}
         editable={!readOnly}
@@ -101,6 +108,7 @@ function InputField({
 }
 
 type Props = {
+  testing_scope?: string;
   test_inputs: TestInputs;
   tested_scope: ScopeDef;
   onTestInputsChange(newValue: TestInputs): void;
@@ -161,6 +169,7 @@ export default function TestInputsEditor(props: Props): ReactElement {
           : countUnsetIn(testIo.value?.value, testIo.typ),
         editor: (
           <InputField
+            testing_scope={props.testing_scope}
             inputName={inputName}
             testIo={testIo}
             isContext={isContext}

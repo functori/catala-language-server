@@ -17,6 +17,7 @@ import { resolveLanguage } from '../shared/settings';
 import type { TraceElement } from '../trace-editor/traceUtils';
 import type { Test } from '../generated/catala_types';
 import { writeTest } from '../generated/catala_types';
+import { TestCaseEditorProvider } from './testCaseEditorProvider';
 
 const fileLineCache = new Map<string, string>();
 
@@ -265,6 +266,19 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
         case 'requestExtract': {
           const text = extractLine(message.file, message.line);
           postToWebView({ kind: 'extract', id: message.id, text });
+          break;
+        }
+        case 'updateData': {
+          logger.log(`Log data value: ${JSON.stringify(message.value)}`);
+          let result = await TestCaseEditorProvider.focusDataInput(
+            document.uri,
+            message.value
+          );
+          if (!result) {
+            vscode.window.showErrorMessage(
+              'Unexpected error when trying to focus'
+            );
+          }
           break;
         }
       }

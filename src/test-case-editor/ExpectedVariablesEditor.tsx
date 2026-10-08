@@ -36,8 +36,10 @@ import {
   MoneyEditor,
   RatEditor,
 } from '../editors/ValueEditors';
+import { focusExpectedVariables, focusTargetId } from '../shared/focusTarget';
 
 type Props = {
+  testing_scope: string;
   test: Test;
   trace?: TraceElement[];
   runTrace?: boolean;
@@ -83,54 +85,95 @@ function formatRuntimeValue(
 }
 
 function TraceValueEditor({
+  testing_scope,
+  path,
   input,
   setInput,
   kind,
   intl,
 }: {
+  testing_scope: string;
+  path: string;
   input: RuntimeValue | undefined;
   setInput: React.Dispatch<React.SetStateAction<RuntimeValue | undefined>>;
   kind: string;
   intl: IntlShape;
 }): ReactElement {
   let rv: ValueDef | undefined = input ? { value: input } : undefined;
+  // Carried by the editor's own root element rather than by a wrapper, so that
+  // a focus request from the trace editor lands on the field itself.
+  const id = focusTargetId({ kind: 'Internal', value: path }, testing_scope);
+  let editor: ReactElement;
   switch (kind) {
     case 'money': {
-      return (
-        <MoneyEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    }
-    case 'bool': {
-      return (
-        <BoolEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    }
-    case 'integer': {
-      return (
-        <IntEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    }
-    case 'decimal':
-      return (
-        <RatEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    case 'date':
-      return (
-        <DateEditor valueDef={rv} onValueChange={setInput} editable={true} />
-      );
-    case 'duration':
-      return (
-        <DurationEditor
+      editor = (
+        <MoneyEditor
+          id={id}
           valueDef={rv}
           onValueChange={setInput}
           editable={true}
         />
       );
+      break;
+    }
+    case 'bool': {
+      editor = (
+        <BoolEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
+    }
+    case 'integer': {
+      editor = (
+        <IntEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
+    }
+    case 'decimal':
+      editor = (
+        <RatEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
+    case 'date':
+      editor = (
+        <DateEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
+    case 'duration':
+      editor = (
+        <DurationEditor
+          id={id}
+          valueDef={rv}
+          onValueChange={setInput}
+          editable={true}
+        />
+      );
+      break;
     case 'absent':
     case 'enum': {
       const inputStr = formatRuntimeValue(input, intl);
-      return (
+      editor = (
         <VscodeTextfield
+          id={id}
           value={inputStr}
           onInput={(e) => {
             let valueField =
@@ -146,10 +189,15 @@ function TraceValueEditor({
           }}
         />
       );
+      break;
     }
     default:
-      return <span />;
+      // Nothing to edit, but the anchor is kept so a focus request on this
+      // path still finds its place in the document.
+      editor = <span id={id} />;
+      break;
   }
+  return editor;
 }
 
 function filterExpectedVariables(
@@ -175,6 +223,7 @@ function filterExpectedVariables(
 }
 
 export default function ExpectedVariablesEditor({
+  testing_scope,
   test,
   trace,
   runTrace,
@@ -243,7 +292,7 @@ export default function ExpectedVariablesEditor({
   }
 
   return (
-    <div className="test-section">
+    <div id={focusExpectedVariables(testing_scope)} className="test-section">
       <h2 className="test-section-title heading-h2">
         <FormattedMessage id="testEditor.variables" />
       </h2>
@@ -255,6 +304,7 @@ export default function ExpectedVariablesEditor({
                 const computed = computedOf(path);
                 return (
                   <VariableRow
+                    testing_scope={testing_scope}
                     key={path}
                     name={path}
                     expected={tv}
@@ -298,6 +348,7 @@ export default function ExpectedVariablesEditor({
                   </div>
                 ) : trVariables.length > 0 ? (
                   <VariableCatalog
+                    testing_scope={testing_scope}
                     trVariables={trVariables}
                     outputs={outputs}
                     onAdd={setVar}
@@ -312,6 +363,7 @@ export default function ExpectedVariablesEditor({
 }
 
 function VariableRow({
+  testing_scope,
   name,
   expected,
   computed,
@@ -321,6 +373,7 @@ function VariableRow({
   onSet,
   onRemove,
 }: {
+  testing_scope: string;
   name: string;
   expected: TraceValue | null;
   computed?: TraceValue;
@@ -403,6 +456,8 @@ function VariableRow({
         <div style={{ margin: 'auto', width: '20em' }}>
           {computed !== undefined ? (
             <TraceValueEditor
+              testing_scope={testing_scope}
+              path={name}
               input={input}
               setInput={setInput}
               kind={computed?.kind!}
@@ -470,10 +525,12 @@ function filterByName(vars: TraceVariable[], q: string): TraceVariable[] {
 }
 
 function VariableCatalog({
+  testing_scope,
   trVariables,
   outputs,
   onAdd,
 }: {
+  testing_scope: string;
   trVariables: TraceVariable[];
   outputs: Record<string, TraceValue>;
   onAdd(path: string, tv: TraceValue | null): void;
@@ -509,6 +566,7 @@ function VariableCatalog({
         <tbody>
           {[...stateVariables.entries()].map(([stateName, nodes]) => (
             <StateRow
+              testing_scope={testing_scope}
               key={`st-${stateName}`}
               varName={stateName}
               nodes={nodes}
@@ -523,6 +581,7 @@ function VariableCatalog({
             )
             .map((v) => (
               <ValueRow
+                testing_scope={testing_scope}
                 key={`v-${v.name}`}
                 node={v}
                 crumbs={[]}
@@ -536,6 +595,7 @@ function VariableCatalog({
             )
             .map((v) => (
               <StepRow
+                testing_scope={testing_scope}
                 key={`s-${variableSegment(v)}`}
                 node={v}
                 crumbs={[]}
@@ -597,11 +657,13 @@ function Breadcrumb({ crumbs }: { crumbs: string[] }): ReactElement {
 }
 
 function StepRow({
+  testing_scope,
   node,
   crumbs,
   onAdd,
   filtering,
 }: {
+  testing_scope: string;
   node: Extract<TraceVariable, { kind: 'step' }>;
   crumbs: string[];
   onAdd(path: string, tv: TraceValue | null): void;
@@ -640,6 +702,7 @@ function StepRow({
             )
             .map((v) => (
               <ValueRow
+                testing_scope={testing_scope}
                 key={`v-${v.name}`}
                 node={v}
                 crumbs={selfCrumbs}
@@ -648,6 +711,7 @@ function StepRow({
             ))}
           {[...stateVariables.entries()].map(([stateName, nodes]) => (
             <StateRow
+              testing_scope={testing_scope}
               key={`st-${stateName}`}
               varName={stateName}
               nodes={nodes}
@@ -663,6 +727,7 @@ function StepRow({
             )
             .map((v) => (
               <StepRow
+                testing_scope={testing_scope}
                 key={`s-${variableSegment(v)}`}
                 node={v}
                 crumbs={selfCrumbs}
@@ -677,12 +742,14 @@ function StepRow({
 }
 
 function StateRow({
+  testing_scope,
   varName,
   nodes,
   crumbs,
   onAdd,
   filtering,
 }: {
+  testing_scope: string;
   varName: string;
   nodes: TraceVariable[];
   crumbs: string[];
@@ -717,6 +784,7 @@ function StateRow({
             )
             .map((v) => (
               <ValueRow
+                testing_scope={testing_scope}
                 padding={true}
                 key={`v-${v.name}`}
                 node={v}
@@ -731,11 +799,13 @@ function StateRow({
 }
 
 function ValueRow({
+  testing_scope,
   node,
   crumbs,
   padding,
   onAdd,
 }: {
+  testing_scope: string;
   node: Extract<TraceVariable, { kind: 'value' }>;
   crumbs: string[];
   padding?: boolean | undefined;
@@ -784,6 +854,8 @@ function ValueRow({
       </td>
       <td>
         <TraceValueEditor
+          testing_scope={testing_scope}
+          path={path}
           kind={computed.kind}
           input={input}
           setInput={setInput}
