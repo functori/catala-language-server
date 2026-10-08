@@ -25,6 +25,7 @@ import {
 } from './traceUtils';
 import type { AddFilter } from './traceMenu';
 import type { WebviewApi } from 'vscode-webview';
+import type { TraceUpMessage } from './messages';
 
 const ExpandContext = createContext<ExpandCommand | null>(null);
 
@@ -285,6 +286,7 @@ function typeIcon(kind?: string): string {
 // -- Components ----------------------------------------------------------------
 
 export function DataPanel({
+  testing_scope,
   vscode,
   test,
   trace,
@@ -292,6 +294,7 @@ export function DataPanel({
   addFilter,
   showContainers = false,
 }: {
+  testing_scope: string;
   vscode: WebviewApi<unknown>;
   test: TraceTest;
   addFilter: AddFilter;
@@ -371,6 +374,7 @@ export function DataPanel({
           <Section id="trace.section.inputs" intl={intl} first>
             {inputNodes.map((node, i) => (
               <NodeRow
+                testing_scope={testing_scope}
                 vscode={vscode}
                 kind="Input"
                 key={`in-${node.path}-${i}`}
@@ -384,6 +388,7 @@ export function DataPanel({
           <Section id="trace.section.internal" intl={intl}>
             {internalNodes.map((node, i) => (
               <NodeRow
+                testing_scope={testing_scope}
                 vscode={vscode}
                 key={`int-${node.path}-${i}`}
                 kind="Internal"
@@ -396,6 +401,7 @@ export function DataPanel({
           <Section id="trace.section.outputs" intl={intl}>
             {outputNodes.map((node, i) => (
               <NodeRow
+                testing_scope={testing_scope}
                 vscode={vscode}
                 kind="Result"
                 key={`out-${node.path}-${i}`}
@@ -494,6 +500,7 @@ function Breadcrumb({ crumbs }: { crumbs: string[] }): ReactElement {
 }
 
 function NodeRow({
+  testing_scope,
   vscode,
   node,
   kind,
@@ -501,6 +508,7 @@ function NodeRow({
   noExpected,
   addFilter,
 }: {
+  testing_scope: string;
   vscode: WebviewApi<unknown>;
   node: DataNode;
   kind: 'Internal' | 'Input' | 'Result';
@@ -544,6 +552,7 @@ function NodeRow({
         {open &&
           children.map((child, i) => (
             <NodeRow
+              testing_scope={testing_scope}
               vscode={vscode}
               key={`${child.path}-${i}`}
               kind={kind}
@@ -614,10 +623,11 @@ function NodeRow({
           style={{ cursor: 'pointer' }}
           onClick={(e) => {
             e.stopPropagation();
-            vscode.postMessage({
+            let message: TraceUpMessage = {
               kind: 'updateData',
-              value: { kind: kind, value: node.path },
-            });
+              value: [testing_scope, { kind: kind, value: node.path }],
+            };
+            vscode.postMessage(message);
           }}
         />
       </td>
