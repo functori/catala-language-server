@@ -271,12 +271,10 @@ export function formatTraceValue(
     }
     case 'duration': {
       switch (lang) {
-        case 'en':
-          return `${v.value.years}y ${v.value.months}m ${v.value.days}d`;
         case 'fr':
           return `${v.value.days}j ${v.value.months}m ${v.value.years}a`;
         default:
-          return 'Unexpected language for duration';
+          return `${v.value.years}y ${v.value.months}m ${v.value.days}d`;
       }
     }
     case 'absent':

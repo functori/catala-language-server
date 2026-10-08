@@ -12,6 +12,8 @@ import type {
   TraceUpMessage,
 } from '../trace-editor/messages';
 import { readTraceFile, runTrace } from '../trace-editor/traceRunner';
+import type { SettingsSource } from './settingsStore';
+import { resolveLanguage } from '../shared/settings';
 import type { TraceElement } from '../trace-editor/traceUtils';
 import type { Test } from '../generated/catala_types';
 import { writeTest } from '../generated/catala_types';
@@ -96,12 +98,14 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
   public static register(
     context: vscode.ExtensionContext,
     getClient: () => LanguageClient | undefined,
-    codiconsCssPath: string
+    codiconsCssPath: string,
+    settings: SettingsSource
   ): vscode.Disposable {
     const provider = new TraceEditorProvider(
       context,
       getClient,
-      codiconsCssPath
+      codiconsCssPath,
+      settings
     );
     logger.log(`Registering ${TraceEditorProvider.viewType}`);
     return vscode.window.registerCustomEditorProvider(
@@ -117,7 +121,8 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
   constructor(
     private readonly context: vscode.ExtensionContext,
     private readonly getClient: () => LanguageClient | undefined,
-    private readonly codiconsCssPath: string
+    private readonly codiconsCssPath: string,
+    private readonly settings: SettingsSource
   ) {}
 
   public async resolveCustomTextEditor(
@@ -134,9 +139,10 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
 
     const language =
       inputs?.language ??
-      file.match(/\.catala_(\w+)/)?.[1] ??
-      vscode.env.language;
+      resolveLanguage(this.settings.get(), file, vscode.env.language);
     webview.html = this.getHtmlForWebview(webview, language);
+
+    let following: vscode.Disposable = new vscode.Disposable(() => {});
 
     function postToWebView(message: TraceDownMessage): void {
       webview.postMessage(message);
@@ -199,6 +205,8 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
       const message = raw as TraceUpMessage;
       switch (message.kind) {
         case 'ready':
+          following.dispose();
+          following = this.settings.follow(webview, file);
           await sendInit(inputs);
           break;
         case 'run': {
@@ -275,6 +283,7 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
       }
     });
     webviewPanel.onDidDispose(() => {
+      following.dispose();
       if (TraceEditorProvider.openEditors.get(file)?.panel === webviewPanel) {
         TraceEditorProvider.openEditors.delete(file);
       }
