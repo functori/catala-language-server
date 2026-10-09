@@ -184,6 +184,15 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         <VscodeButton icon="play" disabled={running} onClick={onRunScope}>
           <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
         </VscodeButton>
+        <VscodeButton
+          icon="tools"
+          onClick={(event) => {
+            event.preventDefault();
+            post(vscode, { kind: 'openInTestEditor' });
+          }}
+        >
+          <FormattedMessage id={'tooltip.openGui'} />
+        </VscodeButton>
         {scope.test !== undefined && (
           <LayoutSlider layout={layout} onLayout={setLayout} />
         )}

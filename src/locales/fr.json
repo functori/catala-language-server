@@ -147,7 +147,7 @@
   "generalTests.tooltip.reload": "Recharger la liste des tests",
   "generalTests.tooltip.reloading": "Rechargement en cours…",
   "generalTests.tooltip.filterScope": "Filtrer les tests selon le champ d'application \"{scope}\"",
-  "generalTests.tooltip.openGui": "Ouvrir l'éditeur Catala",
+  "tooltip.openGui": "Ouvrir l'éditeur Catala",
   "generalTests.tooltip.openTextEditor": "Ouvrir l'éditeur de texte",
   "generalTests.tooltip.stateSuccess": "Test réussi",
   "generalTests.tooltip.stateFailed": "Test échoué",
