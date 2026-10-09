@@ -292,6 +292,9 @@ export function DataPanel({
     )
   );
 
+  const variables = [...test.variables.keys()].map((value) =>
+    pathSegments(value)
+  );
   return (
     <div style={ioPanelStyle}>
       <table style={tableStyle}>
@@ -339,6 +342,7 @@ export function DataPanel({
                 node={node}
                 crumbs={[]}
                 addFilter={addFilter}
+                variablesCrumbs={variables}
               />
             ))}
           </Section>
@@ -469,6 +473,7 @@ function NodeRow({
   crumbs,
   noExpected,
   addFilter,
+  variablesCrumbs,
 }: {
   testing_scope: string;
   vscode: WebviewApi<unknown>;
@@ -477,12 +482,19 @@ function NodeRow({
   crumbs: string[];
   noExpected?: boolean;
   addFilter: AddFilter;
+  variablesCrumbs?: string[][];
 }): ReactElement {
-  const [open, setOpen] = useState(false);
+  const selfCrumbs = [...crumbs, ...pathSegments(node.label)];
+  const remainingCrumbs = variablesCrumbs?.filter(
+    (value) =>
+      value.length >= selfCrumbs.length &&
+      selfCrumbs.every((crumb, index) => crumb === value[index])
+  );
+  let openByDefault = remainingCrumbs ? remainingCrumbs.length > 0 : false;
+  const [open, setOpen] = useState(openByDefault);
   useExpandAll(setOpen);
   const children = node.children;
   const missing = node.missing;
-  const selfCrumbs = [...crumbs, node.label];
   const warning =
     'var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.2))';
 
@@ -522,6 +534,7 @@ function NodeRow({
               crumbs={selfCrumbs}
               noExpected={noExpected}
               addFilter={addFilter}
+              variablesCrumbs={remainingCrumbs}
             />
           ))}
       </>
