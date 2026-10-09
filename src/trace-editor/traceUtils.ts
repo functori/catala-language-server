@@ -735,7 +735,15 @@ export function readTraceTest(x: JsonValue): TraceTest {
 
 // -- Trace kind description ---------------------------------------------------
 
-export type Tone = 'scope' | 'branch' | 'error' | 'plain';
+export type Tone =
+  | 'scope'
+  | 'input'
+  | 'context'
+  | 'output'
+  | 'local'
+  | 'branch'
+  | 'error'
+  | 'plain';
 
 export type Described = {
   symbol: string;
@@ -763,19 +771,19 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
         showsCode: true,
       };
     case 'scope_var': {
-      const label =
+      const [label, tone]: [string, Tone] =
         kind.input === 'reentrant'
-          ? t('trace.kind.scopeContextVariable')
+          ? [t('trace.kind.scopeContextVariable'), 'context']
           : kind.input === 'only_input'
-            ? t('trace.kind.scopeInputVariable')
+            ? [t('trace.kind.scopeInputVariable'), 'input']
             : kind.output === true
-              ? t('trace.kind.scopeOutputVariable')
-              : t('trace.kind.scopeVariable');
+              ? [t('trace.kind.scopeOutputVariable'), 'output']
+              : [t('trace.kind.scopeVariable'), 'plain'];
       return {
         symbol: '≔',
         label,
         detail: detail(kind.name),
-        tone: 'plain',
+        tone,
         showsValue: true,
         showsCode: kind.input !== 'only_input',
       };
@@ -785,7 +793,7 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
         symbol: '≔',
         label: t('trace.kind.localVariable'),
         detail: detail(kind.name),
-        tone: 'plain',
+        tone: 'local',
         showsValue: true,
         showsCode: true,
       };
@@ -798,7 +806,7 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
               .map((n) => String(n?.name ?? n))
               .join(', ')
           : undefined,
-        tone: 'plain',
+        tone: 'local',
         showsValue: true,
         showsCode: true,
       };
@@ -986,8 +994,6 @@ export function subtreeMatches(
   if (forbidden) {
     return false;
   }
-  // If the only remaining filters are exclude type and that there are no more
-  // children, filter matches
   let without_exclude = remaining_filters.filter((f) => f.option != 'exclude');
   const children = Array.isArray(el.trace) ? el.trace : [];
   if (without_exclude.length == 0 && children.length == 0) {
