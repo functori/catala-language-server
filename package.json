@@ -393,7 +393,7 @@
         },
         "catala.traceView.exception": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "markdownDescription": "Show exception steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
         },
         "catala.traceView.error": {
