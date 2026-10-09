@@ -81,10 +81,14 @@ describe('flattenHiddenKinds', () => {
 });
 
 describe('showsTraceKind', () => {
-  it('is true by default for every optional kind', () => {
+  it('shows every optional kind by default, except exceptions', () => {
     for (const kind of TRACE_VIEW_KINDS) {
-      expect(showsTraceKind(defaultSettings, kind)).toBe(true);
+      expect(showsTraceKind(defaultSettings, kind)).toBe(kind !== 'exception');
     }
+  });
+
+  it('hides exceptions by default', () => {
+    expect(showsTraceKind(defaultSettings, 'exception')).toBe(false);
   });
 
   it('is always true for scopes and variables, which have no setting', () => {
