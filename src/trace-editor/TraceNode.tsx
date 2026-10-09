@@ -22,6 +22,7 @@ import {
   describeKind,
   detail,
   filterMatches,
+  elementCodeSpan,
   formatTraceValue,
   inlineTraceValue,
   indexedSegment,
@@ -46,6 +47,14 @@ function toneColor(tone: Tone): string | undefined {
       return 'var(--vscode-symbolIcon-functionForeground, var(--vscode-terminal-ansiCyan))';
     case 'branch':
       return 'var(--vscode-symbolIcon-keywordForeground, var(--vscode-terminal-ansiBlue))';
+    case 'input':
+      return 'var(--vscode-charts-yellow)';
+    case 'context':
+      return 'var(--vscode-terminal-ansiCyan)';
+    case 'output':
+      return 'var(--vscode-charts-orange)';
+    case 'local':
+      return 'var(--vscode-descriptionForeground)';
     case 'error':
       return 'var(--vscode-errorForeground)';
     default:
@@ -285,7 +294,9 @@ export default function TraceNode({
         showsCode: true,
       }
     : describeKind(node.element, intl);
-  const snippetPos = described.showsCode ? te.pos : undefined;
+  const snippetPos = described.showsCode
+    ? (te.codeSpan ?? elementCodeSpan(te))
+    : undefined;
   const accentColor =
     node.element.kind === 'assertion'
       ? !node.trace
