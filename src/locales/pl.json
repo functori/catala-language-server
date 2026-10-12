@@ -145,6 +145,8 @@
   "generalTests.tooltip.displayCard": "Wyświetl testy jako karty",
   "generalTests.tooltip.displayList": "Wyświetl testy jako listę",
   "generalTests.tooltip.reload": "Odśwież listę testów",
+  "generalTests.tooltip.help": "Pokaż pomoc",
+  "generalTests.help": "Pomoc",
   "generalTests.tooltip.reloading": "Odświeżanie…",
   "generalTests.tooltip.filterScope": "Filtruj testy według zakresu „{scope}”",
   "tooltip.openGui": "Otwórz edytor Catala",

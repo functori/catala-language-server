@@ -1333,6 +1333,22 @@ export default function GeneralTests({
           filters={filters}
         />
       )}
+      <button
+        className="help-button"
+        title={intl.formatMessage({
+          id: 'generalTests.tooltip.help',
+          defaultMessage: "Afficher l'aide",
+        })}
+        onClick={(e) => {
+          e.preventDefault();
+          // TODO
+        }}
+      >
+        <span className="codicon codicon-question" />
+        <span>
+          <FormattedMessage id="generalTests.help" defaultMessage="Aide" />
+        </span>
+      </button>
     </div>
   );
 }
