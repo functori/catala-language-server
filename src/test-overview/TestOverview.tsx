@@ -3,7 +3,7 @@ import { FormattedMessage, useIntl } from 'react-intl';
 
 import { type WebviewApi } from 'vscode-webview';
 
-import { AddNewTest, RunAllTests } from './buttons';
+import { AddNewTest, HelpMenu, RunAllTests } from './buttons';
 import type { Filter } from '../FilterPin';
 import { matchFilter, noFilter } from './testUtils';
 import { TestsGrid } from './TestsView';
@@ -138,6 +138,7 @@ export default function TestOverview({
           filters={filters}
         />
       )}
+      <HelpMenu />
     </div>
   );
 }
