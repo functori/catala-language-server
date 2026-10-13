@@ -1167,6 +1167,15 @@ function stepsFilter(intl: IntlShape): Step[] {
   ];
 }
 
+const stepsTests: Step[] = [
+  {
+    id: 'tests_display',
+    content: <FormattedMessage id="generalTests.tuto.displayMode" />,
+    target: '#displayMode',
+    placement: 'top',
+  },
+];
+
 function samplePins(intl: IntlShape): Filter[] {
   const includeExemple: Filter = {
     filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
@@ -1212,6 +1221,7 @@ function chapters(
   return [
     { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
     { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter(intl) },
+    { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
   ].map((chapter, index, all) => ({
     ...chapter,
     start: all
@@ -1526,36 +1536,43 @@ export default function GeneralTests({
           children={(msg) => <h3>{msg}</h3>}
         />
         <div
-          className={`pp-button ${grid ? 'selected' : ''}`}
-          title={intl.formatMessage({
-            id: 'generalTests.tooltip.displayCard',
-            defaultMessage: 'Afficher les tests sous forme de cartes',
-          })}
-          onClick={(event) => {
-            event.preventDefault();
-            setGrid((_) => true);
-          }}
+          id="displayMode"
+          style={{ display: 'flex', alignItems: 'center', gap: '2em' }}
         >
-          <span className="codicon codicon-layout" />
-          <span>
-            <FormattedMessage id="generalTests.card" defaultMessage="Carte" />
-          </span>
-        </div>
-        <div
-          className={`pp-button ${grid ? '' : 'selected'}`}
-          title={intl.formatMessage({
-            id: 'generalTests.tooltip.displayList',
-            defaultMessage: 'Afficher les tests sous forme de liste',
-          })}
-          onClick={(event) => {
-            event.preventDefault();
-            setGrid((_) => false);
-          }}
-        >
-          <span className="codicon codicon-list-unordered" />
-          <span>
-            <FormattedMessage id="generalTests.list" defaultMessage="Liste" />
-          </span>
+          <div
+            id="displayCard"
+            className={`pp-button ${grid ? 'selected' : ''}`}
+            title={intl.formatMessage({
+              id: 'generalTests.tooltip.displayCard',
+              defaultMessage: 'Afficher les tests sous forme de cartes',
+            })}
+            onClick={(event) => {
+              event.preventDefault();
+              setGrid((_) => true);
+            }}
+          >
+            <span className="codicon codicon-layout" />
+            <span>
+              <FormattedMessage id="generalTests.card" defaultMessage="Carte" />
+            </span>
+          </div>
+          <div
+            id="displayList"
+            className={`pp-button ${grid ? '' : 'selected'}`}
+            title={intl.formatMessage({
+              id: 'generalTests.tooltip.displayList',
+              defaultMessage: 'Afficher les tests sous forme de liste',
+            })}
+            onClick={(event) => {
+              event.preventDefault();
+              setGrid((_) => false);
+            }}
+          >
+            <span className="codicon codicon-list-unordered" />
+            <span>
+              <FormattedMessage id="generalTests.list" defaultMessage="Liste" />
+            </span>
+          </div>
         </div>
         <div
           className="refresh-box"
