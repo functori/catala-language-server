@@ -327,9 +327,9 @@ export default function ExpectedVariablesEditor({
                   onClick={() => setShowCatalog((s) => !s)}
                 >
                   <span
-                    className={`codicon codicon-${showCatalog ? 'chevron-down' : 'add'}`}
+                    className={`codicon codicon-${showCatalog ? 'chevron-down' : 'chevron-right'}`}
                   />{' '}
-                  <FormattedMessage id="testEditor.addNewVariable" />
+                  <FormattedMessage id="testEditor.consultVariable" />
                 </button>
               </div>
               {showCatalog &&
