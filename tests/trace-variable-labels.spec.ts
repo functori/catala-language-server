@@ -92,3 +92,37 @@ describe('empty list values', () => {
     expect(formatTraceValue(empty, intl, 'en', true)).toBe('[]');
   });
 });
+
+describe('variable tones', () => {
+  const tone = (kind: TraceKind): string => describeKind(kind, intl).tone;
+
+  it('gives each scope variable flavour its own tone', () => {
+    expect(tone(scopeVar('only_input', false))).toBe('input');
+    expect(tone(scopeVar('reentrant', false))).toBe('context');
+    expect(tone(scopeVar('no_input', true))).toBe('output');
+  });
+
+  it('leaves internal variables plain, so the others stand out', () => {
+    expect(tone(scopeVar('no_input', false))).toBe('plain');
+  });
+
+  it('dims locals', () => {
+    expect(tone({ kind: 'local_var', name: 'v' } as TraceKind)).toBe('local');
+    expect(
+      tone({
+        kind: 'local_tup',
+        names: [{ name: 'a' }],
+      } as unknown as TraceKind)
+    ).toBe('local');
+  });
+
+  it('does not disturb the tones that already carry meaning', () => {
+    expect(tone({ kind: 'scope_call', name: 'S' } as TraceKind)).toBe('scope');
+    expect(tone({ kind: 'function_call', name: 'f' } as TraceKind)).toBe(
+      'scope'
+    );
+    expect(tone({ kind: 'if_branching' } as TraceKind)).toBe('branch');
+    expect(tone({ kind: 'branch_condition' } as TraceKind)).toBe('branch');
+    expect(tone({ kind: 'match_branching' } as TraceKind)).toBe('branch');
+  });
+});
