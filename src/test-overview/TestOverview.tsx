@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 
 import { type WebviewApi } from 'vscode-webview';
@@ -12,7 +12,7 @@ import { Loading } from './widgets';
 import { FilterPanel } from './Filter';
 import { TutoMenu, tutoOptions } from '../shared/Tutorial';
 import { useJoyride } from 'react-joyride';
-import { tutoChapters, tutoSteps } from './tutorial';
+import { samplePins, tutoChapters, tutoSteps } from './tutorial';
 
 type TestOverviewArg = {
   vscode: WebviewApi<unknown>;
@@ -21,6 +21,7 @@ type TestOverviewArg = {
 export default function TestOverview({
   vscode,
 }: TestOverviewArg): ReactElement {
+  const [tuto, setTuto] = useState<boolean>(false);
   const intl = useIntl();
   const [filters, setFilters] = useState<Filter[]>([]);
   const [filterScope, setFilterScope] = useState<string[]>([]);
@@ -32,17 +33,33 @@ export default function TestOverview({
     matchFilter(test, filters, filterScope, filterGui)
   );
 
-  const { controls, state, Tour } = useJoyride({
+  const { controls, on, state, Tour } = useJoyride({
     continuous: true,
-    steps: tutoSteps,
+    steps: tutoSteps(intl),
     options: tutoOptions,
   });
+
+  useEffect(() => {
+    on('tour:end', () => {
+      setTuto(false);
+    });
+    on('error', () => {
+      setTuto(false);
+    });
+    on('tour:start', () => {
+      setTuto(true);
+    });
+  }, [on]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {Tour}
       {state.status === 'running' && (
-        <TutoMenu state={state} controls={controls} chapters={tutoChapters} />
+        <TutoMenu
+          state={state}
+          controls={controls}
+          chapters={tutoChapters(intl)}
+        />
       )}
       <div
         style={{
@@ -76,7 +93,7 @@ export default function TestOverview({
         filterScope={filterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
-        filters={filters}
+        filters={tuto ? samplePins(intl) : filters}
         setFilters={setFilters}
       />
       <div className="select-test-print">

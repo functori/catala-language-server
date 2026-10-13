@@ -35,7 +35,7 @@ function ScopeFilter({
   const intl = useIntl();
   let filteredScope = scopesFromTests(tests ?? []);
   return (
-    <div className="pins">
+    <div id="scopePins" className="pins">
       <div
         style={{
           display: 'flex',
@@ -151,7 +151,7 @@ export function FilterPanel({
       ) : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <div>
+            <div id="filter-gui">
               <input
                 type="checkbox"
                 checked={filterGui}
@@ -168,39 +168,47 @@ export function FilterPanel({
             filterScope={filterScope}
             setFilterScope={setFilterScope}
           />
-          <div style={{ marginLeft: 'auto' }}>
+          <div id="filterPins" style={{ marginLeft: 'auto' }}>
             <FilterPins filters={filters} setFilters={setFilters} />
-            <VscodeTextfield
-              className="search-bar"
-              value={filter}
-              placeholder={intl.formatMessage({
-                id: 'generalTests.searchPlaceholder',
-                defaultMessage: 'Rechercher un test…',
-              })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addFilter(filter);
-                  setFilter('');
-                }
-              }}
-              onInput={(e) => {
-                const value = (e.target as HTMLInputElement).value;
-                setFilter(value);
-              }}
-            >
-              <span
-                style={{ cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  addFilter(filter);
-                  setFilter('');
+            {/* The tutorial targets this wrapper rather than the field: the
+                field is zoomed, which throws off the measures the spotlight
+                is drawn from. */}
+            <div style={{ display: 'inline-flex' }}>
+              <VscodeTextfield
+                className="search-bar"
+                value={filter}
+                placeholder={intl.formatMessage({
+                  id: 'generalTests.searchPlaceholder',
+                  defaultMessage: 'Rechercher un test…',
+                })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addFilter(filter);
+                    setFilter('');
+                  }
                 }}
-                className="codicon codicon-save"
-                slot="content-after"
-              />
-              <span className="codicon codicon-search" slot="content-before" />
-            </VscodeTextfield>
+                onInput={(e) => {
+                  const value = (e.target as HTMLInputElement).value;
+                  setFilter(value);
+                }}
+              >
+                <span
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    addFilter(filter);
+                    setFilter('');
+                  }}
+                  className="codicon codicon-save"
+                  slot="content-after"
+                />
+                <span
+                  className="codicon codicon-search"
+                  slot="content-before"
+                />
+              </VscodeTextfield>
+            </div>
           </div>
         </>
       )}
