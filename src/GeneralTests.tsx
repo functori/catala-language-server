@@ -1254,9 +1254,9 @@ function SampleList(): ReactElement {
   );
 }
 
-// Tutorial step whose text shows a sample pin in place of its colour, drawn by
-// the real `FilterPins` so that it looks exactly like the ones of the search
-// bar. The setter is a no-op: the sample pin is only there to be seen.
+// Tutorial step showing a sample pin, drawn by the real `FilterPins` so that
+// it looks exactly like the ones of the search bar. The setter is a no-op:
+// the sample pin is only there to be seen.
 function PinStep({ option }: { option: Filter['option'] }): ReactElement {
   const intl = useIntl();
   const sample: Filter = {
@@ -1268,14 +1268,14 @@ function PinStep({ option }: { option: Filter['option'] }): ReactElement {
     exclude: 'generalTests.tuto.filterPinExclude',
     ignore: 'generalTests.tuto.filterPinIgnore',
   }[option];
-  const pin = (
-    <FilterPins
-      filters={[sample]}
-      setFilters={() => {}}
-      style={{ display: 'inline-flex', margin: 0, verticalAlign: 'middle' }}
-    />
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'center' }}>
+        <FilterPins filters={[sample]} setFilters={() => {}} />
+      </div>
+      <FormattedMessage id={messageId} />
+    </div>
   );
-  return <FormattedMessage id={messageId} values={{ pin }} />;
 }
 
 // The tour, cut into chapters: the menu shown during the tour jumps to the
