@@ -94,15 +94,50 @@ describe('definitionSpan', () => {
     ).toBeUndefined();
   });
 
-  it('ignores children that are not rules', () => {
-    const withNoise = {
+  it('covers a call site, since calling is part of the expression', () => {
+    const calls = {
       element: { kind: 'scope_var', name: 'v' },
       trace: [
-        { element: { kind: 'scope_call', name: 'S' }, pos: at(1, 1, 1, 2) },
         rule(at(99, 14, 99, 19), at(99, 27, 99, 40)),
+        { element: { kind: 'scope_call', name: 'S' }, pos: at(99, 27, 99, 40) },
       ],
     } as unknown as TraceElement;
-    expect(span(withNoise)).toBe('99:14-99:40');
+    expect(span(calls)).toBe('99:14-99:40');
+  });
+
+  it('does not follow a call into the body of the scope it calls', () => {
+    const calls = {
+      element: { kind: 'scope_var', name: 'v' },
+      trace: [
+        rule(at(99, 14, 99, 19), at(99, 27, 99, 40)),
+        {
+          element: { kind: 'scope_call', name: 'S' },
+          pos: at(99, 27, 99, 40),
+          trace: [
+            {
+              element: { kind: 'scope_var', name: 'inner' },
+              pos: at(5, 3, 5, 9),
+            },
+          ],
+        },
+      ],
+    } as unknown as TraceElement;
+    expect(span(calls)).toBe('99:14-99:40');
+  });
+
+  it('reaches a branch nested inside the rule it belongs to', () => {
+    const branching = {
+      element: { kind: 'scope_var', name: 'v' },
+      trace: [
+        {
+          ...rule(at(30, 3, 30, 9), at(31, 5, 31, 20)),
+          trace: [
+            { element: { kind: 'if_branching' }, pos: at(32, 5, 34, 18) },
+          ],
+        },
+      ],
+    } as unknown as TraceElement;
+    expect(span(branching)).toBe('30:3-34:18');
   });
 
   it('never straddles two files', () => {
