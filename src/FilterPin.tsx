@@ -10,11 +10,9 @@ export type Filter = {
 export function FilterPins({
   filters,
   setFilters,
-  style,
 }: {
   filters: Filter[];
   setFilters: React.Dispatch<React.SetStateAction<Filter[]>>;
-  style?: CSSProperties;
 }): ReactElement | null {
   const intl = useIntl();
   if (filters.length === 0) {
@@ -37,7 +35,7 @@ export function FilterPins({
     setFilters((old) => old.filter((current) => current.filter !== toRemove));
   };
   return (
-    <div style={{ ...pinsStyle, ...style }}>
+    <div style={pinsStyle}>
       {filters.map((filter) => (
         <span
           key={filter.filter}
