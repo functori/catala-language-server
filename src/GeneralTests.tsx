@@ -1160,6 +1160,101 @@ const stepsFilter = [
   },
 ];
 
+const stepsTests = [
+  {
+    id: 'tests_display',
+    content: <FormattedMessage id="generalTests.tuto.displayMode" />,
+    target: '#displayMode',
+  },
+  {
+    id: 'tests_display_card',
+    content: <SampleCard />,
+    target: '#displayCard',
+  },
+  {
+    id: 'tests_display_list',
+    content: <SampleList />,
+    target: '#displayList',
+    width: 'min(900px, 90vw)',
+  },
+];
+
+// The samples below are drawn by the real components, so that they look exactly
+// like the tests of the page, but they must stay inert: their buttons talk to
+// a VS Code API that drops every message, and running them does nothing.
+const inertVsCode: WebviewApi<unknown> = {
+  postMessage: () => {},
+  getState: () => undefined,
+  setState: <T,>(state: T) => state,
+};
+
+function useSampleTests(): TestMacro[] {
+  const intl = useIntl();
+  const sample = (index: number, success: boolean): TestMacro =>
+    testMacro({
+      index,
+      filename: `tests/test_${index + 1}.catala_en`,
+      relative_filename: `tests/test_${index + 1}.catala_en`,
+      test: {
+        kind: 'GUI',
+        value: {
+          scope: `Test${index + 1}`,
+          scope_tested: intl.formatMessage({
+            id: 'generalTests.tuto.sampleScope',
+          }),
+          title: intl.formatMessage(
+            { id: 'generalTests.tuto.sampleTitle' },
+            { num: index + 1 }
+          ),
+          description: intl.formatMessage({
+            id: 'generalTests.tuto.sampleDescription',
+          }),
+        },
+      },
+      success,
+      date: '13/10/2026',
+    });
+  return [sample(0, true)];
+}
+
+function SampleCard(): ReactElement {
+  const [test] = useSampleTests();
+  return (
+    <div>
+      <p>
+        <FormattedMessage id="generalTests.tuto.displayCard" />
+      </p>
+      <div style={{ fontSize: '8px', textAlign: 'left' }}>
+        <TestItem
+          vscode={inertVsCode}
+          test={test}
+          filters={[]}
+          onRun={() => {}}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SampleList(): ReactElement {
+  return (
+    <div>
+      <p>
+        <FormattedMessage id="generalTests.tuto.displayList" />
+      </p>
+      <div style={{ textAlign: 'left' }}>
+        <TestList
+          vscode={inertVsCode}
+          tests={useSampleTests()}
+          filteredScope={[]}
+          filters={[]}
+          onRun={() => {}}
+        />
+      </div>
+    </div>
+  );
+}
+
 // Tutorial step whose text shows a sample pin in place of its colour, drawn by
 // the real `FilterPins` so that it looks exactly like the ones of the search
 // bar. The setter is a no-op: the sample pin is only there to be seen.
@@ -1189,6 +1284,7 @@ function PinStep({ option }: { option: Filter['option'] }): ReactElement {
 const chapters = [
   { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
   { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter },
+  { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
 ].map((chapter, index, all) => ({
   ...chapter,
   start: all.slice(0, index).reduce((n, { steps }) => n + steps.length, 0),
@@ -1488,36 +1584,43 @@ export default function GeneralTests({
           children={(msg) => <h3>{msg}</h3>}
         />
         <div
-          className={`pp-button ${grid ? 'selected' : ''}`}
-          title={intl.formatMessage({
-            id: 'generalTests.tooltip.displayCard',
-            defaultMessage: 'Afficher les tests sous forme de cartes',
-          })}
-          onClick={(event) => {
-            event.preventDefault();
-            setGrid((_) => true);
-          }}
+          id="displayMode"
+          style={{ display: 'flex', alignItems: 'center', gap: '2em' }}
         >
-          <span className="codicon codicon-layout" />
-          <span>
-            <FormattedMessage id="generalTests.card" defaultMessage="Carte" />
-          </span>
-        </div>
-        <div
-          className={`pp-button ${grid ? '' : 'selected'}`}
-          title={intl.formatMessage({
-            id: 'generalTests.tooltip.displayList',
-            defaultMessage: 'Afficher les tests sous forme de liste',
-          })}
-          onClick={(event) => {
-            event.preventDefault();
-            setGrid((_) => false);
-          }}
-        >
-          <span className="codicon codicon-list-unordered" />
-          <span>
-            <FormattedMessage id="generalTests.list" defaultMessage="Liste" />
-          </span>
+          <div
+            id="displayCard"
+            className={`pp-button ${grid ? 'selected' : ''}`}
+            title={intl.formatMessage({
+              id: 'generalTests.tooltip.displayCard',
+              defaultMessage: 'Afficher les tests sous forme de cartes',
+            })}
+            onClick={(event) => {
+              event.preventDefault();
+              setGrid((_) => true);
+            }}
+          >
+            <span className="codicon codicon-layout" />
+            <span>
+              <FormattedMessage id="generalTests.card" defaultMessage="Carte" />
+            </span>
+          </div>
+          <div
+            id="displayList"
+            className={`pp-button ${grid ? '' : 'selected'}`}
+            title={intl.formatMessage({
+              id: 'generalTests.tooltip.displayList',
+              defaultMessage: 'Afficher les tests sous forme de liste',
+            })}
+            onClick={(event) => {
+              event.preventDefault();
+              setGrid((_) => false);
+            }}
+          >
+            <span className="codicon codicon-list-unordered" />
+            <span>
+              <FormattedMessage id="generalTests.list" defaultMessage="Liste" />
+            </span>
+          </div>
         </div>
         <div
           className="refresh-box"
