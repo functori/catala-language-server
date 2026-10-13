@@ -560,14 +560,20 @@ function asLocation(v: JsonValue | undefined): CodeLocation | undefined {
     : undefined;
 }
 
+const CALLS_ELSEWHERE = new Set(['scope_call', 'function_call']);
+
 export function definitionLocations(te: TraceElement): CodeLocation[] {
-  return (te.trace ?? [])
-    .filter((child) => child.element.kind === 'exception')
-    .flatMap((child) =>
-      [child.pos, asLocation(child.element.cons_pos)].filter(
-        (p): p is CodeLocation => p !== undefined
-      )
-    );
+  const collect = (el: TraceElement): CodeLocation[] => [
+    ...(el.pos === undefined ? [] : [el.pos]),
+    ...bindingLocations(el.element),
+    ...(asLocation(el.element.cons_pos) === undefined
+      ? []
+      : [asLocation(el.element.cons_pos) as CodeLocation]),
+    ...(CALLS_ELSEWHERE.has(el.element.kind)
+      ? []
+      : (el.trace ?? []).flatMap(collect)),
+  ];
+  return (te.trace ?? []).flatMap(collect);
 }
 
 export function definitionSpan(te: TraceElement): CodeLocation | undefined {
