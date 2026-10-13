@@ -571,6 +571,7 @@ function matchFilter(
     if (filterPin.option != 'ignore') {
       let filter = filterPin.filter.toLowerCase().trim();
       let pinMatch =
+        test.filename.includes(filter) ||
         testTitle(test).toLowerCase().includes(filter) ||
         testDescription(test).toLowerCase().includes(filter) ||
         testingScope(test).toLowerCase().includes(filter) ||
