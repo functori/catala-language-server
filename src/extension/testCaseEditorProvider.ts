@@ -850,7 +850,11 @@ export class TestCaseEditorProvider
       // where it is, and a webview that does not hold the focus cannot focus
       // one of its fields. Revealing the panel takes the focus, and passing no
       // column leaves the editor in the group the user put it in.
-      panel.reveal(undefined, false);
+      if (panel.viewColumn == vscode.ViewColumn.Beside) {
+        panel.reveal(vscode.ViewColumn.Beside, false);
+      } else {
+        panel.reveal(undefined, false);
+      }
     } else {
       try {
         // Open the same file with the test case editor in a side-by-side
