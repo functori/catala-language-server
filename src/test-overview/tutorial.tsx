@@ -80,6 +80,15 @@ function stepsFilter(intl: IntlShape): Step[] {
   ];
 }
 
+const stepsTests: Step[] = [
+  {
+    id: 'tests_display',
+    content: <FormattedMessage id="generalTests.tuto.displayMode" />,
+    target: '#displayMode',
+    placement: 'top',
+  },
+];
+
 export function samplePins(intl: IntlShape): Filter[] {
   const includeExemple: Filter = {
     filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
@@ -124,6 +133,7 @@ export function tutoChapters(intl: IntlShape): PlacedChapter[] {
     [
       { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
       { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter(intl) },
+      { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
     ],
     stepsWelcome.length
   );
