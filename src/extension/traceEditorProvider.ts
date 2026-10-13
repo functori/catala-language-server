@@ -291,7 +291,6 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         }
         case 'updateData': {
-          logger.log(`Log data value: ${JSON.stringify(message.value)}`);
           let result = await TestCaseEditorProvider.focusDataInput(
             document.uri,
             message.value
