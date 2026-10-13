@@ -6,7 +6,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { FormattedMessage, useIntl } from 'react-intl';
+import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
 
 import { type WebviewApi } from 'vscode-webview';
 
@@ -885,7 +885,7 @@ function ScopeFilter({
   const intl = useIntl();
   let filteredScope = scopesFromTests(tests ?? []);
   return (
-    <div className="pins">
+    <div id="scopePins" className="pins">
       <Box
         sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, textAlign: 'center' }}
       >
@@ -996,6 +996,7 @@ function FilterPanel({
         <>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <FormControlLabel
+              id="filter-gui"
               control={
                 <Checkbox
                   checked={filterGui}
@@ -1020,39 +1021,47 @@ function FilterPanel({
             filterScope={filterScope}
             setFilterScope={setFilterScope}
           />
-          <div style={{ marginLeft: 'auto' }}>
+          <div id="filterPins" style={{ marginLeft: 'auto' }}>
             <FilterPins filters={filters} setFilters={setFilters} />
-            <VscodeTextfield
-              className="search-bar"
-              value={filter}
-              placeholder={intl.formatMessage({
-                id: 'generalTests.searchPlaceholder',
-                defaultMessage: 'Rechercher un test…',
-              })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addFilter(filter);
-                  setFilter('');
-                }
-              }}
-              onInput={(e) => {
-                const value = (e.target as HTMLInputElement).value;
-                setFilter(value);
-              }}
-            >
-              <span
-                style={{ cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  addFilter(filter);
-                  setFilter('');
+            {/* The tutorial targets this wrapper rather than the field: the
+                field is zoomed, which throws off the measures the spotlight
+                is drawn from. */}
+            <div style={{ display: 'inline-flex' }}>
+              <VscodeTextfield
+                className="search-bar"
+                value={filter}
+                placeholder={intl.formatMessage({
+                  id: 'generalTests.searchPlaceholder',
+                  defaultMessage: 'Rechercher un test…',
+                })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addFilter(filter);
+                    setFilter('');
+                  }
                 }}
-                className="codicon codicon-save"
-                slot="content-after"
-              />
-              <span className="codicon codicon-search" slot="content-before" />
-            </VscodeTextfield>
+                onInput={(e) => {
+                  const value = (e.target as HTMLInputElement).value;
+                  setFilter(value);
+                }}
+              >
+                <span
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    addFilter(filter);
+                    setFilter('');
+                  }}
+                  className="codicon codicon-save"
+                  slot="content-after"
+                />
+                <span
+                  className="codicon codicon-search"
+                  slot="content-before"
+                />
+              </VscodeTextfield>
+            </div>
           </div>
         </>
       )}
@@ -1110,11 +1119,99 @@ const stepsButton: Step[] = [
   },
 ];
 
-function chapters(): { title: string; steps: Step[]; start: number }[] {
+function stepsFilter(intl: IntlShape): Step[] {
+  const filterIncludeId = `#include-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  const filterExcludeId = `#exclude-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  const filterIgnoreId = `#ignore-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  return [
+    {
+      id: 'filter_box',
+      content: <FormattedMessage id="generalTests.tuto.filterBox" />,
+      target: '.box-filter',
+    },
+    {
+      id: 'filter_reset',
+      content: <FormattedMessage id="generalTests.tuto.filterReset" />,
+      target: '.reset-filters',
+    },
+    {
+      id: 'filter_gui',
+      content: <FormattedMessage id="generalTests.tuto.filterGUI" />,
+      target: '#filter-gui',
+    },
+    {
+      id: 'filter_scope',
+      content: <FormattedMessage id="generalTests.tuto.filterScope" />,
+      target: '#scopePins',
+    },
+    {
+      id: 'filter_search',
+      content: <FormattedMessage id="generalTests.tuto.filterSearch" />,
+      target: '#filterPins',
+    },
+    {
+      id: 'filter_pin_include',
+      content: <PinStep option="include" />,
+      target: filterIncludeId,
+    },
+    {
+      id: 'filter_pin_exclude',
+      content: <PinStep option="exclude" />,
+      target: filterExcludeId,
+    },
+    {
+      id: 'filter_pin_ignore',
+      content: <PinStep option="ignore" />,
+      target: filterIgnoreId,
+    },
+  ];
+}
+
+function samplePins(intl: IntlShape): Filter[] {
+  const includeExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'include',
+  };
+  const excludeExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'exclude',
+  };
+
+  const ignoreExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'ignore',
+  };
+  return [includeExemple, excludeExemple, ignoreExemple];
+}
+
+// Tutorial step showing a sample pin, drawn by the real `FilterPins` so that
+// it looks exactly like the ones of the search bar. The setter is a no-op:
+// the sample pin is only there to be seen.
+function PinStep({ option }: { option: Filter['option'] }): ReactElement {
+  const intl = useIntl();
+  const pins = samplePins(intl);
+  const messageId = {
+    include: 'generalTests.tuto.filterPinInclude',
+    exclude: 'generalTests.tuto.filterPinExclude',
+    ignore: 'generalTests.tuto.filterPinIgnore',
+  }[option];
+  const pin = (
+    <FilterPins
+      filters={pins.filter((pin) => pin.option == option)}
+      setFilters={() => {}}
+    />
+  );
+  return <FormattedMessage id={messageId} values={{ pin }} />;
+}
+
+function chapters(
+  intl: IntlShape
+): { title: string; steps: Step[]; start: number }[] {
   // The welcome steps come first in the tour but are not a chapter of the
   // menu, so the chapters start after them.
   return [
     { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
+    { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter(intl) },
   ].map((chapter, index, all) => ({
     ...chapter,
     start: all
@@ -1170,7 +1267,7 @@ function TutoMenu({
       </div>
       {!folded && (
         <div className="tuto-menu-items">
-          {chapters().map(({ title, steps, start }) => (
+          {chapters(intl).map(({ title, steps, start }) => (
             <button
               key={title}
               className={
@@ -1212,6 +1309,7 @@ function noFilter(
 export default function GeneralTests({
   vscode,
 }: GeneralTestsArg): ReactElement {
+  const [tuto, setTuto] = useState<boolean>(false);
   const intl = useIntl();
   // Joyride scrolls a target this far from the top of the view: below the
   // unfolded tutorial menu, plus Joyride's own default margin of 20px.
@@ -1222,13 +1320,25 @@ export default function GeneralTests({
   };
   const steps = [
     ...stepsWelcome,
-    ...chapters().flatMap((chapter) => chapter.steps),
+    ...chapters(intl).flatMap((chapter) => chapter.steps),
   ];
-  const { controls, state, Tour } = useJoyride({
+  const { controls, on, state, Tour } = useJoyride({
     continuous: true,
     steps,
     options,
   });
+
+  useEffect(() => {
+    on('tour:end', () => {
+      setTuto(false);
+    });
+    on('error', () => {
+      setTuto(false);
+    });
+    on('tour:start', () => {
+      setTuto(true);
+    });
+  }, [on]);
 
   const [filters, setFilters] = useState<Filter[]>([]);
   const [filterScope, setFilterScope] = useState<string[]>([]);
@@ -1406,7 +1516,7 @@ export default function GeneralTests({
         filterScope={filterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
-        filters={filters}
+        filters={tuto ? samplePins(intl) : filters}
         setFilters={setFilters}
       />
       <div className="select-test-print">
