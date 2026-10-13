@@ -404,7 +404,7 @@ function TestLine({
         <TestPath vscode={vscode} test={test} filters={filters} />
       </th>
       <td>
-        <HighlightText filters={filters} text={testDescription(test)} />
+        <HighlightText filters={filters} text={testTitle(test)} />
       </td>
       <td>
         <HighlightText filters={filters} text={testingScope(test)} />
