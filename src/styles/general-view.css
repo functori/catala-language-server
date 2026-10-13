@@ -42,7 +42,6 @@
    séparateurs, et la largeur maximale empêche une arborescence profonde
    d'écraser le reste du tableau. */
 .test-list .path-column {
-  max-width: 20em;
   overflow-wrap: anywhere;
   text-align: left;
 }
