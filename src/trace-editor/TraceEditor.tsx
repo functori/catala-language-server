@@ -54,10 +54,24 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   const [scopePreset, setScopePreset] = useState(false);
   const [runState, setRunState] = useState<RunState>({ status: 'idle' });
   const [initialized, setInitialized] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [layout, setLayout] = useState<PaneLayout>('both');
   const [filterRequest, setFilterRequest] = useState<FilterCommand | null>(
     null
   );
+
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => (): void => {
+      if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
+    },
+    []
+  );
+  const markCopied = (): void => {
+    setCopied(true);
+    if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+  };
 
   const requestFilter = (filter: string): void =>
     setFilterRequest((prev) => ({ filter, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -109,6 +123,29 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
               post(vscode, { kind: 'run', scope: runScope });
             }
           }
+          break;
+        }
+        case 'scopes': {
+          const extra = new Map<string, TraceTest | undefined>(
+            message.scopes.map(([s, json]) => [
+              s,
+              json !== null ? readTraceTest(json) : undefined,
+            ])
+          );
+          setScopes((prev) => {
+            const merged = new Map(prev);
+            for (const [name, test] of extra) {
+              if (!merged.has(name)) merged.set(name, test);
+            }
+            return merged;
+          });
+          setScope((prev: ScopeWithInfo): ScopeWithInfo => {
+            if (prev.scopeName !== '') {
+              return prev;
+            }
+            const first = extra.entries().next().value;
+            return first ? { scopeName: first[0], test: first[1] } : prev;
+          });
           break;
         }
         case 'result':
@@ -193,12 +230,31 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         >
           <FormattedMessage id={'tooltip.openGui'} />
         </VscodeButton>
+        {runState.status === 'success' && (
+          <VscodeButton
+            icon={copied ? 'check' : 'copy'}
+            secondary
+            title={intl.formatMessage({
+              id: copied ? 'trace.copiedJson' : 'trace.copyJson',
+            })}
+            onClick={() => {
+              void navigator.clipboard.writeText(
+                JSON.stringify(runState.trace, null, 2)
+              );
+              markCopied();
+            }}
+          >
+            <FormattedMessage
+              id={copied ? 'trace.copiedJson' : 'trace.copyJson'}
+            />
+          </VscodeButton>
+        )}
         {scope.test !== undefined && (
           <LayoutSlider layout={layout} onLayout={setLayout} />
         )}
       </div>
 
-      {!scopePreset && scopes.size > 1 && (
+      {!scopePreset && scopes.size !== 1 && (
         <label style={fieldStyle}>
           <span style={{ fontWeight: 600 }}>
             <FormattedMessage id="trace.scope" />
