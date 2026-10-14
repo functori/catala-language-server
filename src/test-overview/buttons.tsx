@@ -4,19 +4,23 @@ import { FormattedMessage, useIntl } from 'react-intl';
 import { type WebviewApi } from 'vscode-webview';
 
 import { writeTestsUpMessage } from '../generated/catala_types';
+import { Controls } from 'react-joyride';
 
 /**
  * Component to run a bunch of tests, the run function is given in argument
  * so that we can choose the function to give
  */
 export function RunAllTests({
+  id,
   onRun,
 }: {
+  id?: string;
   className?: string | undefined;
   onRun: () => void;
 }): ReactElement {
   return (
     <span
+      id={id}
       onClick={(event) => {
         event.preventDefault();
         onRun();
@@ -37,11 +41,14 @@ export function RunAllTests({
  */
 export function AddNewTest({
   vscode,
+  id,
 }: {
+  id?: string;
   vscode: WebviewApi<unknown>;
 }): ReactElement {
   return (
     <span
+      id={id}
       className="vscode-button"
       onClick={(event) => {
         event.preventDefault();
@@ -117,7 +124,7 @@ export function OpenGUI({
   );
 }
 
-export function HelpMenu(): ReactElement {
+export function HelpMenu({ controls }: { controls: Controls }): ReactElement {
   const intl = useIntl();
   return (
     <button
@@ -128,7 +135,7 @@ export function HelpMenu(): ReactElement {
       })}
       onClick={(e) => {
         e.preventDefault();
-        // TODO
+        controls.start();
       }}
     >
       <span className="codicon codicon-question" />
