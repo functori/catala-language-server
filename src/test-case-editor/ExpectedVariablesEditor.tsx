@@ -475,7 +475,7 @@ function VariableRow({
         </div>
         <VscodeButton
           secondary
-          icon="arrow-left"
+          icon="replace"
           disabled={computed === undefined}
           title={intl.formatMessage(
             { id: 'testEditor.fillComputedVariable' },
