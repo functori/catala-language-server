@@ -237,13 +237,17 @@ export default function ExpectedVariablesEditor({
   const failureByName = new Map(
     (failures ?? []).map((failure) => [failure.name, failure])
   );
+  // Sorted by name: the test file does not keep its variables in a stable
+  // order across rewrites, and the rows must not jump around on each edit.
   const testVariables: Map<string, TraceValue | null> = new Map();
-  test.variables.forEach((rv, name) => {
-    const value = rv !== null ? traceValueFromRuntime(rv.value) : null;
-    if (value !== undefined) {
-      testVariables.set(name, value);
-    }
-  });
+  [...test.variables.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([name, rv]) => {
+      const value = rv !== null ? traceValueFromRuntime(rv.value) : null;
+      if (value !== undefined) {
+        testVariables.set(name, value);
+      }
+    });
 
   // The first row the compiler reported a mismatch on, in display order.
   const firstFailure = [...testVariables.keys()].find((path) =>
