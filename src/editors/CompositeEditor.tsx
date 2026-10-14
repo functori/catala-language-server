@@ -58,6 +58,26 @@ function categorize(item: EditorItem): 'scalar' | 'structural' | 'array' {
   return 'scalar';
 }
 
+// A label that does not widen its item: it is cut to the width the editor
+// gives, and shows its full text on hover. Clicking it copies the text, since
+// a cut name can no longer be selected by hand. The text is read from the DOM
+// because a label may be any node, not only a string.
+export function TruncatedLabel({ label }: { label: ReactNode }): ReactElement {
+  return (
+    <span
+      className="item-label-text"
+      onMouseEnter={(e) => {
+        e.currentTarget.title = e.currentTarget.textContent ?? '';
+      }}
+      onClick={(e) => {
+        void navigator.clipboard.writeText(e.currentTarget.textContent ?? '');
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 function TabHeader({ item }: { item: EditorItem }): ReactElement {
   const intl = useIntl();
   const hint = intl.formatMessage({ id: 'tab.hasUnset' });
@@ -183,7 +203,7 @@ export function CompositeEditor(props: CompositeEditorProps): ReactElement {
               className={`simple-item-vertical ${props.atomicElements ? 'atomic-element' : ''}`}
             >
               <label className="item-label body-1">
-                {wrapIdentifier(item.label)}
+                <TruncatedLabel label={wrapIdentifier(item.label)} />
                 {item.mark}
               </label>
               {item.editor}
@@ -200,7 +220,7 @@ export function CompositeEditor(props: CompositeEditorProps): ReactElement {
               className={`simple-item ${props.atomicElements ? 'atomic-element' : ''}`}
             >
               <label className="item-label body-1">
-                {wrapIdentifier(item.label)}
+                <TruncatedLabel label={item.label} />
                 {item.mark}
               </label>
               {item.editor}
@@ -212,7 +232,7 @@ export function CompositeEditor(props: CompositeEditorProps): ReactElement {
       {structuralItems.map((item) => (
         <div key={item.key} className="structural-item">
           <label className="item-label body-1">
-            {wrapIdentifier(item.label)}
+            <TruncatedLabel label={wrapIdentifier(item.label)} />
             {item.mark}
           </label>
           {item.editor}
