@@ -596,6 +596,7 @@
     "@vscode/codicons": "^0.0.40",
     "@vscode-elements/elements": "^2.5.1",
     "@vscode-elements/react-elements": "^2.4.0",
+    "react-joyride": "^3.2.0",
     "command-exists": "^1.2.9",
     "p-queue": "^6.6.2",
     "react": "^18.3.1",

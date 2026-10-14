@@ -258,24 +258,32 @@
 .scope-title {
   display: inline-block;
   padding: 0.7em 0.2em 0.7em 0.2em;
-  color: var(--vscode-button-secondaryForeground);
-  background-color: var(--vscode-button-secondaryBackground);
-  border: 1px solid var(--vscode-button-border, transparent);
   border-radius: 5px;
 }
 
-.selected-filter {
+/* Toggle buttons: the scope pins and the chapters of the tutorial menu */
+.scope-title,
+.tuto-menu button {
+  color: var(--vscode-button-secondaryForeground);
+  background-color: var(--vscode-button-secondaryBackground);
+  border: 1px solid var(--vscode-button-border, transparent);
+}
+
+.selected-filter,
+.tuto-menu button.selected {
   color: var(--vscode-button-foreground);
   background-color: var(--vscode-button-background);
   border-color: var(--vscode-button-background);
 }
 
-.scope-title:hover {
+.scope-title:hover,
+.tuto-menu button:hover {
   cursor: pointer;
   background-color: var(--vscode-button-secondaryHoverBackground);
 }
 
-.selected-filter:hover {
+.selected-filter:hover,
+.tuto-menu button.selected:hover {
   background-color: var(--vscode-button-hoverBackground);
 }
 
@@ -343,4 +351,72 @@
   transform: translateY(0);
   opacity: 1;
   background-color: var(--vscode-button-hoverBackground);
+}
+
+/* Chapters of the tutorial, shown while it runs. Fixed and above Joyride's
+   overlay (z-index 100): it takes no room on the page and stays clickable. */
+.tuto-menu {
+  /* top and max-height are set from GeneralTests.tsx, which hands them to
+     Joyride as its scroll offset */
+  position: fixed;
+  left: 0.8em;
+  z-index: 101;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  padding: 0.8em 1em 1em 1em;
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 0.6em;
+  background-color: var(--vscode-editorWidget-background);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  font-size: 1.2em;
+}
+
+/* Only as wide as its icon and text: unfolded, it is the button that folds the
+   menu, and the empty space beside it must not be */
+.tuto-menu-title {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 0.5em;
+  font-weight: bold;
+}
+
+/* The attribute selector outweighs codicon.css's 16px rule */
+.tuto-menu-title .codicon[class*='codicon-'] {
+  font-size: 1.4em;
+}
+
+/* Folded, the menu shrinks to its icon, still in the top left corner */
+.tuto-menu.folded {
+  padding: 0.5em;
+}
+
+/* Folded, the whole menu toggles it; unfolded, its title row does */
+.tuto-menu.folded:hover,
+.tuto-menu-title:hover {
+  cursor: pointer;
+  background-color: var(--vscode-toolbar-hoverBackground);
+}
+
+.tuto-menu-toggle {
+  border-radius: 0.2em;
+}
+
+.tuto-menu-items {
+  display: flex;
+  gap: 0.5em;
+  padding-top: 0.6em;
+  border-top: 1px solid var(--vscode-widget-border, var(--vscode-focusBorder));
+}
+
+.tuto-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.5em 1em;
+  border-radius: 0.3em;
+  font: inherit;
 }
