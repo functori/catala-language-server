@@ -96,7 +96,7 @@ function TraceValueEditor({
   testing_scope: string;
   path: string;
   input: RuntimeValue | undefined;
-  setInput: React.Dispatch<React.SetStateAction<RuntimeValue | undefined>>;
+  setInput(value: RuntimeValue | undefined): void;
   kind: string;
   intl: IntlShape;
 }): ReactElement {
@@ -388,8 +388,6 @@ function VariableRow({
 }): ReactElement {
   const intl = useIntl();
 
-  // A pending edit of the expected value, committed by the check button.
-  const [input, setInput] = useState<RuntimeValue | undefined>(undefined);
   const computedStr =
     computed !== undefined ? formatTraceValue(computed, intl) : undefined;
 
@@ -412,15 +410,13 @@ function VariableRow({
     : undefined;
   const kind = expected?.kind ?? computed?.kind;
 
-  function apply(): void {
+  function apply(input: RuntimeValue | undefined): void {
     if (input !== undefined) {
       const tvInput = traceValueFromRuntime(input);
       onSet(name, tvInput ?? null);
-      setInput(undefined);
     }
   }
 
-  const inputStr = formatRuntimeValue(input, intl) ?? '';
   // `tabIndex` is what makes the row focusable at all; -1 keeps it out of the
   // tab order, so it is only ever reached by the jump above.
   const editor = (
@@ -464,8 +460,8 @@ function VariableRow({
             <TraceValueEditor
               testing_scope={testing_scope}
               path={name}
-              input={input ?? expValu}
-              setInput={setInput}
+              input={expValu}
+              setInput={apply}
               kind={kind}
               intl={intl}
             />
@@ -482,18 +478,8 @@ function VariableRow({
             { value: computedStr ?? '' }
           )}
           onClick={() => {
-            setInput(compValu);
+            apply(compValu);
           }}
-        />
-        <VscodeButton
-          secondary
-          disabled={input === undefined || inputStr == ''}
-          icon="check"
-          title={intl.formatMessage(
-            { id: 'testEditor.setVariable' },
-            { value: inputStr }
-          )}
-          onClick={apply}
         />
         <VscodeButton
           secondary
