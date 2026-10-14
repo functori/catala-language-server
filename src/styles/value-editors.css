@@ -29,17 +29,6 @@
   vertical-align: top;
 }
 
-/* Apply max-width constraint only to primitive editors (simple inputs) */
-/* Primitive editors: int, bool, rat, date, duration, money */
-.value-editor.int-editor-wrapper,
-.value-editor.bool-editor-wrapper,
-.value-editor.rat-editor-wrapper,
-.value-editor.date-editor-wrapper,
-.value-editor.duration-editor,
-.value-editor.money-editor {
-  max-width: var(--field-width);
-}
-
 /* Complex editors (struct, enum, array) get no max-width constraint */
 /* This allows nested content like arrays in enum payloads to use full available width */
 .value-editor.struct-editor,
