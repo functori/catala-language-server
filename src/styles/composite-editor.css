@@ -39,6 +39,12 @@
   cursor: copy;
 }
 
+/* The break opportunities Identifier puts after each underscore still let
+   Chromium wrap despite `nowrap`: a truncated label must stay on one line. */
+.item-label-text wbr {
+  display: none;
+}
+
 .simple-items-vertical {
   display: flex;
   flex-direction: column;
