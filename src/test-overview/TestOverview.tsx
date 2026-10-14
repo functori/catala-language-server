@@ -10,6 +10,9 @@ import { TestsGrid } from './TestsView';
 import { useTests } from './useTests';
 import { Loading } from './widgets';
 import { FilterPanel } from './Filter';
+import { TutoMenu, tutoOptions } from '../shared/Tutorial';
+import { useJoyride } from 'react-joyride';
+import { tutoChapters, tutoSteps } from './tutorial';
 
 type TestOverviewArg = {
   vscode: WebviewApi<unknown>;
@@ -29,8 +32,18 @@ export default function TestOverview({
     matchFilter(test, filters, filterScope, filterGui)
   );
 
+  const { controls, state, Tour } = useJoyride({
+    continuous: true,
+    steps: tutoSteps,
+    options: tutoOptions,
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {Tour}
+      {state.status === 'running' && (
+        <TutoMenu state={state} controls={controls} chapters={tutoChapters} />
+      )}
       <div
         style={{
           display: 'flex',
@@ -44,8 +57,9 @@ export default function TestOverview({
           children={(msg) => <h1>{msg}</h1>}
         />
         <div className="tests-button">
-          <AddNewTest vscode={vscode} />
+          <AddNewTest id="addTest" vscode={vscode} />
           <RunAllTests
+            id="runAllTests"
             onRun={() =>
               runTests(
                 noFilter(filters, filterScope, filterGui)
@@ -138,7 +152,7 @@ export default function TestOverview({
           filters={filters}
         />
       )}
-      <HelpMenu />
+      <HelpMenu controls={controls} />
     </div>
   );
 }
