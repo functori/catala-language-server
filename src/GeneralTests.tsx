@@ -55,7 +55,9 @@ type TestItemArg = {
  * wether the test is a Catala Test Case editor generated test
  */
 type FilterArg = {
-  tests: TestMacro[] | undefined;
+  // The tests whose scopes are offered as scope filters: already filtered by
+  // everything but the scope, so that only the scopes still reachable show.
+  scopeTests: TestMacro[] | undefined;
   filters: Filter[];
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
@@ -931,7 +933,7 @@ function ScopeFilter({
 }
 
 function FilterPanel({
-  tests,
+  scopeTests,
   filters,
   filterScope,
   setFilterScope,
@@ -948,10 +950,6 @@ function FilterPanel({
     setFilterScope([]);
     setFilters([]);
   };
-
-  const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filters, [], filterGui)
-  );
 
   const addFilter = (filter: string): void => {
     let filterToAdd = filter.trim();
@@ -990,7 +988,7 @@ function FilterPanel({
           />
         </span>
       </div>
-      {tests === undefined ? (
+      {scopeTests === undefined ? (
         <Loading size="small" />
       ) : (
         <>
@@ -1017,7 +1015,7 @@ function FilterPanel({
             />
           </div>
           <ScopeFilter
-            tests={filteredTests}
+            tests={scopeTests}
             filterScope={filterScope}
             setFilterScope={setFilterScope}
           />
@@ -1669,6 +1667,13 @@ export default function GeneralTests({
     matchFilter(test, filters, filterScope, filterGui)
   );
 
+  const filteredTestsForScope = tuto
+    ? [sampleTest(intl)]
+    : tests?.filter((test) => matchFilter(test, filters, [], filterGui));
+  // The user's scope selection is set aside during the tutorial, so that the
+  // sample looks the same for everyone.
+  const shownFilterScope = tuto ? [] : filterScope;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
       {Tour}
@@ -1723,9 +1728,9 @@ export default function GeneralTests({
         </div>
       </div>
       <FilterPanel
-        tests={tests}
+        scopeTests={filteredTestsForScope}
         setFilterScope={setFilterScope}
-        filterScope={filterScope}
+        filterScope={shownFilterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
         filters={tuto ? samplePins(intl) : filters}
@@ -1807,7 +1812,7 @@ export default function GeneralTests({
           vscode={vscode}
           filtered={tuto ? [sampleTest(intl)] : filteredTests}
           grid={shownGrid}
-          filterScope={filterScope}
+          filterScope={shownFilterScope}
           onRun={onRun}
           filters={filters}
         />
