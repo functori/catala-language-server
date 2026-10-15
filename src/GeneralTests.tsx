@@ -1104,6 +1104,16 @@ const stepsWelcome = [
   },
 ];
 
+// Like the welcome step, the closing one is not a chapter of the menu.
+const stepsEnd: Step[] = [
+  {
+    id: 'end',
+    content: <FormattedMessage id="generalTests.tuto.end" />,
+    target: 'body',
+    placement: 'center',
+  },
+];
+
 const stepsButton: Step[] = [
   {
     id: 'test_add',
@@ -1174,6 +1184,9 @@ const stepsTests: Step[] = [
     target: '#displayMode',
     placement: 'top',
   },
+];
+
+const stepsCard: Step[] = [
   {
     id: 'tests_display_card',
     content: <FormattedMessage id="generalTests.tuto.displayCard" />,
@@ -1223,6 +1236,9 @@ const stepsTests: Step[] = [
     target: '.test-item .run-icon',
     placement: 'top',
   },
+];
+
+const stepsList: Step[] = [
   {
     id: 'tests_display_list',
     content: <FormattedMessage id="generalTests.tuto.displayList" />,
@@ -1385,6 +1401,8 @@ function chapters(
     { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
     { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter(intl) },
     { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
+    { title: 'generalTests.tuto.chapter.card', steps: stepsCard },
+    { title: 'generalTests.tuto.chapter.list', steps: stepsList },
   ].map((chapter, index, all) => ({
     ...chapter,
     start: all
@@ -1494,6 +1512,7 @@ export default function GeneralTests({
   const steps = [
     ...stepsWelcome,
     ...chapters(intl).flatMap((chapter) => chapter.steps),
+    ...stepsEnd,
   ];
   const { controls, on, state, Tour } = useJoyride({
     continuous: true,
