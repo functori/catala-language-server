@@ -37,7 +37,7 @@ import {
   RatEditor,
 } from '../editors/ValueEditors';
 import { focusExpectedVariables, focusTargetId } from '../shared/focusTarget';
-import { TruncatedLabel } from '../editors/CompositeEditor';
+import { Identifier } from '../editors/Identifier';
 
 type Props = {
   testing_scope: string;
@@ -438,7 +438,7 @@ function VariableRow({
       }}
     >
       <label className="item-label body-1" style={{ textTransform: 'none' }}>
-        <TruncatedLabel label={name} />
+        <Identifier name={name} />
       </label>
       <div className="expected-variable-row">
         <div
