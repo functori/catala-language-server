@@ -6,6 +6,7 @@ import {
   defaultSettings,
   readSettings,
   showsTraceKind,
+  traceViewKindOf,
 } from '../src/shared/settings';
 
 const node = (kind: string, trace?: TraceElement[]): TraceElement => ({
@@ -80,15 +81,68 @@ describe('flattenHiddenKinds', () => {
   });
 });
 
+describe('call-site input assignments', () => {
+  // an exception under a scope_call is an input being assigned at the call
+  // site; under a scope_var it is one of the variable's definition rules
+  const trace = (): TraceElement[] => [
+    node('scope_call', [
+      node('exception'),
+      node('exception'),
+      node('scope_var', [node('exception')]),
+    ]),
+  ];
+
+  const flatten = (settings = defaultSettings): unknown =>
+    kinds(
+      flattenHiddenKinds(trace(), (kind, parentKind) =>
+        showsTraceKind(settings, traceViewKindOf(kind, parentKind))
+      )
+    );
+
+  it('tells the two apart by their parent', () => {
+    expect(traceViewKindOf('exception', 'scope_call')).toBe('input_assignment');
+    expect(traceViewKindOf('exception', 'scope_var')).toBe('exception');
+    expect(traceViewKindOf('exception', undefined)).toBe('exception');
+    expect(traceViewKindOf('assertion', 'scope_call')).toBe('assertion');
+  });
+
+  it('hides both by default', () => {
+    expect(flatten()).toEqual([{ scope_call: [{ scope_var: [] }] }]);
+  });
+
+  it('shows definition rules without the call-site assignments', () => {
+    const settings = readSettings({
+      traceView: { exception: true, input_assignment: false },
+    });
+    expect(flatten(settings)).toEqual([
+      { scope_call: [{ scope_var: ['exception'] }] },
+    ]);
+  });
+
+  it('shows the call-site assignments on their own', () => {
+    const settings = readSettings({
+      traceView: { exception: false, input_assignment: true },
+    });
+    expect(flatten(settings)).toEqual([
+      { scope_call: ['exception', 'exception', { scope_var: [] }] },
+    ]);
+  });
+});
+
 describe('showsTraceKind', () => {
+  const hiddenByDefault = ['exception', 'input_assignment'];
+
   it('shows every optional kind by default, except exceptions', () => {
     for (const kind of TRACE_VIEW_KINDS) {
-      expect(showsTraceKind(defaultSettings, kind)).toBe(kind !== 'exception');
+      expect(showsTraceKind(defaultSettings, kind)).toBe(
+        !hiddenByDefault.includes(kind)
+      );
     }
   });
 
-  it('hides exceptions by default', () => {
+  it('hides exceptions and call-site input assignments by default', () => {
     expect(showsTraceKind(defaultSettings, 'exception')).toBe(false);
+    expect(showsTraceKind(defaultSettings, 'input_assignment')).toBe(false);
   });
 
   it('is always true for scopes and variables, which have no setting', () => {
