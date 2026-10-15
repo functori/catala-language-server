@@ -4,6 +4,7 @@ import type { Step } from 'react-joyride';
 
 import { FilterPins, type Filter } from '../FilterPin';
 import { placeChapters, type PlacedChapter } from '../shared/Tutorial';
+import type { TestMacro } from './types';
 
 // The guided tour of the 'debug all tests' panel.
 
@@ -88,6 +89,34 @@ const stepsTests: Step[] = [
     placement: 'top',
   },
 ];
+
+export function sampleTest(intl: IntlShape): TestMacro {
+  return {
+    index: 0,
+    filename: 'tests/test_1.catala_en',
+    relative_filename: 'tests/test_1.catala_en',
+    test: {
+      kind: 'GUI',
+      value: {
+        scope: 'Test1',
+        scope_tested: intl.formatMessage({
+          id: 'generalTests.tuto.sampleScope',
+        }),
+        title: intl.formatMessage(
+          { id: 'generalTests.tuto.sampleTitle' },
+          { num: 1 }
+        ),
+        description: intl.formatMessage({
+          id: 'generalTests.tuto.sampleDescription',
+        }),
+      },
+    },
+    success: true,
+    // ISO 8601, as the host records it: `TestDate` formats it with
+    // `intl.formatDate`.
+    date: '2026-10-13T10:00:00',
+  };
+}
 
 export function samplePins(intl: IntlShape): Filter[] {
   const includeExemple: Filter = {
