@@ -309,12 +309,12 @@ export default function TraceNode({
       )}
       {showCode && snippetPos && (
         <div style={openContentStyle}>
-          <LocationSnippet pos={snippetPos} />
+          <LocationSnippet pos={snippetPos} filters={filters} />
         </div>
       )}
       {showConsequence && consPos && (
         <div style={openContentStyle}>
-          <LocationSnippet pos={consPos} />
+          <LocationSnippet pos={consPos} filters={filters} />
         </div>
       )}
       {open && expandable && (
