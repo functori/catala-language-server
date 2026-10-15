@@ -218,9 +218,24 @@ describe('elementCodeSpan', () => {
     expect(codeSpan(withDeclarationPos([]))).toBe('86:12-86:16');
   });
 
-  it('covers the whole binding of a local variable, not just its value', () => {
+  it('keeps the whole binding a local variable reports', () => {
     //     let first equals given * 3 in
-    //         ^^^^^ decl_pos    ^^^^^^^^^ pos
+    //     ^^^^^^^^^^^^^^^^^^^^^^^^^^ pos
+    //         ^^^^^ decl_pos
+    const local = {
+      element: {
+        kind: 'local_var',
+        name: 'first',
+        decl_pos: at(60, 9, 60, 14),
+      },
+      pos: at(60, 5, 60, 31),
+    } as unknown as TraceElement;
+    expect(codeSpan(local)).toBe('60:5-60:31');
+  });
+
+  it('never starts earlier than the position the element reports', () => {
+    // an older runtime, whose pos was only the bound expression: the span
+    // stays there rather than reaching back to the name
     const local = {
       element: {
         kind: 'local_var',
@@ -229,12 +244,13 @@ describe('elementCodeSpan', () => {
       },
       pos: at(60, 22, 60, 31),
     } as unknown as TraceElement;
-    expect(codeSpan(local)).toBe('60:9-60:31');
+    expect(codeSpan(local)).toBe('60:22-60:31');
   });
 
-  it('covers every name a local tuple binds', () => {
+  it('covers a local tuple down to the end of the bound expression', () => {
     //     let (a, b) equals
-    //          ^  ^
+    //     ^^^^^^^^^^^^^^^^^ pos, continuing onto the next line
+    //          ^  ^ decl_pos of each name
     //       (10, 20)
     const tup = {
       element: {
@@ -244,9 +260,9 @@ describe('elementCodeSpan', () => {
           { name: 'b', decl_pos: at(7, 13, 7, 14) },
         ],
       },
-      pos: at(8, 7, 8, 15),
+      pos: at(7, 5, 8, 15),
     } as unknown as TraceElement;
-    expect(codeSpan(tup)).toBe('7:10-8:15');
+    expect(codeSpan(tup)).toBe('7:5-8:15');
   });
 
   it('leaves a local alone when the runtime reports no binding position', () => {
