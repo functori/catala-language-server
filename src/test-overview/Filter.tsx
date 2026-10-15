@@ -2,7 +2,7 @@ import { useState, type ReactElement } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 
 import { VscodeTextfield } from '@vscode-elements/react-elements';
-import { matchFilter, scopesFromTests } from './testUtils';
+import { scopesFromTests } from './testUtils';
 import type { TestMacro } from './types';
 import { Loading } from './widgets';
 import { FilterPins, type Filter } from '../FilterPin';
@@ -12,7 +12,9 @@ import { FilterPins, type Filter } from '../FilterPin';
  * wether the test is a Catala Test Case editor generated test
  */
 type FilterArg = {
-  tests: TestMacro[] | undefined;
+  // The tests whose scopes are offered as scope filters: already filtered by
+  // everything but the scope, so that only the scopes still reachable show.
+  scopeTests: TestMacro[] | undefined;
   filters: Filter[];
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
@@ -86,7 +88,7 @@ function ScopeFilter({
 }
 
 export function FilterPanel({
-  tests,
+  scopeTests,
   filters,
   filterScope,
   setFilterScope,
@@ -119,10 +121,6 @@ export function FilterPanel({
     });
   };
 
-  const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filters, [], filterGui)
-  );
-
   return (
     <div className="box-filter">
       <div className="filter-title">
@@ -146,7 +144,7 @@ export function FilterPanel({
           />
         </span>
       </div>
-      {tests === undefined ? (
+      {scopeTests === undefined ? (
         <Loading size="small" />
       ) : (
         <>
@@ -164,7 +162,7 @@ export function FilterPanel({
             </div>
           </div>
           <ScopeFilter
-            tests={filteredTests}
+            tests={scopeTests}
             filterScope={filterScope}
             setFilterScope={setFilterScope}
           />
