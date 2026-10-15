@@ -1105,6 +1105,16 @@ const stepsWelcome = [
   },
 ];
 
+// Like the welcome step, the closing one is not a chapter of the menu.
+const stepsEnd: Step[] = [
+  {
+    id: 'end',
+    content: <FormattedMessage id="generalTests.tuto.end" />,
+    target: 'body',
+    placement: 'center',
+  },
+];
+
 const stepsButton: Step[] = [
   {
     id: 'test_add',
@@ -1499,6 +1509,7 @@ export default function GeneralTests({
   const steps = [
     ...stepsWelcome,
     ...chapters(intl).flatMap((chapter) => chapter.steps),
+    ...stepsEnd,
   ];
   const { controls, on, state, Tour } = useJoyride({
     continuous: true,
