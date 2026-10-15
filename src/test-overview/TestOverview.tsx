@@ -12,7 +12,7 @@ import { Loading } from './widgets';
 import { FilterPanel } from './Filter';
 import { TutoMenu, tutoLocale, tutoOptions } from '../shared/Tutorial';
 import { useJoyride } from 'react-joyride';
-import { samplePins, tutoChapters, tutoSteps } from './tutorial';
+import { samplePins, sampleTest, tutoChapters, tutoSteps } from './tutorial';
 
 type TestOverviewArg = {
   vscode: WebviewApi<unknown>;
@@ -170,7 +170,7 @@ export default function TestOverview({
       ) : (
         <TestsGrid
           vscode={vscode}
-          filtered={filteredTests}
+          filtered={tuto ? [sampleTest(intl)] : filteredTests}
           grid={grid}
           filterScope={filterScope}
           onRun={onRun}
