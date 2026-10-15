@@ -1426,6 +1426,13 @@ export default function GeneralTests({
     continuous: true,
     steps,
     options,
+    locale: {
+      back: intl.formatMessage({ id: 'generalTests.tuto.button.back' }),
+      close: intl.formatMessage({ id: 'generalTests.tuto.button.close' }),
+      last: intl.formatMessage({ id: 'generalTests.tuto.button.last' }),
+      next: intl.formatMessage({ id: 'generalTests.tuto.button.next' }),
+      skip: intl.formatMessage({ id: 'generalTests.tuto.button.skip' }),
+    },
   });
 
   useEffect(() => {
