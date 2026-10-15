@@ -328,6 +328,7 @@ function TestItem({ vscode, test, filters, onRun }: TestItemArg): ReactElement {
       <div className="footer">
         <TestStateIcon success={test} />
         <span
+          className="test-date"
           title={intl.formatMessage({
             id: 'generalTests.header.lastTestDate',
             defaultMessage: 'Date du dernier test',
@@ -1167,33 +1168,147 @@ function stepsFilter(intl: IntlShape): Step[] {
   ];
 }
 
-const stepsTests = [
+const stepsTests: Step[] = [
   {
     id: 'tests_display',
     content: <FormattedMessage id="generalTests.tuto.displayMode" />,
     target: '#displayMode',
+    placement: 'top',
   },
   {
     id: 'tests_display_card',
-    content: <SampleCard />,
+    content: <FormattedMessage id="generalTests.tuto.displayCard" />,
     target: '#displayCard',
+    placement: 'top',
+  },
+  // The fields of a card, shown on the sample test.
+  {
+    id: 'tests_card_title',
+    content: <FormattedMessage id="generalTests.tuto.card.title" />,
+    target: '.test-item .test-title',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_number',
+    content: <FormattedMessage id="generalTests.tuto.card.number" />,
+    target: '.test-item .test-number',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_description',
+    content: <FormattedMessage id="generalTests.tuto.card.description" />,
+    target: '.test-item .test-descr',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_state',
+    content: <SampleStates />,
+    target: '.test-item .check-icon',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_date',
+    content: <FormattedMessage id="generalTests.tuto.card.date" />,
+    target: '.test-item .test-date',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_open',
+    content: <FormattedMessage id="generalTests.tuto.card.open" />,
+    target: '.test-item .open-gui',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_run',
+    content: <FormattedMessage id="generalTests.tuto.card.run" />,
+    target: '.test-item .run-icon',
+    placement: 'top',
   },
   {
     id: 'tests_display_list',
-    content: <SampleList />,
+    content: <FormattedMessage id="generalTests.tuto.displayList" />,
     target: '#displayList',
-    width: 'min(900px, 90vw)',
+    placement: 'top',
+  },
+  // The columns of the list, shown on the sample test. The texts shared with
+  // the card are reused.
+  {
+    id: 'tests_list_file',
+    content: <FormattedMessage id="generalTests.tuto.list.file" />,
+    target: '.test-list tbody tr .path-column',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_title',
+    content: <FormattedMessage id="generalTests.tuto.card.title" />,
+    target: '.test-list tbody tr td:nth-child(2)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_scope',
+    content: <FormattedMessage id="generalTests.tuto.list.scope" />,
+    target: '.test-list tbody tr td:nth-child(3)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_description',
+    content: <FormattedMessage id="generalTests.tuto.card.description" />,
+    target: '.test-list tbody tr td:nth-child(4)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_date',
+    content: <FormattedMessage id="generalTests.tuto.card.date" />,
+    target: '.test-list tbody tr td:nth-child(5)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_state',
+    content: <SampleStates />,
+    target: '.test-list tbody tr td:nth-child(6)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_run',
+    content: <FormattedMessage id="generalTests.tuto.card.run" />,
+    target: '.test-list tbody tr .run-icon',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_open',
+    content: <FormattedMessage id="generalTests.tuto.card.open" />,
+    target: '.test-list tbody tr .open-gui',
+    placement: 'top',
   },
 ];
 
-// The samples below are drawn by the real components, so that they look exactly
-// like the tests of the page, but they must stay inert: their buttons talk to
-// a VS Code API that drops every message, and running them does nothing.
-const inertVsCode: WebviewApi<unknown> = {
-  postMessage: () => {},
-  getState: () => undefined,
-  setState: <T,>(state: T) => state,
-};
+// One line per state, each with its own icon: written as a sentence, the
+// states read as a single one.
+function SampleStates(): ReactElement {
+  // The ids are written out in full so that the i18n check finds them.
+  const states: [TestState['state'], string][] = [
+    ['Success', 'generalTests.tuto.card.stateSuccess'],
+    ['Failed', 'generalTests.tuto.card.stateFailed'],
+    ['Loading', 'generalTests.tuto.card.stateLoading'],
+    ['Unknown', 'generalTests.tuto.card.stateUnknown'],
+  ];
+  return (
+    <div style={{ textAlign: 'left' }}>
+      <FormattedMessage id="generalTests.tuto.card.state" />
+      <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+        {states.map(([state, id]) => (
+          <li
+            key={state}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}
+          >
+            <TestStateIcon success={{ state }} />
+            <FormattedMessage id={id} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 function sampleTest(intl: IntlShape): TestMacro {
   return testMacro({
@@ -1219,45 +1334,6 @@ function sampleTest(intl: IntlShape): TestMacro {
     success: true,
     date: '13/10/2026',
   });
-}
-
-function SampleCard(): ReactElement {
-  const intl = useIntl();
-  return (
-    <div>
-      <p>
-        <FormattedMessage id="generalTests.tuto.displayCard" />
-      </p>
-      <div style={{ fontSize: '8px', textAlign: 'left' }}>
-        <TestItem
-          vscode={inertVsCode}
-          test={sampleTest(intl)}
-          filters={[]}
-          onRun={() => {}}
-        />
-      </div>
-    </div>
-  );
-}
-
-function SampleList(): ReactElement {
-  const intl = useIntl();
-  return (
-    <div>
-      <p>
-        <FormattedMessage id="generalTests.tuto.displayList" />
-      </p>
-      <div style={{ textAlign: 'left' }}>
-        <TestList
-          vscode={inertVsCode}
-          tests={[sampleTest(intl)]}
-          filteredScope={[]}
-          filters={[]}
-          onRun={() => {}}
-        />
-      </div>
-    </div>
-  );
 }
 
 function samplePins(intl: IntlShape): Filter[] {
@@ -1453,12 +1529,25 @@ export default function GeneralTests({
   // back off by a single run, so that the list does not reshuffle under the
   // pointer when only one test changed.
   const [grid, setGrid] = useState<boolean>(true);
+  // The display mode of the tutorial, kept apart from the user's one so that
+  // the tutorial never changes it: once the tutorial is over, the page is back
+  // in the mode it was in before.
+  const [tutoGrid, setTutoGrid] = useState<boolean>(true);
+  const shownGrid = tuto ? tutoGrid : grid;
   const [tests, setTests] = useState<TestMacro[] | undefined>(undefined);
   const [reload, setReload] = useState<boolean>(false);
 
   useEffect(() => {
     setVsCodeApi(vscode);
   }, [vscode]);
+
+  const listIndex = steps.findIndex(({ id }) => id === 'tests_display_list');
+  const listEndIndex = steps.findIndex(({ id }) => id === 'tests_list_open');
+
+  // The list is shown on its own steps only, the cards everywhere else.
+  useEffect(() => {
+    setTutoGrid(!(state.index >= listIndex && state.index <= listEndIndex));
+  }, [state.index, listIndex, listEndIndex]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
@@ -1636,7 +1725,7 @@ export default function GeneralTests({
         >
           <div
             id="displayCard"
-            className={`pp-button ${grid ? 'selected' : ''}`}
+            className={`pp-button ${shownGrid ? 'selected' : ''}`}
             title={intl.formatMessage({
               id: 'generalTests.tooltip.displayCard',
               defaultMessage: 'Afficher les tests sous forme de cartes',
@@ -1653,7 +1742,7 @@ export default function GeneralTests({
           </div>
           <div
             id="displayList"
-            className={`pp-button ${grid ? '' : 'selected'}`}
+            className={`pp-button ${shownGrid ? '' : 'selected'}`}
             title={intl.formatMessage({
               id: 'generalTests.tooltip.displayList',
               defaultMessage: 'Afficher les tests sous forme de liste',
@@ -1699,7 +1788,7 @@ export default function GeneralTests({
         <TestsGrid
           vscode={vscode}
           filtered={tuto ? [sampleTest(intl)] : filteredTests}
-          grid={grid}
+          grid={shownGrid}
           filterScope={filterScope}
           onRun={onRun}
           filters={filters}
