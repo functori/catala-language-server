@@ -9,6 +9,8 @@ import {
 } from 'react';
 import { useIntl } from 'react-intl';
 import { getVsCodeApi } from '../shared/webviewApi';
+import { HighlightText } from '../shared/Highlight';
+import type { Filter } from '../FilterPin';
 import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { CodeLocation } from './traceUtils';
 import { posText } from './traceUtils';
@@ -137,8 +139,10 @@ function SnippetBlock({
 
 export function LocationSnippet({
   pos,
+  filters,
 }: {
   pos: CodeLocation;
+  filters: Filter[];
 }): ReactElement | null {
   const cwd = useContext(CwdContext);
   const startLine = pos.start.line;
@@ -162,22 +166,10 @@ export function LocationSnippet({
   if (extracts === null || file === undefined) {
     return null;
   }
-  const lines = extracts.map((e) => e?.text ?? null);
-  if (lines.length > 1) {
-    return (
-      <SnippetBlock pos={pos} file={file}>
-        {lines.map((line) => line ?? '').join('\n')}
-      </SnippetBlock>
-    );
-  }
-  const text = lines[0] ?? '';
-  const from = Math.max(0, pos.start.character - 1);
-  const to = Math.max(from, pos.end.character - 1);
+  const text = extracts.map((e) => e?.text ?? '').join('\n');
   return (
     <SnippetBlock pos={pos} file={file}>
-      {text.slice(0, from)}
-      <mark style={markStyle}>{text.slice(from, to) || ' '}</mark>
-      {text.slice(to)}
+      <HighlightText filters={filters} text={text} />
     </SnippetBlock>
   );
 }
@@ -223,10 +215,4 @@ const openButtonStyle: CSSProperties = {
 const openButtonHoverStyle: CSSProperties = {
   background: 'var(--vscode-toolbar-hoverBackground, transparent)',
   opacity: 1,
-};
-
-const markStyle: CSSProperties = {
-  background: 'var(--vscode-editor-findMatchHighlightBackground, yellow)',
-  color: 'inherit',
-  borderRadius: 2,
 };
