@@ -1176,6 +1176,32 @@ const stepsTests: Step[] = [
   },
 ];
 
+function sampleTest(intl: IntlShape): TestMacro {
+  return testMacro({
+    index: 0,
+    filename: 'tests/test_1.catala_en',
+    relative_filename: 'tests/test_1.catala_en',
+    test: {
+      kind: 'GUI',
+      value: {
+        scope: 'Test1',
+        scope_tested: intl.formatMessage({
+          id: 'generalTests.tuto.sampleScope',
+        }),
+        title: intl.formatMessage(
+          { id: 'generalTests.tuto.sampleTitle' },
+          { num: 1 }
+        ),
+        description: intl.formatMessage({
+          id: 'generalTests.tuto.sampleDescription',
+        }),
+      },
+    },
+    success: true,
+    date: '13/10/2026',
+  });
+}
+
 function samplePins(intl: IntlShape): Filter[] {
   const includeExemple: Filter = {
     filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
@@ -1610,7 +1636,7 @@ export default function GeneralTests({
       ) : (
         <TestsGrid
           vscode={vscode}
-          filtered={filteredTests}
+          filtered={tuto ? [sampleTest(intl)] : filteredTests}
           grid={grid}
           filterScope={filterScope}
           onRun={onRun}
