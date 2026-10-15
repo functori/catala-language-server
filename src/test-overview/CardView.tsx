@@ -53,6 +53,7 @@ function TestItem({ vscode, test, filters, onRun }: TestItemArg): ReactElement {
           success={test.last_run?.success}
         />
         <span
+          className="test-date"
           title={intl.formatMessage({
             id: 'generalTests.header.lastTestDate',
             defaultMessage: 'Date du dernier test',
