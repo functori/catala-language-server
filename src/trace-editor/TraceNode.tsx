@@ -20,12 +20,11 @@ import type {
 } from './traceUtils';
 import {
   describeKind,
-  detail,
   filterMatches,
   elementCodeSpan,
   formatTraceValue,
   inlineTraceValue,
-  indexedSegment,
+  stepPath,
   nodeMatchState,
   posText,
   subtreeHasMismatch,
@@ -65,10 +64,6 @@ function toneColor(tone: Tone): string | undefined {
 function relatedLocations(kind: TraceKind): CodeLocation[] {
   const rp = kind.related_pos;
   return Array.isArray(rp) ? (rp as unknown as CodeLocation[]) : [];
-}
-
-function isSingleLine(pos?: CodeLocation): pos is CodeLocation {
-  return !!pos && pos.start.line === pos.end.line;
 }
 
 function formatPos(
@@ -168,112 +163,50 @@ export default function TraceNode({
 }): ReactElement | null {
   const [showValue, setShowValue] = useState(false);
   const [showCode, setShowCode] = useState(false);
-  if (te.element.kind === 'exception' && depth === 1) return null;
+  const [showConsequence, setShowConsequence] = useState(false);
 
   const filtering = filters.length > 0;
-  // `filters` is a fresh array on every render, so it cannot be used as an
-  // effect dependency: the effect below would re-run each time
   const filterKey = filters.map((f) => `${f.option}:${f.filter}`).join('\n');
   const expected = useContext(ExpectedContext);
   const stepIndices = useContext(IndexContext);
   const intl = useIntl();
-
-  const singleLinePos =
-    te.element.kind !== 'scope_var' && isSingleLine(te.pos)
-      ? te.pos
-      : undefined;
-
-  const fulfilled =
-    te.element.kind === 'exception' &&
-    te.value?.kind === 'bool' &&
-    te.value.value === true;
-  const consPos = fulfilled ? asCodeLocation(te.element.cons_pos) : undefined;
-  const consSingleLine = isSingleLine(consPos) ? consPos : undefined;
-
-  const [node, displayName, isMerged]: [TraceElement, string, boolean] =
-    te.element.kind === 'scope_var' &&
-    typeof te.element.name === 'string' &&
-    te.trace?.length === 1 &&
-    te.trace[0].element.kind === 'scope_call' &&
-    typeof te.trace[0].element.name === 'string'
-      ? [te.trace[0], `${te.element.name}.${te.trace[0].element.name}`, true]
-      : [te, te.element.name as string, false];
-
-  const children = node.trace ?? [];
-  const hasChildren = children.length > 0;
-  const containerValue =
-    te.element.kind !== 'if_branching' &&
-    te.element.kind !== 'scope_call' &&
-    te.value !== undefined &&
-    inlineTraceValue(te.value, intl) === undefined
-      ? formatTraceValue(te.value, intl, 'en', true)
-      : undefined;
-  const onlyContainerValue =
-    containerValue !== undefined &&
-    !hasChildren &&
-    !singleLinePos &&
-    !consSingleLine;
-
-  const defaultExpanded =
-    node.element.kind === 'assertion'
-      ? hasChildren
-      : onlyContainerValue
-        ? false
-        : depth < 1;
+  const defaultExpanded = depth < 2;
   const [expanded, setExpanded] = useState(defaultExpanded);
   useEffect(() => {
     setExpanded(
       filters.some((f) => f.option == 'include') ? true : defaultExpanded
     );
   }, [filterKey, defaultExpanded, filtering]);
-
   const expandCmd = useContext(ExpandContext);
   useEffect(() => {
     if (expandCmd != null) {
       setExpanded(expandCmd);
     }
   }, [expandCmd]);
-
-  let childPrefix: string = prefix;
-  let testedScope: string | undefined = tested_scope;
-  if (
-    (node.element.kind === 'scope_call' ||
-      node.element.kind === 'scope_var' ||
-      node.element.kind === 'local_var') &&
-    typeof node.element.name === 'string'
-  ) {
-    if (node.element.name == tested_scope) {
-      testedScope = undefined;
-    } else {
-      const segment = indexedSegment(node, displayName, stepIndices);
-      childPrefix = prefix ? `${prefix}.${segment}` : segment;
-    }
-  }
-
+  const step = stepPath(te, { prefix, testedScope: tested_scope }, stepIndices);
+  const childPrefix = step.prefix;
+  const testedScope = step.testedScope;
   const hasMismatch =
-    expected !== null &&
-    subtreeHasMismatch(node, childPrefix, expected, stepIndices);
+    expected !== null && subtreeHasMismatch(te, step, expected, stepIndices);
   useEffect(() => {
     if (hasMismatch) {
       setExpanded(true);
     }
   }, [hasMismatch]);
-
   const open = expanded;
-
-  if (filtering && !subtreeMatches(node, filters, intl)) {
+  if (filtering && !subtreeMatches(te, filters, intl)) {
     return null;
   }
-  const [childFilters] = filtering ? filterMatches(node, filters, intl) : [[]];
+  const [childFilters] = filtering ? filterMatches(te, filters, intl) : [[]];
   let matchBackground: string | undefined;
   if (
     expected &&
-    node.value !== undefined &&
-    (node.element.kind === 'scope_var' || node.element.kind === 'local_var') &&
-    typeof node.element.name === 'string'
+    tested_scope === undefined &&
+    te.value !== undefined &&
+    (te.element.kind === 'scope_var' || te.element.kind === 'local_var') &&
+    typeof te.element.name === 'string'
   ) {
-    const path = prefix ? `${prefix}.${node.element.name}` : node.element.name;
-    const state = nodeMatchState(expected, path, node.value);
+    const state = nodeMatchState(expected, step.prefix, te.value);
     if (state !== undefined) {
       matchBackground =
         state === 'mismatch'
@@ -281,31 +214,34 @@ export default function TraceNode({
           : 'var(--vscode-diffEditor-insertedTextBackground, rgba(35, 200, 60, 0.2))';
     }
   }
-
-  const described: Described = isMerged
-    ? {
-        symbol: '→',
-        label: intl.formatMessage(
-          { id: 'trace.computationOf' },
-          { name: `${detail(te.element.name)} (${detail(node.element.name)})` }
-        ),
-        tone: 'scope',
-        showsValue: true,
-        showsCode: true,
-      }
-    : describeKind(node.element, intl);
+  const described: Described = describeKind(te.element, intl);
   const snippetPos = described.showsCode
     ? (te.codeSpan ?? elementCodeSpan(te))
     : undefined;
   const accentColor =
-    node.element.kind === 'assertion'
-      ? !node.trace
+    te.element.kind === 'assertion'
+      ? !te.trace
         ? 'var(--vscode-testing-iconPassed, var(--vscode-charts-green))'
         : 'var(--vscode-errorForeground)'
       : toneColor(described.tone);
   const related =
-    node.element.kind === 'error' ? relatedLocations(node.element) : [];
-  const expandable = hasChildren || !!consPos || related.length > 0;
+    te.element.kind === 'error' ? relatedLocations(te.element) : [];
+  const children = te.trace ?? [];
+  const hasChildren = children.length > 0;
+  const expandable = hasChildren || related.length > 0;
+  const containerValue =
+    te.element.kind !== 'if_branching' &&
+    te.element.kind !== 'scope_call' &&
+    te.value !== undefined &&
+    inlineTraceValue(te.value, intl) === undefined
+      ? formatTraceValue(te.value, intl, 'en', true)
+      : undefined;
+  const consPos =
+    te.element.kind === 'exception' &&
+    te.value?.kind === 'bool' &&
+    te.value.value === true
+      ? asCodeLocation(te.element.cons_pos)
+      : undefined;
   return (
     <li style={liStyle}>
       <div
@@ -338,7 +274,9 @@ export default function TraceNode({
           </span>
         )}
         <ValueView te={te} described={described} filters={filters} />
-        {(containerValue !== undefined || snippetPos) && (
+        {(containerValue !== undefined ||
+          snippetPos !== undefined ||
+          consPos) && (
           <span style={pillsStyle}>
             {containerValue !== undefined && (
               <Pill
@@ -354,6 +292,13 @@ export default function TraceNode({
                 onToggle={() => setShowCode((v) => !v)}
               />
             )}
+            {consPos && (
+              <Pill
+                labelId="trace.consequence"
+                active={showConsequence}
+                onToggle={() => setShowConsequence((v) => !v)}
+              />
+            )}
           </span>
         )}
       </div>
@@ -367,19 +312,13 @@ export default function TraceNode({
           <LocationSnippet pos={snippetPos} />
         </div>
       )}
-      {open && (
+      {showConsequence && consPos && (
         <div style={openContentStyle}>
-          {consPos && (
-            <>
-              <div
-                style={{ ...consequenceLabelStyle, color: toneColor('branch') }}
-              >
-                {'⊸ '}
-                <FormattedMessage id="trace.consequence" />
-              </div>
-              <LocationSnippet pos={consPos} />
-            </>
-          )}
+          <LocationSnippet pos={consPos} />
+        </div>
+      )}
+      {open && expandable && (
+        <div style={openContentStyle}>
           {related.length > 0 && (
             <div style={relatedStyle}>
               <span style={{ color: 'var(--vscode-descriptionForeground)' }}>
@@ -467,7 +406,7 @@ function ValueView({
 const childListStyle: CSSProperties = {
   listStyle: 'none',
   margin: 0,
-  paddingLeft: 16,
+  paddingLeft: 8,
   borderLeft: '1px solid var(--vscode-panel-border, transparent)',
 };
 
@@ -486,7 +425,7 @@ const rowStyle: CSSProperties = {
 };
 
 const openContentStyle: CSSProperties = {
-  paddingLeft: 16,
+  paddingLeft: 8,
 };
 
 const pillsStyle: CSSProperties = {
@@ -552,12 +491,6 @@ const relatedStyle: CSSProperties = {
   flexDirection: 'column',
   gap: 2,
   margin: '2px 0 4px 22px',
-  fontSize: '0.9em',
-};
-
-const consequenceLabelStyle: CSSProperties = {
-  margin: '2px 0 0 22px',
-  fontWeight: 600,
   fontSize: '0.9em',
 };
 
