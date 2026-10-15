@@ -6,7 +6,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { FormattedMessage, useIntl } from 'react-intl';
+import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
 
 import { type WebviewApi } from 'vscode-webview';
 
@@ -1025,7 +1025,7 @@ function FilterPanel({
             {/* The tutorial targets this wrapper rather than the field: the
                 field is zoomed, which throws off the measures the spotlight
                 is drawn from. */}
-            <div id="searchBar" style={{ display: 'inline-flex' }}>
+            <div style={{ display: 'inline-flex' }}>
               <VscodeTextfield
                 className="search-bar"
                 value={filter}
@@ -1140,22 +1140,22 @@ const stepsFilter = [
   {
     id: 'filter_search',
     content: <FormattedMessage id="generalTests.tuto.filterSearch" />,
-    target: '#searchBar',
+    target: '#filterPins',
   },
   {
     id: 'filter_pin_include',
     content: <PinStep option="include" />,
-    target: '#filterPins',
+    target: '#filter-pins',
   },
   {
     id: 'filter_pin_exclude',
     content: <PinStep option="exclude" />,
-    target: '#filterPins',
+    target: '#filter-pins',
   },
   {
     id: 'filter_pin_ignore',
     content: <PinStep option="ignore" />,
-    target: '#filterPins',
+    target: '#filter-pins',
   },
 ];
 
@@ -1254,15 +1254,29 @@ function SampleList(): ReactElement {
   );
 }
 
+function samplePins(intl: IntlShape): Filter[] {
+  const includeExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'include',
+  };
+  const excludeExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'exclude',
+  };
+
+  const ignoreExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'ignore',
+  };
+  return [includeExemple, excludeExemple, ignoreExemple];
+}
+
 // Tutorial step showing a sample pin, drawn by the real `FilterPins` so that
 // it looks exactly like the ones of the search bar. The setter is a no-op:
 // the sample pin is only there to be seen.
 function PinStep({ option }: { option: Filter['option'] }): ReactElement {
   const intl = useIntl();
-  const sample: Filter = {
-    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
-    option,
-  };
+  const pins = samplePins(intl);
   const messageId = {
     include: 'generalTests.tuto.filterPinInclude',
     exclude: 'generalTests.tuto.filterPinExclude',
@@ -1271,7 +1285,10 @@ function PinStep({ option }: { option: Filter['option'] }): ReactElement {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <FilterPins filters={[sample]} setFilters={() => {}} />
+        <FilterPins
+          filters={pins.filter((pin) => pin.option == option)}
+          setFilters={() => {}}
+        />
       </div>
       <FormattedMessage id={messageId} />
     </div>
@@ -1378,6 +1395,7 @@ function noFilter(
 export default function GeneralTests({
   vscode,
 }: GeneralTestsArg): ReactElement {
+  const [tuto, setTuto] = useState<boolean>(false);
   const intl = useIntl();
   // Joyride scrolls a target this far from the top of the view: below the
   // unfolded tutorial menu, plus Joyride's own default margin of 20px.
@@ -1392,8 +1410,14 @@ export default function GeneralTests({
   });
 
   useEffect(() => {
-    return on('tour:end', () => {
-      console.log('Tour finished!');
+    on('tour:end', () => {
+      setTuto(false);
+    });
+    on('error', () => {
+      setTuto(false);
+    });
+    on('tour:start', () => {
+      setTuto(true);
     });
   }, [on]);
 
@@ -1573,8 +1597,8 @@ export default function GeneralTests({
         filterScope={filterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
-        filters={filters}
-        setFilters={setFilters}
+        filters={tuto ? samplePins(intl) : filters}
+        setFilters={tuto ? (): void => {} : setFilters}
       />
       <div className="select-test-print">
         <FormattedMessage
