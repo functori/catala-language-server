@@ -50,7 +50,6 @@
 
   /* Widths shared across components */
   /* scalar field: grid column, primitive editor, table column */
-  --field-width: 250px;
   --field-width-min: 150px;
   /* array element card */
   --card-width-min: 200px;

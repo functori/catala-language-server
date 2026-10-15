@@ -4,31 +4,45 @@
   gap: var(--field-gap);
 }
 
-/* Grid + subgrid: the container owns the column widths and each row's
-   label/control tracks, so a wrapped label never shifts its own control.
-   auto-fill sizes columns by the max; the min only matters when narrower. */
+/* Wrapping flex rows: each item is as wide as its own content. Items of a
+   row are stretched to the same height and push their control to the bottom,
+   so a wrapped label never shifts its own control out of line. */
 .simple-items-container {
-  display: grid;
-  grid-template-columns: repeat(
-    auto-fill,
-    minmax(var(--field-width-min), var(--field-width))
-  );
-  justify-content: start;
-  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
   gap: var(--field-gap);
 }
 
 .simple-item {
   box-sizing: border-box;
-  display: grid;
-  grid-template-rows: subgrid;
-  grid-row: span 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   /* label to control */
-  row-gap: var(--label-gap);
+  gap: var(--label-gap);
 }
 
 .simple-item > .item-label {
   margin-bottom: 0;
+  display: flex;
+  /* The label takes no part in the item's width: it only fills what the
+     editor below leaves it. */
+  contain: inline-size;
+}
+
+.item-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: copy;
+}
+
+/* The break opportunities Identifier puts after each underscore still let
+   Chromium wrap despite `nowrap`: a truncated label must stay on one line. */
+.item-label-text wbr {
+  display: none;
 }
 
 .simple-items-vertical {
