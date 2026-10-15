@@ -38,6 +38,7 @@ export function FilterPins({
     <div id="filter-pins" style={pinsStyle}>
       {filters.map((filter) => (
         <span
+          id={`${filter.option}-${filter.filter}`}
           key={`${filter.option}-${filter.filter}`}
           onClick={(e) => {
             e.preventDefault();
