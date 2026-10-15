@@ -34,7 +34,7 @@ import { useTraceMenu } from './traceMenu';
 import { FilterPins, type Filter } from '../FilterPin';
 import TraceNode from './TraceNode';
 import { useCatalaSettings } from '../shared/useSettings';
-import { showsTraceKind } from '../shared/settings';
+import { showsTraceKind, traceViewKindOf } from '../shared/settings';
 
 type SetFilter = React.Dispatch<React.SetStateAction<Filter[]>>;
 
@@ -77,7 +77,9 @@ function TraceTreeView({
   const settings = useCatalaSettings();
 
   trace = withCodeSpans(trace);
-  trace = flattenHiddenKinds(trace, (kind) => showsTraceKind(settings, kind));
+  trace = flattenHiddenKinds(trace, (kind, parentKind) =>
+    showsTraceKind(settings, traceViewKindOf(kind, parentKind))
+  );
 
   let roots: TraceElement[] = trace;
   if (test !== undefined) {

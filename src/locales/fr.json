@@ -203,7 +203,6 @@
   "trace.notFulfilled": "non rempli",
   "trace.absent": "Absent",
   "trace.openLocation": "Ouvrir {target}",
-  "trace.computationOf": "Calcul de {name}",
   "trace.kind.scope": "Champ d'application",
   "trace.kind.scopeVariable": "Interne",
   "trace.kind.scopeInputVariable": "Entrée",
