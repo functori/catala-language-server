@@ -160,16 +160,61 @@ function buildNode(
   path: string,
   expected: TraceValue | undefined,
   computed: TraceValue | undefined,
-  intl: IntlShape
+  intl: IntlShape,
+  expand = false
 ): DataNode {
   const shape = expected ?? computed;
 
   if (isStruct(expected) || isStruct(computed)) {
-    return { label, path, kind: 'struct' };
+    if (!expand || !isStruct(computed)) {
+      return { label, path, kind: 'struct' };
+    }
+    const fields = Object.keys(computed.fields);
+    if (fields.length === 0) {
+      return { label, path, kind: 'struct', value: '{}' };
+    }
+    return {
+      label,
+      path,
+      kind: 'struct',
+      children: leavesFirst(
+        fields.map((field) =>
+          buildNode(
+            field,
+            `${path}.${field}`,
+            undefined,
+            computed.fields[field],
+            intl,
+            expand
+          )
+        )
+      ),
+    };
   }
 
   if (isArray(expected) || isArray(computed)) {
-    return { label, path, kind: 'array' };
+    if (!expand || !isArray(computed)) {
+      return { label, path, kind: 'array' };
+    }
+    if (computed.values.length === 0) {
+      return { label, path, kind: 'array', value: '[]' };
+    }
+    return {
+      label,
+      path,
+      kind: 'array',
+      children: computed.values.map(([item, name], index) => {
+        const segment = name ?? String(index);
+        return buildNode(
+          `[${segment}]`,
+          `${path}[${segment}]`,
+          undefined,
+          item,
+          intl,
+          expand
+        );
+      }),
+    };
   }
 
   const sameCtor =
@@ -190,7 +235,8 @@ function buildNode(
           `${path}.${ctor}`,
           isWrapper(expected) ? expected.value : undefined,
           isWrapper(computed) ? computed.value : undefined,
-          intl
+          intl,
+          expand
         ),
       ],
     };
@@ -257,7 +303,7 @@ export function DataPanel({
 
   const inputNodes = leavesFirst(
     [...test.test_inputs.entries()].map(([name, io]) =>
-      buildNode(name, name, undefined, ioValue(io), intl)
+      buildNode(name, name, undefined, ioValue(io), intl, true)
     )
   );
 
