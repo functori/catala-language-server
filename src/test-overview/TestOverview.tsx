@@ -38,6 +38,13 @@ export default function TestOverview({
     matchFilter(test, filters, filterScope, filterGui)
   );
 
+  const filteredTestsForScope = tuto
+    ? [sampleTest(intl)]
+    : tests?.filter((test) => matchFilter(test, filters, [], filterGui));
+  // The user's scope selection is set aside during the tutorial, so that the
+  // sample looks the same for everyone.
+  const shownFilterScope = tuto ? [] : filterScope;
+
   const steps = tutoSteps(intl);
   const { controls, on, state, Tour } = useJoyride({
     continuous: true,
@@ -103,9 +110,9 @@ export default function TestOverview({
         </div>
       </div>
       <FilterPanel
-        tests={tests}
+        scopeTests={filteredTestsForScope}
         setFilterScope={setFilterScope}
-        filterScope={filterScope}
+        filterScope={shownFilterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
         filters={tuto ? samplePins(intl) : filters}
@@ -186,7 +193,7 @@ export default function TestOverview({
           vscode={vscode}
           filtered={tuto ? [sampleTest(intl)] : filteredTests}
           grid={shownGrid}
-          filterScope={filterScope}
+          filterScope={shownFilterScope}
           onRun={onRun}
           filters={filters}
         />
