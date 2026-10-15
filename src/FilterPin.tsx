@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactElement } from 'react';
+import { type CSSProperties, type ReactElement } from 'react';
 import type { IntlShape } from 'react-intl';
 import { useIntl } from 'react-intl';
 
@@ -35,10 +35,10 @@ export function FilterPins({
     setFilters((old) => old.filter((current) => current.filter !== toRemove));
   };
   return (
-    <div style={pinsStyle}>
+    <div id="filter-pins" style={pinsStyle}>
       {filters.map((filter) => (
         <span
-          key={filter.filter}
+          key={`${filter.option}-${filter.filter}`}
           onClick={(e) => {
             e.preventDefault();
             onClickFilter(filter.filter);
