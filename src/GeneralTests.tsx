@@ -1194,37 +1194,34 @@ const inertVsCode: WebviewApi<unknown> = {
   setState: <T,>(state: T) => state,
 };
 
-function useSampleTests(): TestMacro[] {
-  const intl = useIntl();
-  const sample = (index: number, success: boolean): TestMacro =>
-    testMacro({
-      index,
-      filename: `tests/test_${index + 1}.catala_en`,
-      relative_filename: `tests/test_${index + 1}.catala_en`,
-      test: {
-        kind: 'GUI',
-        value: {
-          scope: `Test${index + 1}`,
-          scope_tested: intl.formatMessage({
-            id: 'generalTests.tuto.sampleScope',
-          }),
-          title: intl.formatMessage(
-            { id: 'generalTests.tuto.sampleTitle' },
-            { num: index + 1 }
-          ),
-          description: intl.formatMessage({
-            id: 'generalTests.tuto.sampleDescription',
-          }),
-        },
+function sampleTest(intl: IntlShape): TestMacro {
+  return testMacro({
+    index: 0,
+    filename: 'tests/test_1.catala_en',
+    relative_filename: 'tests/test_1.catala_en',
+    test: {
+      kind: 'GUI',
+      value: {
+        scope: 'Test1',
+        scope_tested: intl.formatMessage({
+          id: 'generalTests.tuto.sampleScope',
+        }),
+        title: intl.formatMessage(
+          { id: 'generalTests.tuto.sampleTitle' },
+          { num: 1 }
+        ),
+        description: intl.formatMessage({
+          id: 'generalTests.tuto.sampleDescription',
+        }),
       },
-      success,
-      date: '13/10/2026',
-    });
-  return [sample(0, true)];
+    },
+    success: true,
+    date: '13/10/2026',
+  });
 }
 
 function SampleCard(): ReactElement {
-  const [test] = useSampleTests();
+  const intl = useIntl();
   return (
     <div>
       <p>
@@ -1233,7 +1230,7 @@ function SampleCard(): ReactElement {
       <div style={{ fontSize: '8px', textAlign: 'left' }}>
         <TestItem
           vscode={inertVsCode}
-          test={test}
+          test={sampleTest(intl)}
           filters={[]}
           onRun={() => {}}
         />
@@ -1243,6 +1240,7 @@ function SampleCard(): ReactElement {
 }
 
 function SampleList(): ReactElement {
+  const intl = useIntl();
   return (
     <div>
       <p>
@@ -1251,7 +1249,7 @@ function SampleList(): ReactElement {
       <div style={{ textAlign: 'left' }}>
         <TestList
           vscode={inertVsCode}
-          tests={useSampleTests()}
+          tests={[sampleTest(intl)]}
           filteredScope={[]}
           filters={[]}
           onRun={() => {}}
@@ -1623,7 +1621,7 @@ export default function GeneralTests({
         filterGui={filterGui}
         setFilterGui={setFilterGui}
         filters={tuto ? samplePins(intl) : filters}
-        setFilters={tuto ? (): void => {} : setFilters}
+        setFilters={setFilters}
       />
       <div className="select-test-print">
         <FormattedMessage
@@ -1699,7 +1697,7 @@ export default function GeneralTests({
       ) : (
         <TestsGrid
           vscode={vscode}
-          filtered={filteredTests}
+          filtered={tuto ? [sampleTest(intl)] : filteredTests}
           grid={grid}
           filterScope={filterScope}
           onRun={onRun}
