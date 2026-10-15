@@ -4,7 +4,8 @@ import type { Step } from 'react-joyride';
 
 import { FilterPins, type Filter } from '../FilterPin';
 import { placeChapters, type PlacedChapter } from '../shared/Tutorial';
-import type { TestMacro } from './types';
+import type { TestMacro, TestState } from './types';
+import { TestStateIcon } from './widgets';
 
 // The guided tour of the 'debug all tests' panel.
 
@@ -90,6 +91,150 @@ const stepsTests: Step[] = [
   },
 ];
 
+const stepsCard: Step[] = [
+  {
+    id: 'tests_display_card',
+    content: <FormattedMessage id="generalTests.tuto.displayCard" />,
+    target: '#displayCard',
+    placement: 'top',
+  },
+  // The fields of a card, shown on the sample test.
+  {
+    id: 'tests_card_title',
+    content: <FormattedMessage id="generalTests.tuto.card.title" />,
+    target: '.test-item .test-title',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_number',
+    content: <FormattedMessage id="generalTests.tuto.card.number" />,
+    target: '.test-item .test-number',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_description',
+    content: <FormattedMessage id="generalTests.tuto.card.description" />,
+    target: '.test-item .test-descr',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_state',
+    content: <SampleStates />,
+    target: '.test-item .check-icon',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_date',
+    content: <FormattedMessage id="generalTests.tuto.card.date" />,
+    target: '.test-item .test-date',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_open',
+    content: <FormattedMessage id="generalTests.tuto.card.open" />,
+    target: '.test-item .open-gui',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_run',
+    content: <FormattedMessage id="generalTests.tuto.card.run" />,
+    target: '.test-item .run-icon',
+    placement: 'top',
+  },
+];
+
+const stepsList: Step[] = [
+  {
+    id: 'tests_display_list',
+    content: <FormattedMessage id="generalTests.tuto.displayList" />,
+    target: '#displayList',
+    placement: 'top',
+  },
+  // The columns of the list, shown on the sample test. The texts shared with
+  // the card are reused.
+  {
+    id: 'tests_list_file',
+    content: <FormattedMessage id="generalTests.tuto.list.file" />,
+    target: '.test-list tbody tr .path-column',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_title',
+    content: <FormattedMessage id="generalTests.tuto.card.title" />,
+    target: '.test-list tbody tr td:nth-child(2)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_scope',
+    content: <FormattedMessage id="generalTests.tuto.list.scope" />,
+    target: '.test-list tbody tr td:nth-child(3)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_description',
+    content: <FormattedMessage id="generalTests.tuto.card.description" />,
+    target: '.test-list tbody tr td:nth-child(4)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_date',
+    content: <FormattedMessage id="generalTests.tuto.card.date" />,
+    target: '.test-list tbody tr td:nth-child(5)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_state',
+    content: <SampleStates />,
+    target: '.test-list tbody tr td:nth-child(6)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_run',
+    content: <FormattedMessage id="generalTests.tuto.card.run" />,
+    target: '.test-list tbody tr .run-icon',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_open',
+    content: <FormattedMessage id="generalTests.tuto.card.open" />,
+    target: '.test-list tbody tr .open-gui',
+    placement: 'top',
+  },
+];
+
+// One line per state, each with its own icon: written as a sentence, the
+// states read as a single one.
+function SampleStates(): ReactElement {
+  // The ids are written out in full so that the i18n check finds them.
+  // `TestStateIcon` derives the state from these two fields.
+  const states: [
+    TestState,
+    { loading?: boolean; success?: boolean },
+    string,
+  ][] = [
+    ['Success', { success: true }, 'generalTests.tuto.card.stateSuccess'],
+    ['Failed', { success: false }, 'generalTests.tuto.card.stateFailed'],
+    ['Loading', { loading: true }, 'generalTests.tuto.card.stateLoading'],
+    ['Unknown', {}, 'generalTests.tuto.card.stateUnknown'],
+  ];
+  return (
+    <div style={{ textAlign: 'left' }}>
+      <FormattedMessage id="generalTests.tuto.card.state" />
+      <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+        {states.map(([state, props, id]) => (
+          <li
+            key={state}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}
+          >
+            <TestStateIcon {...props} />
+            <FormattedMessage id={id} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function sampleTest(intl: IntlShape): TestMacro {
   return {
     index: 0,
@@ -163,6 +308,8 @@ export function tutoChapters(intl: IntlShape): PlacedChapter[] {
       { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
       { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter(intl) },
       { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
+      { title: 'generalTests.tuto.chapter.card', steps: stepsCard },
+      { title: 'generalTests.tuto.chapter.list', steps: stepsList },
     ],
     stepsWelcome.length
   );

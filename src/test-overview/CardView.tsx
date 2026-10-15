@@ -54,6 +54,7 @@ function TestItem({ vscode, test, filters, onRun }: TestItemArg): ReactElement {
       <div className="footer">
         <TestStateIcon loading={test.loading} success={test.success} />
         <span
+          className="test-date"
           title={intl.formatMessage({
             id: 'generalTests.header.lastTestDate',
             defaultMessage: 'Date du dernier test',
