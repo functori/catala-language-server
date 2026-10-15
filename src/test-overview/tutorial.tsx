@@ -20,6 +20,16 @@ const stepsWelcome: Step[] = [
   },
 ];
 
+// Like the welcome step, the closing one is not a chapter of the menu.
+const stepsEnd: Step[] = [
+  {
+    id: 'end',
+    content: <FormattedMessage id="generalTests.tuto.end" />,
+    target: 'body',
+    placement: 'center',
+  },
+];
+
 const stepsButton: Step[] = [
   {
     id: 'test_add',
@@ -322,5 +332,6 @@ export function tutoSteps(intl: IntlShape): Step[] {
   return [
     ...stepsWelcome,
     ...tutoChapters(intl).flatMap((chapter) => chapter.steps),
+    ...stepsEnd,
   ];
 }
