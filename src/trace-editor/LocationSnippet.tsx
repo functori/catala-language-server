@@ -14,17 +14,31 @@ import type { CodeLocation } from './traceUtils';
 import { posText } from './traceUtils';
 import { CwdContext } from './traceContexts';
 
-export function resolvePath(cwd: string, file: string): string {
-  if (!cwd || file.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(file)) {
+function resolvePath(cwd: string, file: string): string {
+  if (!cwd || isAbsolute(file)) {
     return file;
   }
   return `${cwd.replace(/[\\/]+$/, '')}/${file}`;
 }
 
+function isAbsolute(file: string): boolean {
+  return file.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(file);
+}
+
+export function candidatePaths(cwd: string, file: string): string[] {
+  const direct = resolvePath(cwd, file);
+  if (isAbsolute(file)) {
+    return [direct];
+  }
+  return [direct, resolvePath(cwd, `_build/${file}`)];
+}
+
 // -- Fetching the source lines ------------------------------------------------
 
-const extractCache = new Map<string, string | null>();
-const pendingExtracts = new Map<number, (line: string | null) => void>();
+type Extract = { file: string; text: string } | null;
+
+const extractCache = new Map<string, Extract>();
+const pendingExtracts = new Map<number, (extract: Extract) => void>();
 let extractSeq = 0;
 let extractListenerAttached = false;
 
@@ -39,29 +53,30 @@ function ensureExtractListener(): void {
       const callback = pendingExtracts.get(m.id);
       if (callback) {
         pendingExtracts.delete(m.id);
-        callback(m.text);
+        callback(
+          m.text === null || m.file === undefined
+            ? null
+            : { file: m.file, text: m.text }
+        );
       }
     }
   });
 }
 
-async function fetchExtract(
-  file: string,
-  line: number
-): Promise<string | null> {
-  const key = `${file}:${line}`;
+function fetchExtract(files: string[], line: number): Promise<Extract> {
+  const key = `${files.join('\u0000')}:${line}`;
   const cached = extractCache.get(key);
   if (cached !== undefined) {
     return Promise.resolve(cached);
   }
   ensureExtractListener();
   const id = extractSeq++;
-  return new Promise<string | null>((resolve) => {
+  return new Promise<Extract>((resolve) => {
     pendingExtracts.set(id, resolve);
     const message: TraceUpMessage = {
       kind: 'requestExtract',
       id,
-      file,
+      files,
       line,
     };
     getVsCodeApi().postMessage(message);
@@ -75,19 +90,20 @@ async function fetchExtract(
 
 function SnippetBlock({
   pos,
+  file,
   children,
 }: {
   pos: CodeLocation;
+  file: string;
   children: ReactNode;
 }): ReactElement {
-  const cwd = useContext(CwdContext);
   const intl = useIntl();
   const [hover, setHover] = useState(false);
   const openLocation = (e: MouseEvent): void => {
     e.stopPropagation();
     const message: TraceUpMessage = {
       kind: 'openLocation',
-      file: resolvePath(cwd, pos.file),
+      files: [file],
       start: pos.start,
       end: pos.end,
     };
@@ -127,27 +143,29 @@ export function LocationSnippet({
   const cwd = useContext(CwdContext);
   const startLine = pos.start.line;
   const endLine = Math.max(startLine, pos.end.line);
-  const [lines, setLines] = useState<(string | null)[] | null>(null);
+  const [extracts, setExtracts] = useState<Extract[] | null>(null);
   useEffect(() => {
     let cancelled = false;
     const nums: number[] = [];
     for (let l = startLine; l <= endLine; l++) nums.push(l);
     void Promise.all(
-      nums.map((l) => fetchExtract(resolvePath(cwd, pos.file), l))
-    ).then((texts) => {
-      if (!cancelled) setLines(texts);
+      nums.map((l) => fetchExtract(candidatePaths(cwd, pos.file), l))
+    ).then((found) => {
+      if (!cancelled) setExtracts(found);
     });
     return (): void => {
       cancelled = true;
     };
   }, [cwd, pos]);
 
-  if (lines === null || lines.every((l) => l === null)) {
+  const file = extracts?.find((e) => e !== null)?.file;
+  if (extracts === null || file === undefined) {
     return null;
   }
+  const lines = extracts.map((e) => e?.text ?? null);
   if (lines.length > 1) {
     return (
-      <SnippetBlock pos={pos}>
+      <SnippetBlock pos={pos} file={file}>
         {lines.map((line) => line ?? '').join('\n')}
       </SnippetBlock>
     );
@@ -156,7 +174,7 @@ export function LocationSnippet({
   const from = Math.max(0, pos.start.character - 1);
   const to = Math.max(from, pos.end.character - 1);
   return (
-    <SnippetBlock pos={pos}>
+    <SnippetBlock pos={pos} file={file}>
       {text.slice(0, from)}
       <mark style={markStyle}>{text.slice(from, to) || ' '}</mark>
       {text.slice(to)}
