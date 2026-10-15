@@ -1103,11 +1103,13 @@ const stepsWelcome = [
   },
 ];
 
-const stepsButton = [
+const stepsButton: Step[] = [
   {
     id: 'test_add',
     content: <FormattedMessage id="generalTests.tuto.addTest" />,
     target: '#addTest',
+    // No way back to the welcome step: the default buttons, without 'back'.
+    buttons: ['close', 'primary'],
   },
   {
     id: 'tests_run',
@@ -1303,13 +1305,17 @@ function PinStep({ option }: { option: Filter['option'] }): ReactElement {
 function chapters(
   intl: IntlShape
 ): { title: string; steps: Step[]; start: number }[] {
+  // The welcome steps come first in the tour but are not a chapter of the
+  // menu, so the chapters start after them.
   return [
     { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
     { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter(intl) },
     { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
   ].map((chapter, index, all) => ({
     ...chapter,
-    start: all.slice(0, index).reduce((n, { steps }) => n + steps.length, 0),
+    start: all
+      .slice(0, index)
+      .reduce((n, { steps }) => n + steps.length, stepsWelcome.length),
   }));
 }
 
@@ -1408,12 +1414,16 @@ export default function GeneralTests({
   // unfolded tutorial menu, plus Joyride's own default margin of 20px.
   const options: Partial<Options> = {
     skipBeacon: true,
+    blockTargetInteraction: true,
     scrollOffset: TUTO_MENU_TOP + TUTO_MENU_MAX_HEIGHT + 20,
   };
-  const steps = chapters(intl).flatMap((chapter) => chapter.steps);
+  const steps = [
+    ...stepsWelcome,
+    ...chapters(intl).flatMap((chapter) => chapter.steps),
+  ];
   const { controls, on, state, Tour } = useJoyride({
     continuous: true,
-    steps: [...stepsWelcome, ...steps],
+    steps,
     options,
   });
 
