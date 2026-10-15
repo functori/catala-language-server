@@ -10,7 +10,7 @@ import { TestsGrid } from './TestsView';
 import { useTests } from './useTests';
 import { Loading } from './widgets';
 import { FilterPanel } from './Filter';
-import { TutoMenu, tutoOptions } from '../shared/Tutorial';
+import { TutoMenu, tutoLocale, tutoOptions } from '../shared/Tutorial';
 import { useJoyride } from 'react-joyride';
 import { samplePins, tutoChapters, tutoSteps } from './tutorial';
 
@@ -37,6 +37,7 @@ export default function TestOverview({
     continuous: true,
     steps: tutoSteps(intl),
     options: tutoOptions,
+    locale: tutoLocale(intl),
   });
 
   useEffect(() => {
