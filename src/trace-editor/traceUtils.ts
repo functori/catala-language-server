@@ -508,14 +508,16 @@ function traceVariables(trace: TraceElement[]): TraceVariable[] {
 
 export function flattenHiddenKinds(
   trace: TraceElement[],
-  shows: (kind: string) => boolean
+  shows: (kind: string, parentKind?: string) => boolean,
+  parentKind?: string
 ): TraceElement[] {
   return trace.flatMap((element) => {
+    const kind = element.element.kind;
     const children =
       element.trace === undefined
         ? undefined
-        : flattenHiddenKinds(element.trace, shows);
-    return shows(element.element.kind)
+        : flattenHiddenKinds(element.trace, shows, kind);
+    return shows(kind, parentKind)
       ? [{ ...element, trace: children }]
       : (children ?? []);
   });
@@ -629,7 +631,7 @@ export function elementCodeSpan(te: TraceElement): CodeLocation | undefined {
     .reduce(
       (span, p) => ({
         file: span.file,
-        start: before(p.start, span.start) ? p.start : span.start,
+        start: span.start,
         end: before(span.end, p.end) ? p.end : span.end,
         law_headings: span.law_headings,
       }),
@@ -760,7 +762,7 @@ export type Described = {
   showsCode: boolean;
 };
 
-export function detail(x: JsonValue): string {
+function detail(x: JsonValue): string {
   return typeof x === 'string' ? x : '';
 }
 
@@ -912,48 +914,21 @@ export function nodeMatchState(
 
 export function subtreeHasMismatch(
   el: TraceElement,
-  childPrefix: string,
+  step: PathStep,
   expected: Expected,
   stepIndices: Map<TraceElement, number>
 ): boolean {
-  const newPrefix = (c: TraceElement): string => {
-    if (
-      (c.element.kind === 'scope_call' ||
-        c.element.kind === 'scope_var' ||
-        c.element.kind === 'local_var') &&
-      typeof c.element.name === 'string'
-    ) {
-      const segment = indexedSegment(c, c.element.name, stepIndices);
-      return childPrefix ? `${childPrefix}.${segment}` : segment;
-    } else {
-      return childPrefix;
-    }
-  };
   if (
-    (el.element.kind === 'scope_call' ||
-      el.element.kind === 'scope_var' ||
-      el.element.kind === 'local_var') &&
-    el.trace !== undefined
-  ) {
-    const scopeMismatch = el.trace.some((c) =>
-      subtreeHasMismatch(c, newPrefix(c), expected, stepIndices)
-    );
-    if (scopeMismatch) return true;
-  }
-  if (
+    step.testedScope === undefined &&
     (el.element.kind === 'scope_var' || el.element.kind === 'local_var') &&
-    el.value !== undefined
+    el.value !== undefined &&
+    nodeMatchState(expected, step.prefix, el.value) === 'mismatch'
   ) {
-    if (nodeMatchState(expected, childPrefix, el.value) === 'mismatch') {
-      return true;
-    }
+    return true;
   }
-  if (el.trace !== undefined) {
-    return el.trace.some((c) =>
-      subtreeHasMismatch(c, newPrefix(c), expected, stepIndices)
-    );
-  }
-  return false;
+  return (el.trace ?? []).some((c) =>
+    subtreeHasMismatch(c, stepPath(c, step, stepIndices), expected, stepIndices)
+  );
 }
 
 // -- Filtering ----------------------------------------------------------------
@@ -1008,13 +983,36 @@ export function subtreeMatches(
   return children.some((c) => subtreeMatches(c, remaining_filters, intl));
 }
 
-export function indexedSegment(
+function indexedSegment(
   el: TraceElement,
   name: string,
   stepIndices: Map<TraceElement, number>
 ): string {
   const index = stepIndices.get(el);
   return index !== undefined ? `${name}[${index}]` : name;
+}
+
+export type PathStep = { prefix: string; testedScope?: string };
+
+export function stepPath(
+  el: TraceElement,
+  { prefix, testedScope }: PathStep,
+  stepIndices: Map<TraceElement, number>
+): PathStep {
+  const { kind, name } = el.element;
+  if (
+    (kind === 'scope_call' || kind === 'scope_var' || kind === 'local_var') &&
+    typeof name === 'string'
+  ) {
+    if (name === testedScope) {
+      return { prefix, testedScope: undefined };
+    }
+    if (testedScope === undefined) {
+      const segment = indexedSegment(el, name, stepIndices);
+      return { prefix: prefix ? `${prefix}.${segment}` : segment, testedScope };
+    }
+  }
+  return { prefix, testedScope };
 }
 
 function stepInto(
@@ -1027,35 +1025,11 @@ function stepInto(
   prefix: string;
   testedScope: string | undefined;
 } {
-  const merged =
-    te.element.kind === 'scope_var' &&
-    typeof te.element.name === 'string' &&
-    te.trace?.length === 1 &&
-    te.trace[0].element.kind === 'scope_call' &&
-    typeof te.trace[0].element.name === 'string';
-  const node = merged && te.trace ? te.trace[0] : te;
-  const displayName = merged
-    ? `${te.element.name as string}.${node.element.name as string}`
-    : (te.element.name as string);
-  let childPrefix = prefix;
-  let nextTestedScope = testedScope;
-  if (
-    (node.element.kind === 'scope_call' ||
-      node.element.kind === 'scope_var' ||
-      node.element.kind === 'local_var') &&
-    typeof node.element.name === 'string'
-  ) {
-    if (node.element.name === testedScope) {
-      nextTestedScope = undefined;
-    } else {
-      const segment = indexedSegment(node, displayName, stepIndices);
-      childPrefix = prefix ? `${prefix}.${segment}` : segment;
-    }
-  }
+  const step = stepPath(te, { prefix, testedScope }, stepIndices);
   return {
-    children: node.trace ?? [],
-    prefix: childPrefix,
-    testedScope: nextTestedScope,
+    children: te.trace ?? [],
+    prefix: step.prefix,
+    testedScope: step.testedScope,
   };
 }
 
