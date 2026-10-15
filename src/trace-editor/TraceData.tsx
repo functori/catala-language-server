@@ -344,27 +344,8 @@ export function DataPanel({
   return (
     <div style={ioPanelStyle}>
       <table style={tableStyle}>
-        <thead>
-          <tr>
-            <th style={nameThStyle}>
-              <FormattedMessage id="trace.col.name" />
-            </th>
-            <th style={thStyle}>
-              <FormattedMessage id="trace.col.expected" />
-            </th>
-            <th style={thStyle}>
-              <FormattedMessage id="trace.col.value" />
-            </th>
-            <th>
-              <span
-                className="codicon codicon-edit"
-                style={{ cursor: 'pointer' }}
-              />
-            </th>
-          </tr>
-        </thead>
         <tbody>
-          <Section id="trace.section.inputs" intl={intl} first>
+          <Section id="trace.section.inputs" intl={intl} first noExpected>
             {inputNodes.map((node, i) => (
               <NodeRow
                 testing_scope={testing_scope}
@@ -415,11 +396,13 @@ function Section({
   id,
   intl,
   first,
+  noExpected,
   children,
 }: {
   id: string;
   intl: IntlShape;
   first?: boolean;
+  noExpected?: boolean;
   children: ReactElement[];
 }): ReactElement {
   const [open, setOpen] = useState(true);
@@ -469,9 +452,25 @@ function Section({
         </td>
       </tr>
       {open && (
-        <ExpandContext.Provider value={expand}>
-          {children}
-        </ExpandContext.Provider>
+        <>
+          <tr>
+            <th style={nameThStyle}>
+              <FormattedMessage id="trace.col.name" />
+            </th>
+            <th style={thStyle}>
+              {noExpected ? null : <FormattedMessage id="trace.col.expected" />}
+            </th>
+            <th style={thStyle}>
+              <FormattedMessage id="trace.col.value" />
+            </th>
+            <th style={thStyle}>
+              <span className="codicon codicon-edit" />
+            </th>
+          </tr>
+          <ExpandContext.Provider value={expand}>
+            {children}
+          </ExpandContext.Provider>
+        </>
       )}
     </>
   );
@@ -617,7 +616,7 @@ function NodeRow({
         </span>
       </td>
       {noExpected || node.expected === undefined ? (
-        <td style={disabledCellStyle}>—</td>
+        <td style={disabledCellStyle} />
       ) : (
         <td
           style={tdStyle}
@@ -638,7 +637,7 @@ function NodeRow({
       >
         {node.value ?? ''}
       </td>
-      <td>
+      <td style={tdStyle}>
         <span
           className="codicon codicon-edit"
           style={{ cursor: 'pointer' }}
