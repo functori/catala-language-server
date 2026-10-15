@@ -175,6 +175,7 @@
   "generalTests.tuto.button.next": "Dalej",
   "generalTests.tuto.button.skip": "Pomiń",
   "generalTests.tuto.welcome": "Witamy w samouczku rozszerzenia Catala do przeglądania testów Twojego projektu! Kliknij tutaj, aby otworzyć menu nawigacji i poruszać się po samouczku.",
+  "generalTests.tuto.end": "Samouczek dobiegł końca! Możesz go uruchomić ponownie w dowolnym momencie i za pomocą menu nawigacji wrócić do dowolnej części.",
   "generalTests.tuto.filterBox": "Ten obszar grupuje wszystkie dostępne filtry. Pozwalają one zawęzić listę wyświetlanych testów, aby szybko znaleźć te, które Cię interesują. Przycisk 'Uruchom testy' uruchamia tylko wyświetlane testy",
   "generalTests.tuto.filterReset": "Resetuje wszystkie filtry",
   "generalTests.tuto.filterGUI": "Domyślnie wyświetlane są tylko testy 'UI'. Odznacz to pole, aby wyświetlić wszystkie testy",
