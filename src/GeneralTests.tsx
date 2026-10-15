@@ -404,7 +404,7 @@ function TestLine({
         <TestPath vscode={vscode} test={test} filters={filters} />
       </th>
       <td>
-        <HighlightText filters={filters} text={testDescription(test)} />
+        <HighlightText filters={filters} text={testTitle(test)} />
       </td>
       <td>
         <HighlightText filters={filters} text={testingScope(test)} />
@@ -571,6 +571,7 @@ function matchFilter(
     if (filterPin.option != 'ignore') {
       let filter = filterPin.filter.toLowerCase().trim();
       let pinMatch =
+        test.filename.includes(filter) ||
         testTitle(test).toLowerCase().includes(filter) ||
         testDescription(test).toLowerCase().includes(filter) ||
         testingScope(test).toLowerCase().includes(filter) ||
