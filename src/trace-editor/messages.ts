@@ -9,11 +9,11 @@ export type TraceUpMessage =
   | { kind: 'run'; scope: string }
   | { kind: 'loadFile'; path: string }
   | { kind: 'openInTestEditor' }
-  | { kind: 'openLocation'; file: string; start: TracePos; end: TracePos }
+  | { kind: 'openLocation'; files: string[]; start: TracePos; end: TracePos }
   | {
       kind: 'requestExtract';
       id: number;
-      file: string;
+      files: string[];
       line: number;
     }
   | { kind: 'updateData'; value: [string, TraceData] };
@@ -31,7 +31,7 @@ export type TraceDownMessage =
   | { kind: 'scopes'; scopes: [string, JsonValue][] }
   | { kind: 'result'; ok: true; trace: TraceElement[] }
   | { kind: 'result'; ok: false; error: string }
-  | { kind: 'extract'; id: number; text: string | null }
+  | { kind: 'extract'; id: number; text: string | null; file?: string }
   | { kind: 'viewWithFilter' }
   | { kind: 'addToFilter' };
 

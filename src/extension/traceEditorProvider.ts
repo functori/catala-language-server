@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import type { LanguageClient } from 'vscode-languageclient/node';
 import { listEntrypoints } from './lspRequests';
 import type { CatalaEntrypoint } from './lspRequests';
@@ -21,24 +21,30 @@ import { TestCaseEditorProvider } from './testCaseEditorProvider';
 
 const fileLineCache = new Map<string, string>();
 
-function extractLine(file: string, line: number): string | null {
-  const key = `${file}:${line}`;
-  const cached = fileLineCache.get(key);
-  if (cached !== undefined) {
-    return cached;
+function extractLine(
+  files: string[],
+  line: number
+): { file: string; text: string } | null {
+  for (const file of files) {
+    const key = `${file}:${line}`;
+    const cached = fileLineCache.get(key);
+    if (cached !== undefined) {
+      return { file, text: cached };
+    }
+    let lines: string[];
+    try {
+      lines = readFileSync(file, 'utf8').split(/\r?\n/);
+    } catch {
+      continue;
+    }
+    if (line < 1 || line > lines.length) {
+      continue;
+    }
+    const text = lines[line - 1];
+    fileLineCache.set(key, text);
+    return { file, text };
   }
-  let lines: string[];
-  try {
-    lines = readFileSync(file, 'utf8').split(/\r?\n/);
-  } catch {
-    return null;
-  }
-  if (line < 1 || line > lines.length) {
-    return null;
-  }
-  const text = lines[line - 1];
-  fileLineCache.set(key, text);
-  return text;
+  return null;
 }
 
 function scopeName(e: CatalaEntrypoint): string {
@@ -270,9 +276,11 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
               Math.max(0, message.end.character - 1)
             )
           );
+          const target =
+            message.files.find((f) => existsSync(f)) ?? message.files[0];
           try {
             const doc = await vscode.workspace.openTextDocument(
-              vscode.Uri.file(message.file)
+              vscode.Uri.file(target)
             );
             await vscode.window.showTextDocument(doc, {
               selection: range,
@@ -280,14 +288,19 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
             });
           } catch (e) {
             vscode.window.showErrorMessage(
-              `Cannot open ${message.file}: ${String(e)}`
+              `Cannot open ${target}: ${String(e)}`
             );
           }
           break;
         }
         case 'requestExtract': {
-          const text = extractLine(message.file, message.line);
-          postToWebView({ kind: 'extract', id: message.id, text });
+          const found = extractLine(message.files, message.line);
+          postToWebView({
+            kind: 'extract',
+            id: message.id,
+            text: found?.text ?? null,
+            file: found?.file,
+          });
           break;
         }
         case 'updateData': {
