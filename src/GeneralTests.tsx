@@ -20,7 +20,7 @@ import { setVsCodeApi } from './shared/webviewApi';
 import type { Filter } from './FilterPin';
 import { FilterPins } from './FilterPin';
 import { HighlightText } from './shared/Highlight';
-import type { Controls, Options, State } from 'react-joyride';
+import type { Controls, Options, State, Step } from 'react-joyride';
 import { useJoyride } from 'react-joyride';
 
 type TestGridArg = {
@@ -1116,48 +1116,53 @@ const stepsButton = [
   },
 ];
 
-const stepsFilter = [
-  {
-    id: 'filter_box',
-    content: <FormattedMessage id="generalTests.tuto.filterBox" />,
-    target: '.box-filter',
-  },
-  {
-    id: 'filter_reset',
-    content: <FormattedMessage id="generalTests.tuto.filterReset" />,
-    target: '.reset-filters',
-  },
-  {
-    id: 'filter_gui',
-    content: <FormattedMessage id="generalTests.tuto.filterGUI" />,
-    target: '#filter-gui',
-  },
-  {
-    id: 'filter_scope',
-    content: <FormattedMessage id="generalTests.tuto.filterScope" />,
-    target: '#scopePins',
-  },
-  {
-    id: 'filter_search',
-    content: <FormattedMessage id="generalTests.tuto.filterSearch" />,
-    target: '#filterPins',
-  },
-  {
-    id: 'filter_pin_include',
-    content: <PinStep option="include" />,
-    target: '#filter-pins',
-  },
-  {
-    id: 'filter_pin_exclude',
-    content: <PinStep option="exclude" />,
-    target: '#filter-pins',
-  },
-  {
-    id: 'filter_pin_ignore',
-    content: <PinStep option="ignore" />,
-    target: '#filter-pins',
-  },
-];
+function stepsFilter(intl: IntlShape): Step[] {
+  const filterIncludeId = `#include-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  const filterExcludeId = `#exclude-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  const filterIgnoreId = `#ignore-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  return [
+    {
+      id: 'filter_box',
+      content: <FormattedMessage id="generalTests.tuto.filterBox" />,
+      target: '.box-filter',
+    },
+    {
+      id: 'filter_reset',
+      content: <FormattedMessage id="generalTests.tuto.filterReset" />,
+      target: '.reset-filters',
+    },
+    {
+      id: 'filter_gui',
+      content: <FormattedMessage id="generalTests.tuto.filterGUI" />,
+      target: '#filter-gui',
+    },
+    {
+      id: 'filter_scope',
+      content: <FormattedMessage id="generalTests.tuto.filterScope" />,
+      target: '#scopePins',
+    },
+    {
+      id: 'filter_search',
+      content: <FormattedMessage id="generalTests.tuto.filterSearch" />,
+      target: '#filterPins',
+    },
+    {
+      id: 'filter_pin_include',
+      content: <PinStep option="include" />,
+      target: filterIncludeId,
+    },
+    {
+      id: 'filter_pin_exclude',
+      content: <PinStep option="exclude" />,
+      target: filterExcludeId,
+    },
+    {
+      id: 'filter_pin_ignore',
+      content: <PinStep option="ignore" />,
+      target: filterIgnoreId,
+    },
+  ];
+}
 
 const stepsTests = [
   {
@@ -1295,18 +1300,18 @@ function PinStep({ option }: { option: Filter['option'] }): ReactElement {
   );
 }
 
-// The tour, cut into chapters: the menu shown during the tour jumps to the
-// first step of each of them.
-const chapters = [
-  { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
-  { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter },
-  { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
-].map((chapter, index, all) => ({
-  ...chapter,
-  start: all.slice(0, index).reduce((n, { steps }) => n + steps.length, 0),
-}));
-
-const steps = chapters.flatMap((chapter) => chapter.steps);
+function chapters(
+  intl: IntlShape
+): { title: string; steps: Step[]; start: number }[] {
+  return [
+    { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
+    { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter(intl) },
+    { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
+  ].map((chapter, index, all) => ({
+    ...chapter,
+    start: all.slice(0, index).reduce((n, { steps }) => n + steps.length, 0),
+  }));
+}
 
 // Pinned to the top left corner and drawn over Joyride's overlay (which sits
 // at 100), so that it stays reachable and moves nothing on the page.
@@ -1323,6 +1328,8 @@ function TutoMenu({
   controls: Controls;
 }): ReactElement {
   const intl = useIntl();
+  // The tour, cut into chapters: the menu shown during the tour jumps to the
+  // first step of each of them.
   // Folded, only the icon is left, so that the menu does not hide the element
   // a step points at. The tour starts folded: the menu is there for those who
   // look for it.
@@ -1353,7 +1360,7 @@ function TutoMenu({
       </div>
       {!folded && (
         <div className="tuto-menu-items">
-          {chapters.map(({ title, steps, start }) => (
+          {chapters(intl).map(({ title, steps, start }) => (
             <button
               key={title}
               className={
@@ -1403,6 +1410,7 @@ export default function GeneralTests({
     skipBeacon: true,
     scrollOffset: TUTO_MENU_TOP + TUTO_MENU_MAX_HEIGHT + 20,
   };
+  const steps = chapters(intl).flatMap((chapter) => chapter.steps);
   const { controls, on, state, Tour } = useJoyride({
     continuous: true,
     steps: [...stepsWelcome, ...steps],
