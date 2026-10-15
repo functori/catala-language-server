@@ -9,7 +9,7 @@ import {
 import type { JsonValue } from '../shared/util_client';
 import { getVsCodeApi } from '../shared/webviewApi';
 import type { TraceUpMessage } from './messages';
-import { LocationSnippet, resolvePath } from './LocationSnippet';
+import { LocationSnippet, candidatePaths } from './LocationSnippet';
 import { isSelectingText } from './traceMenu';
 import type {
   CodeLocation,
@@ -100,7 +100,7 @@ function PosLink({
     e.stopPropagation();
     const message: TraceUpMessage = {
       kind: 'openLocation',
-      file: resolvePath(cwd, pos.file),
+      files: candidatePaths(cwd, pos.file),
       start: pos.start ?? { line: 1, character: 1 },
       end: pos.end ?? pos.start ?? { line: 1, character: 1 },
     };
