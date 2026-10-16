@@ -87,7 +87,7 @@ export default function TestOutputsEditor({
 
   return (
     <div className="test-outputs-editor">
-      <div className="test-outputs data-card">
+      <div className="test-outputs data-card simple-items-container">
         {Array.from(tested_scope.outputs, ([outputName]) => {
           const outputData = test_outputs.get(outputName);
 
