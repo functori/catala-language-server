@@ -598,6 +598,16 @@ function samePoint(a: Point, b: Point): boolean {
   return a.line === b.line && a.character === b.character;
 }
 
+function sameLocation(a?: CodeLocation, b?: CodeLocation): boolean {
+  return (
+    a !== undefined &&
+    b !== undefined &&
+    a.file === b.file &&
+    samePoint(a.start, b.start) &&
+    samePoint(a.end, b.end)
+  );
+}
+
 function bindingLocations(kind: TraceKind): CodeLocation[] {
   if (kind.kind === 'local_var') {
     const decl = asLocation(kind.decl_pos);
@@ -612,20 +622,19 @@ function bindingLocations(kind: TraceKind): CodeLocation[] {
 }
 
 export function elementCodeSpan(te: TraceElement): CodeLocation | undefined {
-  const decl = te.element.decl_pos;
-  const ownIsDeclaration =
-    te.pos !== undefined &&
-    decl !== undefined &&
-    te.pos.file === decl.file &&
-    samePoint(te.pos.start, decl.start) &&
-    samePoint(te.pos.end, decl.end);
+  const ownIsDeclaration = sameLocation(te.pos, te.element.decl_pos);
+  const bindings = bindingLocations(te.element);
   const locations = [
     ...(te.pos !== undefined && !ownIsDeclaration ? [te.pos] : []),
-    ...bindingLocations(te.element),
+    ...bindings,
     ...definitionLocations(te),
   ];
   const first = locations[0];
   if (first === undefined) return te.pos;
+  const start = bindings.reduce(
+    (p, b) => (b.file === first.file && before(b.start, p) ? b.start : p),
+    first.start
+  );
   return locations
     .filter((p) => p.file === first.file)
     .reduce(
@@ -635,7 +644,7 @@ export function elementCodeSpan(te: TraceElement): CodeLocation | undefined {
         end: before(span.end, p.end) ? p.end : span.end,
         law_headings: span.law_headings,
       }),
-      first
+      { ...first, start }
     );
 }
 
@@ -776,7 +785,7 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
         detail: detail(kind.name),
         tone: 'scope',
         showsValue: true,
-        showsCode: true,
+        showsCode: false,
       };
     case 'scope_var': {
       const [label, tone]: [string, Tone] =

@@ -233,18 +233,22 @@ describe('elementCodeSpan', () => {
     expect(codeSpan(local)).toBe('60:5-60:31');
   });
 
-  it('never starts earlier than the position the element reports', () => {
-    // an older runtime, whose pos was only the bound expression: the span
-    // stays there rather than reaching back to the name
+  it('reaches back to the name when pos is only the bound expression', () => {
+    //     let second equals
+    //         ^^^^^^ decl_pos
+    //       first
+    //       + adjustment
+    //       + many_lines
+    //       ^^^^^^^^^^^^^ pos
     const local = {
       element: {
         kind: 'local_var',
-        name: 'first',
-        decl_pos: at(60, 9, 60, 14),
+        name: 'second',
+        decl_pos: at(61, 9, 61, 15),
       },
-      pos: at(60, 22, 60, 31),
+      pos: at(62, 7, 64, 19),
     } as unknown as TraceElement;
-    expect(codeSpan(local)).toBe('60:22-60:31');
+    expect(codeSpan(local)).toBe('61:9-64:19');
   });
 
   it('covers a local tuple down to the end of the bound expression', () => {
