@@ -507,12 +507,19 @@ type dependency_graph = {
   edges : dependency_edge list;
 }
 
+type dependency_kind = [
+  | IntraScopes <json name="intra-scopes">
+  | InterScopes <json name="inter-scopes">
+  | Types <json name="types">
+]
+
 type dependency_graphs = {
-  intra_scopes : (string * dependency_graph) list <json repr="object"> <ts repr="map">;
-  inter_scopes : dependency_graph;
-  types : dependency_graph;
+  ?intra_scopes : (string * dependency_graph) list <json repr="object"> <ts repr="map"> option;
+  ?inter_scopes : dependency_graph option;
+  ?types : dependency_graph option;
 }
 
 type dependency_graph_params = {
   uri : string;
+  ?kinds : dependency_kind list option;
 }

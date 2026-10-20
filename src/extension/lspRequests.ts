@@ -4,6 +4,7 @@ import { logger } from './logger';
 
 import type {
   DependencyGraphs,
+  DependencyKind,
   Entrypoint,
   EntrypointParamKind,
   EntrypointsParams,
@@ -84,11 +85,12 @@ export function checkTraceAssert(
 /** @lintignore */
 export async function dependencyGraphs(
   client: LanguageClient,
-  uri: vscode.Uri
+  uri: vscode.Uri,
+  kinds?: DependencyKind[]
 ): Promise<DependencyGraphs | null> {
   const ret: JSON | null = await client.sendRequest(
     'catala.dependencyGraph',
-    writeDependencyGraphParams({ uri: uri.toString() })
+    writeDependencyGraphParams({ uri: uri.toString(), kinds })
   );
   return ret === null ? null : readDependencyGraphs(ret);
 }
