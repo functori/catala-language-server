@@ -444,6 +444,33 @@ export type EntrypointsParams = {
   no_variables?: boolean;
 }
 
+export type DependencyPos = {
+  file: string;
+  start: VscodePosition;
+  end_: VscodePosition;
+}
+
+export type DependencyEdge = {
+  from_: number /*int*/;
+  to_: number /*int*/;
+  pos: DependencyPos;
+}
+
+export type DependencyGraph = {
+  nodes: Map<string, string>;
+  edges: DependencyEdge[];
+}
+
+export type DependencyGraphs = {
+  intra_scopes: Map<string, DependencyGraph>;
+  inter_scopes: DependencyGraph;
+  types: DependencyGraph;
+}
+
+export type DependencyGraphParams = {
+  uri: string;
+}
+
 export function writeTyp(x: Typ, context: any = x): any {
   switch (x.kind) {
     case 'TBool':
@@ -1944,6 +1971,80 @@ export function readEntrypointsParams(x: any, context: any = x): EntrypointsPara
     path: _atd_read_optional_field(_atd_read_string, x['path'], x),
     no_lambdas: _atd_read_optional_field(_atd_read_bool, x['no_lambdas'], x),
     no_variables: _atd_read_optional_field(_atd_read_bool, x['no_variables'], x),
+  };
+}
+
+export function writeDependencyPos(x: DependencyPos, context: any = x): any {
+  return {
+    'file': _atd_write_required_field('DependencyPos', 'file', _atd_write_string, x.file, x),
+    'start': _atd_write_required_field('DependencyPos', 'start', writeVscodePosition, x.start, x),
+    'end': _atd_write_required_field('DependencyPos', 'end_', writeVscodePosition, x.end_, x),
+  };
+}
+
+export function readDependencyPos(x: any, context: any = x): DependencyPos {
+  return {
+    file: _atd_read_required_field('DependencyPos', 'file', _atd_read_string, x['file'], x),
+    start: _atd_read_required_field('DependencyPos', 'start', readVscodePosition, x['start'], x),
+    end_: _atd_read_required_field('DependencyPos', 'end', readVscodePosition, x['end'], x),
+  };
+}
+
+export function writeDependencyEdge(x: DependencyEdge, context: any = x): any {
+  return {
+    'from': _atd_write_required_field('DependencyEdge', 'from_', _atd_write_int, x.from_, x),
+    'to': _atd_write_required_field('DependencyEdge', 'to_', _atd_write_int, x.to_, x),
+    'pos': _atd_write_required_field('DependencyEdge', 'pos', writeDependencyPos, x.pos, x),
+  };
+}
+
+export function readDependencyEdge(x: any, context: any = x): DependencyEdge {
+  return {
+    from_: _atd_read_required_field('DependencyEdge', 'from', _atd_read_int, x['from'], x),
+    to_: _atd_read_required_field('DependencyEdge', 'to', _atd_read_int, x['to'], x),
+    pos: _atd_read_required_field('DependencyEdge', 'pos', readDependencyPos, x['pos'], x),
+  };
+}
+
+export function writeDependencyGraph(x: DependencyGraph, context: any = x): any {
+  return {
+    'nodes': _atd_write_required_field('DependencyGraph', 'nodes', _atd_write_assoc_map_to_object(_atd_write_string), x.nodes, x),
+    'edges': _atd_write_required_field('DependencyGraph', 'edges', _atd_write_array(writeDependencyEdge), x.edges, x),
+  };
+}
+
+export function readDependencyGraph(x: any, context: any = x): DependencyGraph {
+  return {
+    nodes: _atd_read_required_field('DependencyGraph', 'nodes', _atd_read_assoc_object_into_map(_atd_read_string), x['nodes'], x),
+    edges: _atd_read_required_field('DependencyGraph', 'edges', _atd_read_array(readDependencyEdge), x['edges'], x),
+  };
+}
+
+export function writeDependencyGraphs(x: DependencyGraphs, context: any = x): any {
+  return {
+    'intra_scopes': _atd_write_required_field('DependencyGraphs', 'intra_scopes', _atd_write_assoc_map_to_object(writeDependencyGraph), x.intra_scopes, x),
+    'inter_scopes': _atd_write_required_field('DependencyGraphs', 'inter_scopes', writeDependencyGraph, x.inter_scopes, x),
+    'types': _atd_write_required_field('DependencyGraphs', 'types', writeDependencyGraph, x.types, x),
+  };
+}
+
+export function readDependencyGraphs(x: any, context: any = x): DependencyGraphs {
+  return {
+    intra_scopes: _atd_read_required_field('DependencyGraphs', 'intra_scopes', _atd_read_assoc_object_into_map(readDependencyGraph), x['intra_scopes'], x),
+    inter_scopes: _atd_read_required_field('DependencyGraphs', 'inter_scopes', readDependencyGraph, x['inter_scopes'], x),
+    types: _atd_read_required_field('DependencyGraphs', 'types', readDependencyGraph, x['types'], x),
+  };
+}
+
+export function writeDependencyGraphParams(x: DependencyGraphParams, context: any = x): any {
+  return {
+    'uri': _atd_write_required_field('DependencyGraphParams', 'uri', _atd_write_string, x.uri, x),
+  };
+}
+
+export function readDependencyGraphParams(x: any, context: any = x): DependencyGraphParams {
+  return {
+    uri: _atd_read_required_field('DependencyGraphParams', 'uri', _atd_read_string, x['uri'], x),
   };
 }
 

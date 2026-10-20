@@ -487,3 +487,32 @@ type entrypoints_params = {
   ?no_lambdas : bool option ;
   ?no_variables : bool option ;
 }
+
+(* Dependency graphs *)
+
+type dependency_pos = {
+  file : string;
+  start : vscode_position;
+  end_ <json name="end"> : vscode_position;
+}
+
+type dependency_edge = {
+  from_ <json name="from"> : int;
+  to_ <json name="to"> : int;
+  pos : dependency_pos;
+}
+
+type dependency_graph = {
+  nodes : (string * string) list <json repr="object"> <ts repr="map">;
+  edges : dependency_edge list;
+}
+
+type dependency_graphs = {
+  intra_scopes : (string * dependency_graph) list <json repr="object"> <ts repr="map">;
+  inter_scopes : dependency_graph;
+  types : dependency_graph;
+}
+
+type dependency_graph_params = {
+  uri : string;
+}

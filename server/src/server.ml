@@ -441,31 +441,64 @@ let server_initialized, resolve_init =
   in
   w, r
 
-let dependency_graph_json
+let dependency_pos (pos : Pos.t) : Catala_types_t.dependency_pos =
+  {
+    file = Pos.get_file pos;
+    start =
+      { line = Pos.get_start_line pos; character = Pos.get_start_column pos };
+    end_ = { line = Pos.get_end_line pos; character = Pos.get_end_column pos };
+  }
+
+module Dep_graph (G : Graph.Sig.G with type E.label = Pos.t) = struct
+  let to_atd (format : Format.formatter -> G.V.t -> unit) (g : G.t) :
+      Catala_types_t.dependency_graph =
+    let nodes =
+      G.fold_vertex
+        (fun v acc ->
+          (string_of_int (G.V.hash v), Format.asprintf "%a" format v) :: acc)
+        g []
+    in
+    let edges =
+      G.fold_edges_e
+        (fun e acc ->
+          {
+            Catala_types_t.from_ = G.V.hash (G.E.src e);
+            to_ = G.V.hash (G.E.dst e);
+            pos = dependency_pos (G.E.label e);
+          }
+          :: acc)
+        g []
+    in
+    { Catala_types_t.nodes; edges }
+end
+
+module Scope_graph = Dep_graph (Scopelang.Dependency.SDependencies)
+module Type_graph = Dep_graph (Scopelang.Dependency.TDependencies)
+module Var_graph = Dep_graph (Desugared.Dependency.ScopeDependencies)
+
+let format_scope_vertex ppf : Scopelang.Dependency.vertex -> unit = function
+  | Scope (s, _) -> Shared_ast.ScopeName.format ppf s
+  | Topdef t -> Shared_ast.TopdefName.format ppf t
+
+let dependency_graphs
     (desugared : Desugared.Ast.program)
-    (prg : Shared_ast.typed Scopelang.Ast.program) : Yojson.Safe.t =
-  let intra_scopes =
-    Shared_ast.ScopeName.Map.bindings desugared.program_root.module_scopes
-    |> List.map (fun (name, scope) ->
-           ( Shared_ast.ScopeName.to_string name,
-             Desugared.Dependency.build_scope_dependencies scope
-             |> Desugared.Dependency.scope_dependencies_to_json ))
-  in
-  let inter_scopes =
-    Scopelang.Dependency.build_program_dep_graph prg
-    |> Scopelang.Dependency.inter_scope_dependencies_graph_to_json
-  in
-  let types =
-    Scopelang.Dependency.build_type_graph prg.program_ctx.ctx_structs
-      prg.program_ctx.ctx_enums
-    |> Scopelang.Dependency.type_dependencies_graph_to_json
-  in
-  `Assoc
-    [
-      "intra_scopes", `Assoc intra_scopes;
-      "inter_scopes", inter_scopes;
-      "types", types;
-    ]
+    (prg : Shared_ast.typed Scopelang.Ast.program) :
+    Catala_types_t.dependency_graphs =
+  {
+    intra_scopes =
+      Shared_ast.ScopeName.Map.bindings desugared.program_root.module_scopes
+      |> List.map (fun (name, scope) ->
+             ( Shared_ast.ScopeName.to_string name,
+               Desugared.Dependency.build_scope_dependencies scope
+               |> Var_graph.to_atd Desugared.Dependency.Vertex.format ));
+    inter_scopes =
+      Scopelang.Dependency.build_program_dep_graph prg
+      |> Scope_graph.to_atd format_scope_vertex;
+    types =
+      Scopelang.Dependency.build_type_graph prg.program_ctx.ctx_structs
+        prg.program_ctx.ctx_enums
+      |> Type_graph.to_atd Shared_ast.TypeIdent.format;
+  }
 
 class catala_lsp_server =
   let open Linol_lwt in
@@ -838,11 +871,17 @@ class catala_lsp_server =
           match params with
           | None -> Lwt.return `Null
           | Some json -> (
-            let uri = Yojson.Safe.Util.(json |> member "uri" |> to_string) in
+            let { Catala_types_t.uri } =
+              Yojson.Safe.to_string json
+              |> Catala_types_j.dependency_graph_params_of_string
+            in
             let doc_id = Doc_id.of_lsp_uri (Uri0.of_string uri) in
             match Doc_id.Map.find_opt doc_id open_documents with
             | Some { last_valid_result = Some { prg; desugared; _ }; _ } ->
-              Lwt.return (dependency_graph_json desugared prg)
+              let buf = Buffer.create 1024 in
+              Catala_types_j.write_dependency_graphs buf
+                (dependency_graphs desugared prg);
+              Lwt.return (Yojson.Safe.from_string ~buf (Buffer.contents buf))
             | _ -> Lwt.return `Null))
         (fun exn ->
           Log.err (fun m ->
