@@ -338,6 +338,7 @@ let surface_to_scopelang
     | Ok () -> k r)
 
 let process
+    ?(whole_program = false)
     ~(resolve_file_content : string -> string Global.input_src)
     ~(get_module_content : Surface.Parser_driver.module_loading)
     { document_id = doc_id; buffer_state; project; project_file; _ } :
@@ -369,7 +370,7 @@ let process
   let options =
     Catala_utils.Global.enforce_options
       ~path_rewrite:(fun rf -> (rf :> string))
-      ~input_src ()
+      ~input_src ~whole_program ()
   in
   let l = ref [] in
   let get_errors () = !l in
@@ -400,8 +401,10 @@ let process
   ignore @@ Typing.program ~internal_check:true prg;
   Message.report_delayed_errors_if_any ()
 
-let process ~resolve_file_content ~get_module_content document =
-  let r = process ~resolve_file_content ~get_module_content document in
+let process ?whole_program ~resolve_file_content ~get_module_content document =
+  let r =
+    process ?whole_program ~resolve_file_content ~get_module_content document
+  in
   let nb_diags diags =
     Doc_id.Map.fold
       (fun _d rm i -> Server_types.Range.Map.cardinal rm + i)
