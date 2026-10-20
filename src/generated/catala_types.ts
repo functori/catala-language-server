@@ -476,6 +476,7 @@ export type DependencyGraphs = {
 export type DependencyGraphParams = {
   uri: string;
   kinds?: DependencyKind[];
+  whole_program?: boolean;
 }
 
 export function writeTyp(x: Typ, context: any = x): any {
@@ -2076,6 +2077,7 @@ export function writeDependencyGraphParams(x: DependencyGraphParams, context: an
   return {
     'uri': _atd_write_required_field('DependencyGraphParams', 'uri', _atd_write_string, x.uri, x),
     'kinds': _atd_write_optional_field(_atd_write_array(writeDependencyKind), x.kinds, x),
+    'whole_program': _atd_write_optional_field(_atd_write_bool, x.whole_program, x),
   };
 }
 
@@ -2083,6 +2085,7 @@ export function readDependencyGraphParams(x: any, context: any = x): DependencyG
   return {
     uri: _atd_read_required_field('DependencyGraphParams', 'uri', _atd_read_string, x['uri'], x),
     kinds: _atd_read_optional_field(_atd_read_array(readDependencyKind), x['kinds'], x),
+    whole_program: _atd_read_optional_field(_atd_read_bool, x['whole_program'], x),
   };
 }
 
