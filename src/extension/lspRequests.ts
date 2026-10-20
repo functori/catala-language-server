@@ -3,11 +3,14 @@ import type { LanguageClient } from 'vscode-languageclient/node';
 import { logger } from './logger';
 
 import type {
+  DependencyGraphs,
   Entrypoint,
   EntrypointParamKind,
   EntrypointsParams,
 } from '../generated/catala_types';
 import {
+  writeDependencyGraphParams,
+  readDependencyGraphs,
   writeEntrypointsParams,
   readEntrypoints,
 } from '../generated/catala_types';
@@ -76,6 +79,18 @@ export function checkTraceAssert(
       return false;
     }
   };
+}
+
+/** @lintignore */
+export async function dependencyGraphs(
+  client: LanguageClient,
+  uri: vscode.Uri
+): Promise<DependencyGraphs | null> {
+  const ret: JSON | null = await client.sendRequest(
+    'catala.dependencyGraph',
+    writeDependencyGraphParams({ uri: uri.toString() })
+  );
+  return ret === null ? null : readDependencyGraphs(ret);
 }
 
 export type ExceptionsArgs = {
