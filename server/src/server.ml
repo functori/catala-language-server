@@ -491,6 +491,32 @@ let server_initialized, resolve_init =
 
 let ongoing_project_scan = ref false
 
+let dependency_graph_json
+    (desugared : Desugared.Ast.program)
+    (prg : Shared_ast.typed Scopelang.Ast.program) : Yojson.Safe.t =
+  let intra_scopes =
+    Shared_ast.ScopeName.Map.bindings desugared.program_root.module_scopes
+    |> List.map (fun (name, scope) ->
+           ( Shared_ast.ScopeName.to_string name,
+             Desugared.Dependency.build_scope_dependencies scope
+             |> Desugared.Dependency.scope_dependencies_to_json ))
+  in
+  let inter_scopes =
+    Scopelang.Dependency.build_program_dep_graph prg
+    |> Scopelang.Dependency.inter_scope_dependencies_graph_to_json
+  in
+  let types =
+    Scopelang.Dependency.build_type_graph prg.program_ctx.ctx_structs
+      prg.program_ctx.ctx_enums
+    |> Scopelang.Dependency.type_dependencies_graph_to_json
+  in
+  `Assoc
+    [
+      "intra_scopes", `Assoc intra_scopes;
+      "inter_scopes", inter_scopes;
+      "types", types;
+    ]
+
 class catala_lsp_server =
   let open Linol_lwt in
   object (self)
@@ -864,6 +890,27 @@ class catala_lsp_server =
               m "catala.exceptionsAt failed: %s" (Printexc.to_string exn));
           Lwt.return `Null)
 
+    method private dependency_graph (params : Yojson.Safe.t option) :
+        Yojson.Safe.t Lwt.t =
+      let* () = server_initialized in
+      St.use_when_ready server_state
+      @@ fun { open_documents; _ } ->
+      Lwt.catch
+        (fun () ->
+          match params with
+          | None -> Lwt.return `Null
+          | Some json -> (
+            let uri = Yojson.Safe.Util.(json |> member "uri" |> to_string) in
+            let doc_id = Doc_id.of_lsp_uri (Uri0.of_string uri) in
+            match Doc_id.Map.find_opt doc_id open_documents with
+            | Some { last_valid_result = Some { prg; desugared; _ }; _ } ->
+              Lwt.return (dependency_graph_json desugared prg)
+            | _ -> Lwt.return `Null))
+        (fun exn ->
+          Log.err (fun m ->
+              m "catala.dependencyGraph failed: %s" (Printexc.to_string exn));
+          Lwt.return `Null)
+
     method private get_trace_assert (params : Yojson.Safe.t option) :
         Yojson.Safe.t Lwt.t =
       Lwt.catch
@@ -1016,6 +1063,9 @@ class catala_lsp_server =
         | UnknownRequest { meth = "catala.rescanProjects"; params = _ } ->
           let* () = self#rescan_projects ~notify_back () in
           Lwt.return `Null
+        | UnknownRequest { meth = "catala.dependencyGraph"; params } ->
+          self#dependency_graph
+            (Option.map Linol_jsonrpc.Jsonrpc.Structured.yojson_of_t params)
         | UnknownRequest { meth; _ } ->
           Format.kasprintf Lwt.fail_with "Unknown LSP request received: %s" meth
         | _ -> super#on_request_unhandled ~notify_back ~id r
