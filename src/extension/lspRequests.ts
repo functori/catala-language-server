@@ -86,11 +86,16 @@ export function checkTraceAssert(
 export async function dependencyGraphs(
   client: LanguageClient,
   uri: vscode.Uri,
-  kinds?: DependencyKind[]
+  kinds?: DependencyKind[],
+  wholeProgram?: boolean
 ): Promise<DependencyGraphs | null> {
   const ret: JSON | null = await client.sendRequest(
     'catala.dependencyGraph',
-    writeDependencyGraphParams({ uri: uri.toString(), kinds })
+    writeDependencyGraphParams({
+      uri: uri.toString(),
+      kinds,
+      whole_program: wholeProgram,
+    })
   );
   return ret === null ? null : readDependencyGraphs(ret);
 }
