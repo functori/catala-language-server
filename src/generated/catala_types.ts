@@ -462,14 +462,20 @@ export type DependencyGraph = {
   edges: DependencyEdge[];
 }
 
+export type DependencyKind =
+| { kind: 'IntraScopes' /* JSON: "intra-scopes" */ }
+| { kind: 'InterScopes' /* JSON: "inter-scopes" */ }
+| { kind: 'Types' /* JSON: "types" */ }
+
 export type DependencyGraphs = {
-  intra_scopes: Map<string, DependencyGraph>;
-  inter_scopes: DependencyGraph;
-  types: DependencyGraph;
+  intra_scopes?: Map<string, DependencyGraph>;
+  inter_scopes?: DependencyGraph;
+  types?: DependencyGraph;
 }
 
 export type DependencyGraphParams = {
   uri: string;
+  kinds?: DependencyKind[];
 }
 
 export function writeTyp(x: Typ, context: any = x): any {
@@ -2025,31 +2031,58 @@ export function readDependencyGraph(x: any, context: any = x): DependencyGraph {
   };
 }
 
+export function writeDependencyKind(x: DependencyKind, context: any = x): any {
+  switch (x.kind) {
+    case 'IntraScopes':
+      return 'intra-scopes'
+    case 'InterScopes':
+      return 'inter-scopes'
+    case 'Types':
+      return 'types'
+  }
+}
+
+export function readDependencyKind(x: any, context: any = x): DependencyKind {
+  switch (x) {
+    case 'intra-scopes':
+      return { kind: 'IntraScopes' }
+    case 'inter-scopes':
+      return { kind: 'InterScopes' }
+    case 'types':
+      return { kind: 'Types' }
+    default:
+      _atd_bad_json('DependencyKind', x, context)
+      throw new Error('impossible')
+  }
+}
+
 export function writeDependencyGraphs(x: DependencyGraphs, context: any = x): any {
   return {
-    'intra_scopes': _atd_write_required_field('DependencyGraphs', 'intra_scopes', _atd_write_assoc_map_to_object(writeDependencyGraph), x.intra_scopes, x),
-    'inter_scopes': _atd_write_required_field('DependencyGraphs', 'inter_scopes', writeDependencyGraph, x.inter_scopes, x),
-    'types': _atd_write_required_field('DependencyGraphs', 'types', writeDependencyGraph, x.types, x),
+    'intra_scopes': _atd_write_optional_field(_atd_write_assoc_map_to_object(writeDependencyGraph), x.intra_scopes, x),
+    'inter_scopes': _atd_write_optional_field(writeDependencyGraph, x.inter_scopes, x),
+    'types': _atd_write_optional_field(writeDependencyGraph, x.types, x),
   };
 }
 
 export function readDependencyGraphs(x: any, context: any = x): DependencyGraphs {
   return {
-    intra_scopes: _atd_read_required_field('DependencyGraphs', 'intra_scopes', _atd_read_assoc_object_into_map(readDependencyGraph), x['intra_scopes'], x),
-    inter_scopes: _atd_read_required_field('DependencyGraphs', 'inter_scopes', readDependencyGraph, x['inter_scopes'], x),
-    types: _atd_read_required_field('DependencyGraphs', 'types', readDependencyGraph, x['types'], x),
+    intra_scopes: _atd_read_optional_field(_atd_read_assoc_object_into_map(readDependencyGraph), x['intra_scopes'], x),
+    inter_scopes: _atd_read_optional_field(readDependencyGraph, x['inter_scopes'], x),
+    types: _atd_read_optional_field(readDependencyGraph, x['types'], x),
   };
 }
 
 export function writeDependencyGraphParams(x: DependencyGraphParams, context: any = x): any {
   return {
     'uri': _atd_write_required_field('DependencyGraphParams', 'uri', _atd_write_string, x.uri, x),
+    'kinds': _atd_write_optional_field(_atd_write_array(writeDependencyKind), x.kinds, x),
   };
 }
 
 export function readDependencyGraphParams(x: any, context: any = x): DependencyGraphParams {
   return {
     uri: _atd_read_required_field('DependencyGraphParams', 'uri', _atd_read_string, x['uri'], x),
+    kinds: _atd_read_optional_field(_atd_read_array(readDependencyKind), x['kinds'], x),
   };
 }
 
