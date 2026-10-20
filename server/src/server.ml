@@ -531,23 +531,28 @@ let format_scope_vertex ppf : Scopelang.Dependency.vertex -> unit = function
   | Topdef t -> Shared_ast.TopdefName.format ppf t
 
 let dependency_graphs
+    (kinds : Catala_types_t.dependency_kind list)
     (desugared : Desugared.Ast.program)
     (prg : Shared_ast.typed Scopelang.Ast.program) :
     Catala_types_t.dependency_graphs =
+  let when_wanted kind f = if List.mem kind kinds then Some (f ()) else None in
   {
     intra_scopes =
-      Shared_ast.ScopeName.Map.bindings desugared.program_root.module_scopes
-      |> List.map (fun (name, scope) ->
-             ( Shared_ast.ScopeName.to_string name,
-               Desugared.Dependency.build_scope_dependencies scope
-               |> Var_graph.to_atd Desugared.Dependency.Vertex.format ));
+      when_wanted `IntraScopes (fun () ->
+          Shared_ast.ScopeName.Map.bindings desugared.program_root.module_scopes
+          |> List.map (fun (name, scope) ->
+                 ( Shared_ast.ScopeName.to_string name,
+                   Desugared.Dependency.build_scope_dependencies scope
+                   |> Var_graph.to_atd Desugared.Dependency.Vertex.format )));
     inter_scopes =
-      Scopelang.Dependency.build_program_dep_graph prg
-      |> Scope_graph.to_atd format_scope_vertex;
+      when_wanted `InterScopes (fun () ->
+          Scopelang.Dependency.build_program_dep_graph prg
+          |> Scope_graph.to_atd format_scope_vertex);
     types =
-      Scopelang.Dependency.build_type_graph prg.program_ctx.ctx_structs
-        prg.program_ctx.ctx_enums
-      |> Type_graph.to_atd Shared_ast.TypeIdent.format;
+      when_wanted `Types (fun () ->
+          Scopelang.Dependency.build_type_graph prg.program_ctx.ctx_structs
+            prg.program_ctx.ctx_enums
+          |> Type_graph.to_atd Shared_ast.TypeIdent.format);
   }
 
 class catala_lsp_server =
@@ -933,16 +938,19 @@ class catala_lsp_server =
           match params with
           | None -> Lwt.return `Null
           | Some json -> (
-            let { Catala_types_t.uri } =
+            let { Catala_types_t.uri; kinds } =
               Yojson.Safe.to_string json
               |> Catala_types_j.dependency_graph_params_of_string
+            in
+            let kinds =
+              Option.value kinds ~default:[`IntraScopes; `InterScopes; `Types]
             in
             let doc_id = Doc_id.of_lsp_uri (Uri0.of_string uri) in
             match Doc_id.Map.find_opt doc_id open_documents with
             | Some { last_valid_result = Some { prg; desugared; _ }; _ } ->
               let buf = Buffer.create 1024 in
               Catala_types_j.write_dependency_graphs buf
-                (dependency_graphs desugared prg);
+                (dependency_graphs kinds desugared prg);
               Lwt.return (Yojson.Safe.from_string ~buf (Buffer.contents buf))
             | _ -> Lwt.return `Null))
         (fun exn ->
