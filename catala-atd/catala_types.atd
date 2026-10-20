@@ -523,4 +523,5 @@ type dependency_graphs = {
 type dependency_graph_params = {
   uri : string;
   ?kinds : dependency_kind list option;
+  ?whole_program : bool option;
 }
