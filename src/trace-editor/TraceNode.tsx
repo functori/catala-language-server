@@ -14,13 +14,14 @@ import { isSelectingText } from './traceMenu';
 import type { AddFilter } from './traceMenu';
 import type {
   CodeLocation,
+  DependencyFrame,
   Described,
   TraceElement,
   TraceKind,
   Tone,
 } from './traceUtils';
 import {
-  dependenciesOf,
+  dependencyValues,
   describeKind,
   filterMatches,
   elementCodeSpan,
@@ -158,6 +159,7 @@ export default function TraceNode({
   filters,
   prefix,
   tested_scope,
+  frames,
   addFilter,
 }: {
   te: TraceElement;
@@ -165,6 +167,7 @@ export default function TraceNode({
   filters: Filter[];
   prefix: string;
   tested_scope?: string;
+  frames: DependencyFrame[];
   addFilter: AddFilter;
 }): ReactElement | null {
   const [showValue, setShowValue] = useState(false);
@@ -248,7 +251,7 @@ export default function TraceNode({
     inlineTraceValue(te.value, intl) === undefined
       ? formatTraceValue(te.value, intl, 'en', true)
       : undefined;
-  const dependencies = dependenciesOf(graphs, te, cwd);
+  const dependencies = dependencyValues(graphs, te, cwd, frames);
   const consPos =
     te.element.kind === 'exception' &&
     te.value?.kind === 'bool' &&
@@ -331,22 +334,36 @@ export default function TraceNode({
       {showDependencies && dependencies.length > 0 && (
         <div style={openContentStyle}>
           <div style={dependencyListStyle}>
-            {dependencies.map((d) => (
-              <span
-                key={d}
-                style={dependencyPillStyle}
-                title={intl.formatMessage(
-                  { id: 'trace.filterOn' },
-                  { name: d }
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  addFilter(d);
-                }}
-              >
-                {d}
-              </span>
-            ))}
+            {dependencies.map((d) => {
+              const shown =
+                d.value === undefined
+                  ? undefined
+                  : inlineTraceValue(d.value, intl);
+              const detail =
+                d.value !== undefined && shown === undefined
+                  ? formatTraceValue(d.value, intl, 'en', true)
+                  : undefined;
+              const label = intl.formatMessage(
+                { id: 'trace.filterOn' },
+                { name: d.name }
+              );
+              return (
+                <span
+                  key={d.name}
+                  style={dependencyPillStyle}
+                  title={detail === undefined ? label : `${label}\n${detail}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    addFilter(d.name);
+                  }}
+                >
+                  {d.name}
+                  {shown !== undefined && (
+                    <span style={dependencyValueStyle}>{shown}</span>
+                  )}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
@@ -382,6 +399,7 @@ export default function TraceNode({
                   filters={childFilters}
                   prefix={childPrefix}
                   tested_scope={testedScope}
+                  frames={[{ nodes: children, before: i }, ...frames]}
                   addFilter={addFilter}
                 />
               ))}
@@ -498,6 +516,11 @@ const dependencyListStyle: CSSProperties = {
   flexWrap: 'wrap',
   gap: 6,
   margin: '2px 0 4px 22px',
+};
+
+const dependencyValueStyle: CSSProperties = {
+  marginLeft: 6,
+  color: 'var(--vscode-debugTokenExpression-value, var(--vscode-foreground))',
 };
 
 const dependencyPillStyle: CSSProperties = {
