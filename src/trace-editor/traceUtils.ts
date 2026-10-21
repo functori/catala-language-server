@@ -1,5 +1,8 @@
 import type { JsonValue } from '../shared/util_client';
 import type {
+  DependencyGraph,
+  DependencyGraphs,
+  DependencyPos,
   RuntimeValueRaw,
   RuntimeValue,
   ScopeDef,
@@ -646,6 +649,102 @@ export function elementCodeSpan(te: TraceElement): CodeLocation | undefined {
       }),
       { ...first, start }
     );
+}
+
+export function isAbsolutePath(file: string): boolean {
+  return file.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(file);
+}
+
+export function resolvePath(cwd: string, file: string): string {
+  if (!cwd || isAbsolutePath(file)) {
+    return file;
+  }
+  return `${cwd.replace(/[\\/]+$/, '')}/${file}`;
+}
+
+const lastSegment = (name: string): string =>
+  name.slice(name.lastIndexOf('.') + 1);
+
+const traceName = (name: string): string => name.replace('@', '#');
+
+function sameFile(cwd: string, a: string, b: string): boolean {
+  return resolvePath(cwd, a) === resolvePath(cwd, b);
+}
+
+function samePlace(cwd: string, a: DependencyPos, b: CodeLocation): boolean {
+  return (
+    sameFile(cwd, a.file, b.file) &&
+    samePoint(a.start, b.start) &&
+    samePoint(a.end_, b.end)
+  );
+}
+
+function withinSpan(
+  cwd: string,
+  span: CodeLocation,
+  pos: DependencyPos
+): boolean {
+  const atMost = (a: Point, b: Point): boolean =>
+    a.line !== b.line ? a.line < b.line : a.character <= b.character;
+  return (
+    sameFile(cwd, pos.file, span.file) &&
+    atMost(span.start, pos.start) &&
+    atMost(pos.end_, span.end)
+  );
+}
+
+function dependenciesIn(graph: DependencyGraph, id: string): string[] {
+  return graph.edges
+    .filter((e) => String(e.to_) === id)
+    .map((e) => graph.nodes.get(String(e.from_)))
+    .filter((n): n is string => n !== undefined);
+}
+
+function scopeCallNode(
+  graph: DependencyGraph,
+  te: TraceElement,
+  cwd: string
+): string | undefined {
+  const pos = te.pos;
+  const edge =
+    pos === undefined
+      ? undefined
+      : graph.edges.find((e) => samePlace(cwd, e.pos, pos));
+  if (edge !== undefined) {
+    return String(edge.from_);
+  }
+  const name = te.element.name;
+  if (typeof name !== 'string') return undefined;
+  const matches = [...graph.nodes.entries()].filter(
+    ([, v]) => lastSegment(v) === name
+  );
+  return matches.length === 1 ? matches[0][0] : undefined;
+}
+
+export function dependenciesOf(
+  graphs: DependencyGraphs | null,
+  te: TraceElement,
+  cwd: string
+): string[] {
+  if (graphs === null) return [];
+  if (te.element.kind === 'scope_call') {
+    const graph = graphs.inter_scopes;
+    if (graph === undefined) return [];
+    const id = scopeCallNode(graph, te, cwd);
+    return id === undefined ? [] : dependenciesIn(graph, id).map(lastSegment);
+  }
+  if (te.element.kind !== 'scope_var') return [];
+  const span = elementCodeSpan(te);
+  if (span === undefined || graphs.intra_scopes === undefined) return [];
+  const used = new Set<string>();
+  for (const graph of graphs.intra_scopes.values()) {
+    for (const edge of graph.edges) {
+      if (!withinSpan(cwd, span, edge.pos)) continue;
+      const name = graph.nodes.get(String(edge.from_));
+      if (name !== undefined) used.add(traceName(name));
+    }
+  }
+  return [...used];
 }
 
 export function withCodeSpans(trace: TraceElement[]): TraceElement[] {
