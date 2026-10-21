@@ -167,6 +167,7 @@ function TraceTreeView({
                   filters={f}
                   prefix={rootPrefix}
                   tested_scope={testedScope}
+                  frames={[{ nodes: roots, before: i }]}
                   addFilter={addFilter}
                 />
               ))}

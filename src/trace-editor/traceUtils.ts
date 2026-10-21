@@ -721,7 +721,7 @@ function scopeCallNode(
   return matches.length === 1 ? matches[0][0] : undefined;
 }
 
-export function dependenciesOf(
+function dependenciesOf(
   graphs: DependencyGraphs | null,
   te: TraceElement,
   cwd: string
@@ -734,7 +734,7 @@ export function dependenciesOf(
     return id === undefined ? [] : dependenciesIn(graph, id).map(lastSegment);
   }
   if (te.element.kind !== 'scope_var') return [];
-  const span = elementCodeSpan(te);
+  const span = te.codeSpan ?? elementCodeSpan(te);
   if (span === undefined || graphs.intra_scopes === undefined) return [];
   const used = new Set<string>();
   for (const graph of graphs.intra_scopes.values()) {
@@ -745,6 +745,37 @@ export function dependenciesOf(
     }
   }
   return [...used];
+}
+
+export type DependencyFrame = { nodes: TraceElement[]; before: number };
+
+export type Dependency = { name: string; value?: TraceValue };
+
+function computedBefore(
+  frames: DependencyFrame[],
+  name: string
+): TraceValue | undefined {
+  for (const { nodes, before } of frames) {
+    for (let i = before - 1; i >= 0; i--) {
+      const node = nodes[i];
+      if (node.element.kind === 'scope_var' && node.element.name === name) {
+        return node.value;
+      }
+    }
+  }
+  return undefined;
+}
+
+export function dependencyValues(
+  graphs: DependencyGraphs | null,
+  te: TraceElement,
+  cwd: string,
+  frames: DependencyFrame[]
+): Dependency[] {
+  return dependenciesOf(graphs, te, cwd).map((name) => ({
+    name,
+    value: computedBefore(frames, name),
+  }));
 }
 
 export function withCodeSpans(trace: TraceElement[]): TraceElement[] {
