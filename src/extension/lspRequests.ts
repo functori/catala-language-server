@@ -82,7 +82,6 @@ export function checkTraceAssert(
   };
 }
 
-/** @lintignore */
 export async function dependencyGraphs(
   client: LanguageClient,
   uri: vscode.Uri,
