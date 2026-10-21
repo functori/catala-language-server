@@ -13,23 +13,12 @@ import { HighlightText } from '../shared/Highlight';
 import type { Filter } from '../FilterPin';
 import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { CodeLocation } from './traceUtils';
-import { posText } from './traceUtils';
+import { isAbsolutePath, posText, resolvePath } from './traceUtils';
 import { CwdContext } from './traceContexts';
-
-function resolvePath(cwd: string, file: string): string {
-  if (!cwd || isAbsolute(file)) {
-    return file;
-  }
-  return `${cwd.replace(/[\\/]+$/, '')}/${file}`;
-}
-
-function isAbsolute(file: string): boolean {
-  return file.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(file);
-}
 
 export function candidatePaths(cwd: string, file: string): string[] {
   const direct = resolvePath(cwd, file);
-  if (isAbsolute(file)) {
+  if (isAbsolutePath(file)) {
     return [direct];
   }
   return [direct, resolvePath(cwd, `_build/${file}`)];

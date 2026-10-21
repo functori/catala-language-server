@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { existsSync, readFileSync } from 'fs';
 import type { LanguageClient } from 'vscode-languageclient/node';
-import { listEntrypoints } from './lspRequests';
+import { dependencyGraphs, listEntrypoints } from './lspRequests';
 import type { CatalaEntrypoint } from './lspRequests';
 import { parseTestFile } from '../test-case-editor/testCaseCompilerInterop';
 import { logger } from './logger';
@@ -16,7 +16,7 @@ import type { SettingsSource } from './settingsStore';
 import { resolveLanguage } from '../shared/settings';
 import type { TraceElement } from '../trace-editor/traceUtils';
 import type { Test } from '../generated/catala_types';
-import { writeTest } from '../generated/catala_types';
+import { writeDependencyGraphs, writeTest } from '../generated/catala_types';
 import { TestCaseEditorProvider } from './testCaseEditorProvider';
 
 const fileLineCache = new Map<string, string>();
@@ -175,6 +175,23 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
       return new Map(parsed.value.map((t) => [t.testing_scope, t]));
     };
 
+    const sendDependencies = async (): Promise<void> => {
+      const client = this.getClient();
+      if (!client) return;
+      const graphs = await dependencyGraphs(
+        client,
+        document.uri,
+        [{ kind: 'IntraScopes' }, { kind: 'InterScopes' }],
+        true
+      );
+      if (graphs !== null) {
+        postToWebView({
+          kind: 'dependencies',
+          graphs: writeDependencyGraphs(graphs) as JsonValue,
+        });
+      }
+    };
+
     const scopesFromProject = async (): Promise<string[]> => {
       const client = this.getClient();
       if (!client) return [];
@@ -206,6 +223,10 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
         trace: ins?.trace,
         run: ins?.run,
       });
+
+      void sendDependencies().catch((e) =>
+        logger.log(`Trace editor: could not get dependencies: ${String(e)}`)
+      );
 
       if (ins?.test) return;
       void scopesFromProject()

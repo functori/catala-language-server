@@ -195,6 +195,8 @@
   "trace.value": "wartość",
   "trace.consequence": "Konsekwencja",
   "trace.code": "kod",
+  "trace.dependencies": "zależności",
+  "trace.filterOn": "filtruj według {name}",
   "trace.relatedLocations": "Powiązane lokalizacje:",
   "trace.fulfilled": "spełniony",
   "trace.notFulfilled": "niespełniony",

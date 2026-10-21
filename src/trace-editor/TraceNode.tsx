@@ -11,6 +11,7 @@ import { getVsCodeApi } from '../shared/webviewApi';
 import type { TraceUpMessage } from './messages';
 import { LocationSnippet, candidatePaths } from './LocationSnippet';
 import { isSelectingText } from './traceMenu';
+import type { AddFilter } from './traceMenu';
 import type {
   CodeLocation,
   Described,
@@ -19,6 +20,7 @@ import type {
   Tone,
 } from './traceUtils';
 import {
+  dependenciesOf,
   describeKind,
   filterMatches,
   elementCodeSpan,
@@ -32,6 +34,7 @@ import {
 } from './traceUtils';
 import {
   CwdContext,
+  DependenciesContext,
   ExpandContext,
   ExpectedContext,
   IndexContext,
@@ -154,16 +157,21 @@ export default function TraceNode({
   filters,
   prefix,
   tested_scope,
+  addFilter,
 }: {
   te: TraceElement;
   depth: number;
   filters: Filter[];
   prefix: string;
   tested_scope?: string;
+  addFilter: AddFilter;
 }): ReactElement | null {
   const [showValue, setShowValue] = useState(false);
   const [showCode, setShowCode] = useState(false);
   const [showConsequence, setShowConsequence] = useState(false);
+  const [showDependencies, setShowDependencies] = useState(false);
+  const graphs = useContext(DependenciesContext);
+  const cwd = useContext(CwdContext);
 
   const filtering = filters.length > 0;
   const filterKey = filters.map((f) => `${f.option}:${f.filter}`).join('\n');
@@ -236,6 +244,7 @@ export default function TraceNode({
     inlineTraceValue(te.value, intl) === undefined
       ? formatTraceValue(te.value, intl, 'en', true)
       : undefined;
+  const dependencies = dependenciesOf(graphs, te, cwd);
   const consPos =
     te.element.kind === 'exception' &&
     te.value?.kind === 'bool' &&
@@ -276,6 +285,7 @@ export default function TraceNode({
         <ValueView te={te} described={described} filters={filters} />
         {(containerValue !== undefined ||
           snippetPos !== undefined ||
+          dependencies.length > 0 ||
           consPos) && (
           <span style={pillsStyle}>
             {containerValue !== undefined && (
@@ -292,6 +302,13 @@ export default function TraceNode({
                 onToggle={() => setShowCode((v) => !v)}
               />
             )}
+            {dependencies.length > 0 && (
+              <Pill
+                labelId="trace.dependencies"
+                active={showDependencies}
+                onToggle={() => setShowDependencies((v) => !v)}
+              />
+            )}
             {consPos && (
               <Pill
                 labelId="trace.consequence"
@@ -305,6 +322,28 @@ export default function TraceNode({
       {showValue && containerValue !== undefined && (
         <div style={openContentStyle}>
           <pre style={containerValueStyle}>{containerValue}</pre>
+        </div>
+      )}
+      {showDependencies && dependencies.length > 0 && (
+        <div style={openContentStyle}>
+          <div style={dependencyListStyle}>
+            {dependencies.map((d) => (
+              <span
+                key={d}
+                style={dependencyPillStyle}
+                title={intl.formatMessage(
+                  { id: 'trace.filterOn' },
+                  { name: d }
+                )}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  addFilter(d);
+                }}
+              >
+                {d}
+              </span>
+            ))}
+          </div>
         </div>
       )}
       {showCode && snippetPos && (
@@ -339,6 +378,7 @@ export default function TraceNode({
                   filters={childFilters}
                   prefix={childPrefix}
                   tested_scope={testedScope}
+                  addFilter={addFilter}
                 />
               ))}
             </ul>
@@ -447,6 +487,24 @@ const pillStyle: CSSProperties = {
 const pillActiveStyle: CSSProperties = {
   background: 'var(--vscode-badge-background)',
   color: 'var(--vscode-badge-foreground)',
+};
+
+const dependencyListStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: 6,
+  margin: '2px 0 4px 22px',
+};
+
+const dependencyPillStyle: CSSProperties = {
+  cursor: 'pointer',
+  userSelect: 'none',
+  fontFamily: 'var(--vscode-editor-font-family, monospace)',
+  padding: '1px 8px',
+  borderRadius: 4,
+  border: '1px solid var(--vscode-widget-border, transparent)',
+  background: 'var(--vscode-editorWidget-background)',
+  color: 'var(--vscode-foreground)',
 };
 
 const containerValueStyle: CSSProperties = {
