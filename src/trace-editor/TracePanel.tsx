@@ -123,7 +123,11 @@ function TraceTreeView({
   let stepIndices: Map<TraceElement, number> = new Map();
   if (test !== undefined) {
     stepIndices = stepIndexMap(trace);
-    const [, outputs] = traceVariablesForTest(trace, test.tested_scope.name);
+    const [, outputs] = traceVariablesForTest(
+      trace,
+      test.testing_scope,
+      test.tested_scope.name
+    );
     const output: Map<string, Match> = new Map();
     for (const [name, io] of test.test_outputs.entries()) {
       const exp = io?.value ? traceValueFromRuntime(io.value.value) : undefined;

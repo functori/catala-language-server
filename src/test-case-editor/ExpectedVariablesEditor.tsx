@@ -269,10 +269,20 @@ export default function ExpectedVariablesEditor({
     return (): void => clearTimeout(timer);
   }, [failures, focusFailure]);
 
-  const [trVariablesAux, outputs] = traceVariablesForTest(
+  const [trVariable, outputs] = traceVariablesForTest(
     trace ?? [],
+    test.testing_scope,
     test.tested_scope.name
   );
+  // Every hook is above: returning early here keeps their order stable.
+  if (trVariable === null) {
+    return (
+      <div className="test-section">
+        <FormattedMessage id="testEditor.noTraceVariable" />
+      </div>
+    );
+  }
+  const trVariablesAux = [trVariable];
   const trVariables = filterExpectedVariables(
     trVariablesAux,
     outputs,

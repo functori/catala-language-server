@@ -699,16 +699,35 @@ function findScope(
   }
 }
 
+function skipTestingScope(
+  trace: TraceElement[],
+  testing_scope_name: string
+): TraceElement[] {
+  if (trace.length == 1) {
+    const testing_scope = trace[0];
+    if (
+      testing_scope.element.kind == 'scope_call' &&
+      testing_scope.element.name == testing_scope_name &&
+      testing_scope.trace !== undefined
+    ) {
+      return testing_scope.trace;
+    }
+  }
+  return trace;
+}
+
 export function traceVariablesForTest(
   trace: TraceElement[],
+  testing_scope: string,
   scope: string
-): [TraceVariable[], Record<string, TraceValue>] {
-  let variables: TraceVariable[] = [];
+): [TraceVariable | null, Record<string, TraceValue>] {
+  let variable: TraceVariable | null = null;
   let outputs: Record<string, TraceValue> = {};
   if (trace !== undefined) {
-    const testedScope = findScope(scope, traceVariables(trace));
+    const allVariables = traceVariables(skipTestingScope(trace, testing_scope));
+    const testedScope = findScope(scope, allVariables);
     if (testedScope !== undefined) {
-      variables = testedScope.variables;
+      variable = testedScope;
       if (testedScope.value?.kind === 'struct') {
         outputs = testedScope.value.fields;
       } else if (testedScope.value !== undefined) {
@@ -716,7 +735,7 @@ export function traceVariablesForTest(
       }
     }
   }
-  return [variables, outputs];
+  return [variable, outputs];
 }
 
 function readTraceTestVariables(x: JsonValue): Map<string, TraceValue | null> {
