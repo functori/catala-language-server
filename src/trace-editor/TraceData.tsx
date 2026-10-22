@@ -296,10 +296,13 @@ export function DataPanel({
   trace?: TraceElement[];
   intl: IntlShape;
 }): ReactElement {
-  const [trVariables, trOutputs] = traceVariablesForTest(
+  const [trVariable, trOutputs] = traceVariablesForTest(
     trace ?? [],
+    test.testing_scope,
     test.tested_scope.name
   );
+
+  const trVariables = trVariable == null ? [] : [trVariable];
 
   const inputNodes = leavesFirst(
     [...test.test_inputs.entries()].map(([name, io]) =>
