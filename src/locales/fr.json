@@ -159,6 +159,7 @@
   "testEditor.variables": "Variables internes",
   "testEditor.addVariable": "Ajouter une variable calculée…",
   "testEditor.consultVariable": "Consulter les variables intermédiaires",
+  "testEditor.noTraceVariable": "Aucune variable trouvée dans la trace",
   "testEditor.filterVariables": "Filtrer les variables…",
   "testEditor.deleteVariable": "Supprimer la variable attendue",
   "testEditor.fillComputedVariable": "Remplir avec la valeur calculée ({value})",
