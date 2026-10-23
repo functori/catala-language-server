@@ -160,6 +160,7 @@
   "testEditor.variables": "Zmienne wewnętrzne",
   "testEditor.addVariable": "Dodaj obliczoną zmienną…",
   "testEditor.consultVariable": "Sprawdź wszystkie zmienne wewnętrzne",
+  "testEditor.noTraceVariable": "Nie znaleziono żadnej zmiennej w śladzie",
   "testEditor.filterVariables": "Filtruj zmienne…",
   "testEditor.deleteVariable": "Usuń oczekiwaną zmienną",
   "testEditor.fillComputedVariable": "Wypełnij obliczoną wartością ({value})",
