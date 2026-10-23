@@ -212,7 +212,14 @@ function filterExpectedVariables(
   for (const tv of variables) {
     const pr = variablePath(prefix, tv);
     if (tv.kind === 'step') {
-      variables = filterExpectedVariables(tv.variables, {}, testVariables, pr);
+      // The list starts with the tested scope: its outputs are among its own
+      // variables, one level down, and nowhere deeper.
+      variables = filterExpectedVariables(
+        tv.variables,
+        prefix === '' ? outputs : {},
+        testVariables,
+        pr
+      );
       out.push({ ...tv, variables });
     } else if (
       outputs[tv.name] === undefined &&
