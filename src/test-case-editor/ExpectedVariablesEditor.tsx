@@ -37,6 +37,7 @@ import {
   RatEditor,
 } from '../editors/ValueEditors';
 import { focusExpectedVariables, focusTargetId } from '../shared/focusTarget';
+import { Identifier } from '../editors/Identifier';
 
 type Props = {
   testing_scope: string;
@@ -95,7 +96,7 @@ function TraceValueEditor({
   testing_scope: string;
   path: string;
   input: RuntimeValue | undefined;
-  setInput: React.Dispatch<React.SetStateAction<RuntimeValue | undefined>>;
+  setInput(value: RuntimeValue | undefined): void;
   kind: string;
   intl: IntlShape;
 }): ReactElement {
@@ -174,6 +175,7 @@ function TraceValueEditor({
       editor = (
         <VscodeTextfield
           id={id}
+          style={{ width: '100%' }}
           value={inputStr}
           onInput={(e) => {
             let valueField =
@@ -235,13 +237,17 @@ export default function ExpectedVariablesEditor({
   const failureByName = new Map(
     (failures ?? []).map((failure) => [failure.name, failure])
   );
+  // Sorted by name: the test file does not keep its variables in a stable
+  // order across rewrites, and the rows must not jump around on each edit.
   const testVariables: Map<string, TraceValue | null> = new Map();
-  test.variables.forEach((rv, name) => {
-    const value = rv !== null ? traceValueFromRuntime(rv.value) : null;
-    if (value !== undefined) {
-      testVariables.set(name, value);
-    }
-  });
+  [...test.variables.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([name, rv]) => {
+      const value = rv !== null ? traceValueFromRuntime(rv.value) : null;
+      if (value !== undefined) {
+        testVariables.set(name, value);
+      }
+    });
 
   // The first row the compiler reported a mismatch on, in display order.
   const firstFailure = [...testVariables.keys()].find((path) =>
@@ -299,7 +305,7 @@ export default function ExpectedVariablesEditor({
       <div className="test-inputs data-card">
         <div className="composite-editor">
           {testVariables.size > 0 && (
-            <div className="simple-items-vertical">
+            <div className="simple-items-container">
               {[...testVariables.entries()].map(([path, tv]) => {
                 const computed = computedOf(path);
                 return (
@@ -327,9 +333,9 @@ export default function ExpectedVariablesEditor({
                   onClick={() => setShowCatalog((s) => !s)}
                 >
                   <span
-                    className={`codicon codicon-${showCatalog ? 'chevron-down' : 'add'}`}
+                    className={`codicon codicon-${showCatalog ? 'chevron-down' : 'chevron-right'}`}
                   />{' '}
-                  <FormattedMessage id="testEditor.addNewVariable" />
+                  <FormattedMessage id="testEditor.consultVariable" />
                 </button>
               </div>
               {showCatalog &&
@@ -386,9 +392,6 @@ function VariableRow({
 }): ReactElement {
   const intl = useIntl();
 
-  const [input, setInput] = useState<RuntimeValue | undefined>(undefined);
-  const expectedStr =
-    expected !== null ? formatTraceValue(expected, intl) : '--';
   const computedStr =
     computed !== undefined ? formatTraceValue(computed, intl) : undefined;
 
@@ -405,40 +408,46 @@ function VariableRow({
     ? { value: comp, attrs: [] }
     : undefined;
 
-  function apply(): void {
+  const exp = expected !== null ? traceValueToRuntime(expected) : undefined;
+  const expValu: RuntimeValue | undefined = exp
+    ? { value: exp, attrs: [] }
+    : undefined;
+  const kind = expected?.kind ?? computed?.kind;
+
+  function apply(input: RuntimeValue | undefined): void {
     if (input !== undefined) {
       const tvInput = traceValueFromRuntime(input);
       onSet(name, tvInput ?? null);
-      setInput(undefined);
     }
   }
 
-  const inputStr = formatRuntimeValue(input, intl) ?? '';
   // `tabIndex` is what makes the row focusable at all; -1 keeps it out of the
   // tab order, so it is only ever reached by the jump above.
   const editor = (
     <div
-      className="simple-item-vertical atomic-element"
+      className="simple-item atomic-element"
       ref={rowRef}
       tabIndex={failure !== undefined ? -1 : undefined}
-      style={
-        missing
+      style={{
+        ...(missing
           ? {
               background:
                 'var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.2))',
             }
-          : undefined
-      }
+          : {}),
+      }}
     >
       <label className="item-label body-1" style={{ textTransform: 'none' }}>
-        {name}
+        <Identifier name={name} />
       </label>
       <div className="expected-variable-row">
-        <span
+        <div
           className="expected-variable-value body-1"
-          style={
-            mismatch ? { color: 'var(--vscode-errorForeground)' } : undefined
-          }
+          style={{
+            ...(mismatch
+              ? { outline: '1px solid var(--vscode-errorForeground)' }
+              : {}),
+          }}
           title={
             failure !== undefined
               ? intl.formatMessage(
@@ -451,43 +460,30 @@ function VariableRow({
               : undefined
           }
         >
-          {expectedStr}
-        </span>
-        <div style={{ margin: 'auto', width: '20em' }}>
-          {computed !== undefined ? (
+          {kind !== undefined ? (
             <TraceValueEditor
               testing_scope={testing_scope}
               path={name}
-              input={input}
-              setInput={setInput}
-              kind={computed?.kind!}
+              input={expValu}
+              setInput={apply}
+              kind={kind}
               intl={intl}
             />
           ) : (
-            <span className="codicon codicon-loading codicon-modifier-spin" />
+            '--'
           )}
         </div>
         <VscodeButton
           secondary
-          icon="arrow-left"
+          icon="replace"
           disabled={computed === undefined}
           title={intl.formatMessage(
             { id: 'testEditor.fillComputedVariable' },
             { value: computedStr ?? '' }
           )}
           onClick={() => {
-            setInput(compValu);
+            apply(compValu);
           }}
-        />
-        <VscodeButton
-          secondary
-          disabled={inputStr == ''}
-          icon="check"
-          title={intl.formatMessage(
-            { id: 'testEditor.setVariable' },
-            { value: inputStr }
-          )}
-          onClick={apply}
         />
         <VscodeButton
           secondary
@@ -500,7 +496,10 @@ function VariableRow({
   );
 
   return failure !== undefined ? (
-    <div className="diff-highlight atomic-diff">
+    <div
+      className="diff-highlight atomic-diff"
+      style={{ width: 'fit-content' }}
+    >
       {editor}
       <div className="diff-actual">
         <FormattedMessage id="diff.actual" />: {failure.current_value ?? ''}
