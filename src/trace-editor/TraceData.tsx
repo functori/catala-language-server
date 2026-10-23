@@ -302,23 +302,28 @@ export function DataPanel({
     test.tested_scope.name
   );
 
-  const trVariables = trVariable == null ? [] : [trVariable];
-
   const inputNodes = leavesFirst(
     [...test.test_inputs.entries()].map(([name, io]) =>
       buildNode(name, name, undefined, ioValue(io), intl, true)
     )
   );
 
-  const hasTraceVars = trVariables.length > 0;
+  const hasTraceVars = trVariable !== null;
   const matched = new Set<string>();
-  const auxiliary = trVariables.filter(
-    (variable) =>
-      variable.kind === 'step' || trOutputs[variable.name] === undefined
-  );
+  // The tested scope only roots the paths, which start with it as the expected
+  // variables do: its variables are shown at the top level. Its outputs have
+  // their own section.
+  const rootPath = trVariable === null ? '' : variablePath('', trVariable);
+  const auxiliary =
+    trVariable?.kind === 'step'
+      ? trVariable.variables.filter(
+          (variable) =>
+            variable.kind === 'step' || trOutputs[variable.name] === undefined
+        )
+      : [];
   let internalNodes = nodesFromTrace(
     auxiliary,
-    '',
+    rootPath,
     test.variables,
     matched,
     intl
@@ -331,7 +336,16 @@ export function DataPanel({
       ...buildNode(name, name, expected ?? undefined, undefined, intl),
       missing: hasTraceVars,
     };
-    internalNodes = insertAt(internalNodes, pathSegments(name), '', leaf);
+    // The scope's own name may hold dots: cut it off whole, not by segments.
+    const underRoot = rootPath !== '' && name.startsWith(`${rootPath}.`);
+    internalNodes = underRoot
+      ? insertAt(
+          internalNodes,
+          pathSegments(name.slice(rootPath.length + 1)),
+          rootPath,
+          leaf
+        )
+      : insertAt(internalNodes, pathSegments(name), '', leaf);
   }
   internalNodes = sortTree(internalNodes);
 
