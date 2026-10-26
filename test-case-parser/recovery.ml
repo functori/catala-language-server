@@ -979,7 +979,7 @@ let rebuild_broken_test
            build. *)
         match
           let path_to_build, include_dirs =
-            lookup_include_dirs module_options
+            lookup_include_dirs ~build_dir:"_build" module_options
           in
           read_program include_dirs path_to_build module_options
         with

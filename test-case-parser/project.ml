@@ -37,7 +37,7 @@ let lookup_clerk_toml from_dir =
     end
   with _ -> None
 
-let lookup_include_dirs ?buffer_path options =
+let lookup_include_dirs ?buffer_path ~build_dir options =
   (* Otherwise, lookup for the toml *)
   let dir =
     match options.Global.input_src with
@@ -77,7 +77,11 @@ let lookup_include_dirs ?buffer_path options =
           List.sort_uniq String.compare (to_relative dir :: include_dirs)
         | _ -> include_dirs
       in
-      let include_dirs = List.map (File.( / ) path_to_build) all_include_dirs in
+      let include_dirs =
+        List.map
+          (fun dir -> File.(path_to_build / build_dir / dir))
+          all_include_dirs
+      in
       let all_include_dirs =
         match options.Global.input_src with
         | Stdin _ ->
