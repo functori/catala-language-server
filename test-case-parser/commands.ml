@@ -219,7 +219,8 @@ let generate_test
     | Some p -> p
     | None ->
       let path_to_build, include_dirs =
-        if include_dirs = [] then lookup_include_dirs options
+        if include_dirs = [] then
+          lookup_include_dirs ~build_dir:default_build_dir options
         else ".", include_dirs
       in
       read_program include_dirs path_to_build options
@@ -497,7 +498,8 @@ let import_catala_tests (prg, naming_ctx) =
 
 let read_test include_dirs (options : Global.options) buffer_path scope_filter =
   let path_to_build, include_dirs =
-    if include_dirs = [] then lookup_include_dirs ?buffer_path options
+    if include_dirs = [] then
+      lookup_include_dirs ~build_dir:default_build_dir ?buffer_path options
     else ".", include_dirs
   in
   let prg = read_program include_dirs path_to_build options in
@@ -534,7 +536,9 @@ let read_tests_of_file ~(lang : Global.backend_lang) (file : string) :
         Global.enforce_options ~input_src:(Global.FileName file)
           ~language:(Some lang) ()
       in
-      let path_to_build, include_dirs = lookup_include_dirs options in
+      let path_to_build, include_dirs =
+        lookup_include_dirs ~build_dir:default_build_dir options
+      in
       import_catala_tests (read_program include_dirs path_to_build options)
     with
     | tests -> Ok (Some tests)
@@ -587,15 +591,7 @@ let retrieve_program
     options
     scope_name =
   let path_to_build, include_dirs =
-    if include_dirs = [] then
-      let path_to_build, include_dirs = lookup_include_dirs options in
-      let build_include_dirs =
-        List.map
-          (fun (p : Global.raw_file) ->
-            File.(path_to_build / build_dir / (p :> string)) |> Global.raw_file)
-          include_dirs
-      in
-      path_to_build, build_include_dirs @ include_dirs
+    if include_dirs = [] then lookup_include_dirs ~build_dir options
     else ".", []
   in
   let desugared_prg, naming_ctx =
@@ -664,6 +660,7 @@ let interpret_program dcalc_prg scope_name build_term_to_interp =
     | { Message.kind = AssertFailure; _ } ->
       failed_asserts := e :: !failed_asserts;
       false (* absorb error *)
+    | { Message.kind = TraceAssertFails; _ } -> (* absorb trace error *) false
     | _ -> true (* propagate error and crash *)
   in
   let () =
@@ -674,12 +671,12 @@ let interpret_program dcalc_prg scope_name build_term_to_interp =
     |> Interpreter.evaluate_expr dcalc_prg.decl_ctx dcalc_prg.lang
   in
   let to_interp = build_term_to_interp program_fun in
-  let results, trace_asserts =
+  let results, failed_trace_asserts =
     Interpreter.evaluate_expr_with_trace dcalc_prg.decl_ctx dcalc_prg.lang
       scope_name to_interp
   in
   Message.report_delayed_errors_if_any ();
-  results, !failed_asserts, trace_asserts
+  results, !failed_asserts, failed_trace_asserts
 
 (* A run's results, as the test's outputs typed by the output struct. *)
 let test_outputs_of dcalc_prg out_struct actual_results =
@@ -1002,7 +999,9 @@ let print_scopes scopes = write_stdout J.write_scope_def_list scopes
 
 let list_scopes include_dirs options =
   let path_to_build, include_dirs =
-    if include_dirs = [] then lookup_include_dirs options else ".", include_dirs
+    if include_dirs = [] then
+      lookup_include_dirs ~build_dir:default_build_dir options
+    else ".", include_dirs
   in
   let prg, _ = read_program include_dirs path_to_build options in
   let module_name =
