@@ -20,19 +20,6 @@ module J = Catala_types_j
 open Project
 open Model
 
-let check_failed_trace_var ~trace_assert ~tested_scope json =
-  List.map
-    (fun e ->
-      O.
-        {
-          name = Trace_assertion.(asserted_trace_variable_to_string e.name);
-          expected = Trace_assertion.(value_to_string e.expected);
-          current_value =
-            Trace_assertion.(Option.map value_to_string e.current_value);
-        })
-    (Trace_assertion.check ~asserted_trace_variables:trace_assert ~tested_scope
-       json)
-
 let get_scope_test
     (prg : I.program)
     (testing_scope : string)

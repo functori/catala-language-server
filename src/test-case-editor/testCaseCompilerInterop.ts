@@ -317,9 +317,8 @@ export type ScopeRunResult =
 export function runTestScope(
   filename: string,
   testScope: string,
-  inputs?: TestInputs,
-  /** Absolute path of the JSON file the trace should be written to. */
-  traceFile?: string
+  trace: boolean,
+  inputs?: TestInputs
 ): TestRunResults {
   /*
    * Notes:
@@ -339,10 +338,9 @@ export function runTestScope(
   // Dependencies are built in a separate directory so that the instrumented
   // artifacts do not evict the plain ones from the main build dir.
   const TRACE_BUILD_DIR = '_build/_trace';
-  const clerkTraceArgs = traceFile
+  const clerkTraceArgs = trace
     ? [
         '--trace',
-        traceFile,
         '--build-dir',
         TRACE_BUILD_DIR,
         '--ninja-output-file',
@@ -354,9 +352,7 @@ export function runTestScope(
   // carries only "<function>" as its root value. The build dir has to be
   // repeated: this run loads the stdlib and the modules clerk just compiled
   // there, and would otherwise look for them in the default `_build`.
-  const catalaTraceArgs = traceFile
-    ? [`--check-trace=${traceFile}`, '--build-dir', TRACE_BUILD_DIR]
-    : [];
+  const catalaTraceArgs = trace ? ['--build-dir', TRACE_BUILD_DIR] : [];
   const args = [
     'testcase',
     'run',
