@@ -364,7 +364,7 @@ async function processGUITest(
 ): Promise<void> {
   try {
     const uri = vscode.Uri.file(file);
-    const res: TestRunResults = await runTestScope(file, scope);
+    const res: TestRunResults = await runTestScope(file, scope, false);
     if (res.kind === 'Ok') {
       if (hasTestFailures(res.value)) {
         // Prefer focusing the custom editor and displaying diffs there
