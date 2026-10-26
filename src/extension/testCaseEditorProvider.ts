@@ -324,9 +324,9 @@ export class TestCaseEditorProvider
     async function runTest(
       fileName: string,
       scope: string,
-      traceFile?: string
+      trace: boolean
     ): Promise<TestRunResults> {
-      return runTestScope(fileName, scope, undefined, traceFile);
+      return runTestScope(fileName, scope, trace);
     }
 
     function applyGuiEdit(
@@ -498,7 +498,11 @@ export class TestCaseEditorProvider
           let results;
           try {
             results = await this.testQueue.add(() =>
-              runTest(document.uri.fsPath, scope, traceFile)
+              runTest(
+                document.uri.fsPath,
+                scope,
+                has_trace_assert && checkTraceAssert
+              )
             );
 
             if (traceFile !== undefined) {
