@@ -331,7 +331,11 @@ export function runTestScope(
   // carries only "<function>" as its root value. The build dir has to be
   // repeated: this run loads the stdlib and the modules clerk just compiled
   // there, and would otherwise look for them in the default `_build`.
-  const catalaTraceArgs = trace ? ['--build-dir', TRACE_BUILD_DIR] : [];
+  // `--check-trace-assertion` has the `#[trace.assert]` attributes checked
+  // against the trace collected during the run, to fill `failed_trace_assert`.
+  const catalaTraceArgs = trace
+    ? ['--build-dir', TRACE_BUILD_DIR, '--check-trace-assertion']
+    : [];
   const args = [
     'testcase',
     'run',
