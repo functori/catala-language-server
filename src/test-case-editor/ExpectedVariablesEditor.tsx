@@ -12,7 +12,7 @@ import {
   type TraceElement,
   type TraceVariable,
   type TraceValue,
-  findTraceValue,
+  findTraceVariable,
   formatTraceValue,
   traceVariablesForTest,
   traceValueEqual,
@@ -296,8 +296,8 @@ export default function ExpectedVariablesEditor({
     testVariables
   );
 
-  function computedOf(path: string): TraceValue | undefined {
-    return findTraceValue(path, trVariablesAux);
+  function variableOf(path: string): TraceVariable | undefined {
+    return findTraceVariable(path, trVariablesAux);
   }
 
   const hasTraceVars = trVariablesAux.length > 0;
@@ -324,12 +324,14 @@ export default function ExpectedVariablesEditor({
           {testVariables.size > 0 && (
             <div className="simple-items-container">
               {[...testVariables.entries()].map(([path, tv]) => {
-                const computed = computedOf(path);
+                const variable = variableOf(path);
+                const computed = variable?.value;
                 return (
                   <VariableRow
                     testing_scope={testing_scope}
                     key={path}
                     name={path}
+                    displayName={variable?.name}
                     expected={tv}
                     computed={computed}
                     missing={hasTraceVars && computed === undefined}
@@ -388,6 +390,7 @@ export default function ExpectedVariablesEditor({
 function VariableRow({
   testing_scope,
   name,
+  displayName,
   expected,
   computed,
   missing,
@@ -397,7 +400,11 @@ function VariableRow({
   onRemove,
 }: {
   testing_scope: string;
+  /** The full path of the variable, shown on hover and copied on click. */
   name: string;
+  /** Its last segment, as found in the trace; absent when the trace does not
+   *  have it, in which case the full path is shown. */
+  displayName?: string;
   expected: TraceValue | null;
   computed?: TraceValue;
   /** Expected here, but absent from the trace that ran. */
@@ -455,7 +462,7 @@ function VariableRow({
       }}
     >
       <label className="item-label body-1" style={{ textTransform: 'none' }}>
-        <Identifier name={name} />
+        <Identifier name={name} displayName={displayName} />
       </label>
       <div className="expected-variable-row">
         <div

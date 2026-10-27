@@ -670,17 +670,19 @@ export function variablePath(prefix: string, v: TraceVariable): string {
   return prefix ? `${prefix}.${segment}` : segment;
 }
 
-export function findTraceValue(
+/** The variable at [path]: besides its value, it carries its own segment of
+ *  the path as [name], with no need to split the path back. */
+export function findTraceVariable(
   path: string,
   variables: TraceVariable[],
   prefix = ''
-): TraceValue | undefined {
+): TraceVariable | undefined {
   for (const v of variables) {
     const childPath = variablePath(prefix, v);
-    if (childPath === path) return v.value;
+    if (childPath === path) return v;
     if (v.kind === 'step') {
-      const tv = findTraceValue(path, v.variables, childPath);
-      if (tv !== undefined) return tv;
+      const found = findTraceVariable(path, v.variables, childPath);
+      if (found !== undefined) return found;
     }
   }
   return undefined;
