@@ -156,7 +156,7 @@
   "generalTests.tooltip.stateFailed": "Test failed",
   "generalTests.tooltip.stateLoading": "Test running…",
   "generalTests.tooltip.stateUnknown": "Test never run",
-  "testEditor.variables": "Internal variables",
+  "testEditor.variables": "Intermediate variables",
   "testEditor.addVariable": "Add computed variable…",
   "testEditor.consultVariable": "Check all internal variables",
   "testEditor.noTraceVariable": "No variable found in the trace",
