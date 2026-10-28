@@ -27,6 +27,7 @@ import type { Step } from 'react-joyride';
 import { useJoyride } from 'react-joyride';
 import {
   type Chapter,
+  HelpButton,
   placeChapters,
   TutoMenu,
   tutoLocale,
@@ -258,11 +259,13 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     <DependenciesContext.Provider value={dependencies}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {Tour}
+        <HelpButton onStart={() => controls.start()} />
         {tutoState.status === 'running' && (
           <TutoMenu
             state={tutoState}
             controls={controls}
             chapters={tutoChapters}
+            corner="bottom"
           />
         )}
 
@@ -273,10 +276,16 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
               scope.scopeName &&
               `  —  ${scope.scopeName}`}
           </h2>
-          <VscodeButton icon="play" disabled={running} onClick={onRunScope}>
+          <VscodeButton
+            id="traceRun"
+            icon="play"
+            disabled={running}
+            onClick={onRunScope}
+          >
             <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
           </VscodeButton>
           <VscodeButton
+            id="traceOpenGui"
             icon="tools"
             onClick={(event) => {
               event.preventDefault();

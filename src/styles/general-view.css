@@ -356,8 +356,8 @@
 /* Chapters of the tutorial, shown while it runs. Fixed and above Joyride's
    overlay (z-index 100): it takes no room on the page and stays clickable. */
 .tuto-menu {
-  /* top and max-height are set from shared/Tutorial.tsx, which hands them to
-     Joyride as its scroll offset */
+  /* top (or bottom) and max-height are set from shared/Tutorial.tsx, which
+     hands them to Joyride as its scroll offset */
   position: fixed;
   left: 0.8em;
   z-index: 101;
