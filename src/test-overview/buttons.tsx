@@ -4,7 +4,6 @@ import { FormattedMessage, useIntl } from 'react-intl';
 import { type WebviewApi } from 'vscode-webview';
 
 import { writeTestsUpMessage } from '../generated/catala_types';
-import { Controls } from 'react-joyride';
 
 /**
  * Component to run a bunch of tests, the run function is given in argument
@@ -121,28 +120,6 @@ export function OpenGUI({
       }}
       className="codicon codicon-eye open-gui"
     />
-  );
-}
-
-export function HelpMenu({ controls }: { controls: Controls }): ReactElement {
-  const intl = useIntl();
-  return (
-    <button
-      className="help-button"
-      title={intl.formatMessage({
-        id: 'generalTests.tooltip.help',
-        defaultMessage: "Afficher l'aide",
-      })}
-      onClick={(e) => {
-        e.preventDefault();
-        controls.start();
-      }}
-    >
-      <span className="codicon codicon-question" />
-      <span>
-        <FormattedMessage id="generalTests.help" defaultMessage="Aide" />
-      </span>
-    </button>
   );
 }
 
