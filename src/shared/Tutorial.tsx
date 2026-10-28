@@ -29,6 +29,21 @@ export function placeChapters(
 const TUTO_MENU_TOP = 12;
 const TUTO_MENU_MAX_HEIGHT = 120;
 
+/** Shown by Joyride while it waits for the target of a step. Its own spinner
+ *  is drawn in dark grey, which can hardly be seen on a dark theme: this one
+ *  is the codicon spinner of VS Code, in a color of the current theme. */
+export function TutoLoader(): ReactElement {
+  return (
+    <span
+      className="codicon codicon-loading codicon-modifier-spin"
+      style={{
+        fontSize: 64,
+        color: 'var(--vscode-progressBar-background, var(--vscode-foreground))',
+      }}
+    />
+  );
+}
+
 /** Options shared by the tours. Joyride scrolls a target this far from the
  *  top of the view: below the unfolded tutorial menu, plus Joyride's own
  *  default margin of 20px. */

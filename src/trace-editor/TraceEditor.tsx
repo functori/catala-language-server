@@ -26,6 +26,7 @@ import {
   type Chapter,
   HelpButton,
   placeChapters,
+  TutoLoader,
   TutoMenu,
   tutoLocale,
   tutoOptions,
@@ -92,6 +93,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     steps: tutoSteps,
     options: tutoOptions,
     locale: tutoLocale(intl),
+    loaderComponent: TutoLoader,
   });
 
   // The tour starts in three renders: the panes are laid out for it, then the

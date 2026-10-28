@@ -26,6 +26,7 @@ import {
   HelpButton,
   type PlacedChapter,
   placeChapters,
+  TutoLoader,
   TutoMenu,
   tutoLocale,
   tutoOptions,
@@ -1438,6 +1439,7 @@ export default function GeneralTests({
     steps,
     options: tutoOptions,
     locale: tutoLocale(intl),
+    loaderComponent: TutoLoader,
   });
 
   useEffect(() => {
