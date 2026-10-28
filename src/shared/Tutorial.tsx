@@ -22,10 +22,10 @@ export function placeChapters(
   }));
 }
 
-// Pinned to the top left corner and drawn over Joyride's overlay (which sits
-// at 100), so that it stays reachable and moves nothing on the page.
-// The menu never grows past this height (in pixels, from the top of the view),
-// so that Joyride can scroll the targets below it without measuring it.
+// Pinned to the top or bottom left corner and drawn over Joyride's overlay
+// (which sits at 100), so that it stays reachable and moves nothing on the
+// page. The menu never grows past this height (in pixels, from the edge of the
+// view), so that Joyride can scroll the targets below it without measuring it.
 const TUTO_MENU_TOP = 12;
 const TUTO_MENU_MAX_HEIGHT = 120;
 
@@ -52,10 +52,13 @@ export function TutoMenu({
   state,
   controls,
   chapters,
+  corner = 'top',
 }: {
   state: State;
   controls: Controls;
   chapters: PlacedChapter[];
+  /** The left corner of the view the menu is pinned to. */
+  corner?: 'top' | 'bottom';
 }): ReactElement {
   const intl = useIntl();
   // Folded, only the icon is left, so that the menu does not hide the element
@@ -79,7 +82,7 @@ export function TutoMenu({
   return (
     <div
       className={`tuto-menu ${folded ? 'folded' : ''}`}
-      style={{ top: TUTO_MENU_TOP, maxHeight: TUTO_MENU_MAX_HEIGHT }}
+      style={{ [corner]: TUTO_MENU_TOP, maxHeight: TUTO_MENU_MAX_HEIGHT }}
       {...(folded ? toggle : {})}
     >
       <div className="tuto-menu-title" {...(folded ? {} : toggle)}>
@@ -116,5 +119,29 @@ export function TutoMenu({
         </div>
       )}
     </div>
+  );
+}
+
+/** The floating button that starts the tour: partially hidden under the bottom
+ *  edge of the view, it slides up on hover (see `.help-button`). */
+export function HelpButton({ controls }: { controls: Controls }): ReactElement {
+  const intl = useIntl();
+  return (
+    <button
+      className="help-button"
+      title={intl.formatMessage({
+        id: 'generalTests.tooltip.help',
+        defaultMessage: "Afficher l'aide",
+      })}
+      onClick={(e) => {
+        e.preventDefault();
+        controls.start();
+      }}
+    >
+      <span className="codicon codicon-question" />
+      <span>
+        <FormattedMessage id="generalTests.help" defaultMessage="Aide" />
+      </span>
+    </button>
   );
 }

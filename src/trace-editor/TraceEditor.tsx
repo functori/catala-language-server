@@ -24,6 +24,7 @@ import type { Step } from 'react-joyride';
 import { useJoyride } from 'react-joyride';
 import {
   type Chapter,
+  HelpButton,
   placeChapters,
   TutoMenu,
   tutoLocale,
@@ -232,11 +233,13 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {Tour}
+      <HelpButton controls={controls} />
       {tutoState.status === 'running' && (
         <TutoMenu
           state={tutoState}
           controls={controls}
           chapters={tutoChapters}
+          corner="bottom"
         />
       )}
       <div style={titleRowStyle}>
@@ -287,19 +290,6 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         {scope.test !== undefined && (
           <LayoutSlider layout={layout} onLayout={setLayout} />
         )}
-        <VscodeButton
-          icon="question"
-          secondary
-          // The slider, when there is one, already pushes it to the right.
-          style={scope.test === undefined ? { marginLeft: 'auto' } : undefined}
-          title={intl.formatMessage({ id: 'generalTests.tooltip.help' })}
-          onClick={(event) => {
-            event.preventDefault();
-            controls.start();
-          }}
-        >
-          <FormattedMessage id="generalTests.help" />
-        </VscodeButton>
       </div>
 
       {!scopePreset && scopes.size !== 1 && (

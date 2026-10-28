@@ -23,6 +23,7 @@ import { HighlightText } from './shared/Highlight';
 import type { Step } from 'react-joyride';
 import { useJoyride } from 'react-joyride';
 import {
+  HelpButton,
   type PlacedChapter,
   placeChapters,
   TutoMenu,
@@ -1731,22 +1732,7 @@ export default function GeneralTests({
           filters={filters}
         />
       )}
-      <button
-        className="help-button"
-        title={intl.formatMessage({
-          id: 'generalTests.tooltip.help',
-          defaultMessage: "Afficher l'aide",
-        })}
-        onClick={(e) => {
-          e.preventDefault();
-          controls.start();
-        }}
-      >
-        <span className="codicon codicon-question" />
-        <span>
-          <FormattedMessage id="generalTests.help" defaultMessage="Aide" />
-        </span>
-      </button>
+      <HelpButton controls={controls} />
     </div>
   );
 }
