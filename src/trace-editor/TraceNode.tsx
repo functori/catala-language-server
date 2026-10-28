@@ -215,6 +215,10 @@ export default function TraceNode({
     }
   }
   const described: Described = describeKind(te.element, intl);
+  // An internal variable of a scope: the target of a step of the tutorial.
+  const internal =
+    te.element.kind === 'scope_var' &&
+    described.label === intl.formatMessage({ id: 'trace.kind.scopeVariable' });
   const snippetPos = described.showsCode
     ? (te.codeSpan ?? elementCodeSpan(te))
     : undefined;
@@ -245,6 +249,7 @@ export default function TraceNode({
   return (
     <li style={liStyle}>
       <div
+        className={internal ? 'internal' : undefined}
         style={{
           ...rowStyle,
           cursor: expandable ? 'pointer' : 'default',
