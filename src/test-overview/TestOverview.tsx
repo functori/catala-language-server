@@ -3,14 +3,19 @@ import { FormattedMessage, useIntl } from 'react-intl';
 
 import { type WebviewApi } from 'vscode-webview';
 
-import { AddNewTest, HelpMenu, RunAllTests } from './buttons';
+import { AddNewTest, RunAllTests } from './buttons';
 import type { Filter } from '../FilterPin';
 import { matchFilter, noFilter } from './testUtils';
 import { TestsGrid } from './TestsView';
 import { useTests } from './useTests';
 import { Loading } from './widgets';
 import { FilterPanel } from './Filter';
-import { TutoMenu, tutoLocale, tutoOptions } from '../shared/Tutorial';
+import {
+  HelpButton,
+  TutoMenu,
+  tutoLocale,
+  tutoOptions,
+} from '../shared/Tutorial';
 import { useJoyride } from 'react-joyride';
 import { samplePins, sampleTest, tutoChapters, tutoSteps } from './tutorial';
 
@@ -198,7 +203,7 @@ export default function TestOverview({
           filters={filters}
         />
       )}
-      <HelpMenu controls={controls} />
+      <HelpButton onStart={() => controls.start()} />
     </div>
   );
 }
