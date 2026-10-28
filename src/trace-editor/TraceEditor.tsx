@@ -20,6 +20,15 @@ import type { TraceElement, TraceTest } from './traceUtils';
 import { fieldValue, PANEL_HEIGHT_VAR, readTraceTest } from './traceUtils';
 import { DataPanel } from './TraceData';
 import TracePanel, { preStyle, type FilterCommand } from './TracePanel';
+import type { Step } from 'react-joyride';
+import { useJoyride } from 'react-joyride';
+import {
+  type Chapter,
+  placeChapters,
+  TutoMenu,
+  tutoLocale,
+  tutoOptions,
+} from '../shared/Tutorial';
 
 type RunState =
   | { status: 'idle' }
@@ -72,6 +81,17 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(false), 1500);
   };
+
+  const {
+    controls,
+    state: tutoState,
+    Tour,
+  } = useJoyride({
+    continuous: true,
+    steps: tutoSteps,
+    options: tutoOptions,
+    locale: tutoLocale(intl),
+  });
 
   const requestFilter = (filter: string): void =>
     setFilterRequest((prev) => ({ filter, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -211,6 +231,14 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {Tour}
+      {tutoState.status === 'running' && (
+        <TutoMenu
+          state={tutoState}
+          controls={controls}
+          chapters={tutoChapters}
+        />
+      )}
       <div style={titleRowStyle}>
         <h2 style={{ margin: 0 }}>
           <FormattedMessage id="trace.viewer.title" />
@@ -218,10 +246,16 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
             scope.scopeName &&
             `  —  ${scope.scopeName}`}
         </h2>
-        <VscodeButton icon="play" disabled={running} onClick={onRunScope}>
+        <VscodeButton
+          id="traceRun"
+          icon="play"
+          disabled={running}
+          onClick={onRunScope}
+        >
           <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
         </VscodeButton>
         <VscodeButton
+          id="traceOpenGui"
           icon="tools"
           onClick={(event) => {
             event.preventDefault();
@@ -232,6 +266,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         </VscodeButton>
         {runState.status === 'success' && (
           <VscodeButton
+            id="traceCopyJson"
             icon={copied ? 'check' : 'copy'}
             secondary
             title={intl.formatMessage({
@@ -252,10 +287,23 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         {scope.test !== undefined && (
           <LayoutSlider layout={layout} onLayout={setLayout} />
         )}
+        <VscodeButton
+          icon="question"
+          secondary
+          // The slider, when there is one, already pushes it to the right.
+          style={scope.test === undefined ? { marginLeft: 'auto' } : undefined}
+          title={intl.formatMessage({ id: 'generalTests.tooltip.help' })}
+          onClick={(event) => {
+            event.preventDefault();
+            controls.start();
+          }}
+        >
+          <FormattedMessage id="generalTests.help" />
+        </VscodeButton>
       </div>
 
       {!scopePreset && scopes.size !== 1 && (
-        <label style={fieldStyle}>
+        <label className="trace-scope-select" style={fieldStyle}>
           <span style={{ fontWeight: 600 }}>
             <FormattedMessage id="trace.scope" />
           </span>
@@ -328,6 +376,70 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   );
 }
 
+// -- Tutorial -----------------------------------------------------------------
+// Most targets only exist once a trace has run, or for a scope that has a test:
+// Joyride skips the steps whose target is missing.
+
+const tutoStep = (id: string, target: string, extra?: Partial<Step>): Step => ({
+  id,
+  content: <FormattedMessage id={id} />,
+  target,
+  ...extra,
+});
+
+const tutoWelcome: Step[] = [
+  // The message invites to open the menu: the click must go through.
+  tutoStep('trace.tuto.welcome', '.tuto-menu', {
+    blockTargetInteraction: false,
+  }),
+];
+
+const tutoChapters = placeChapters(
+  [
+    {
+      title: 'trace.tuto.chapter.toolbar',
+      steps: [
+        // No way back to the welcome step: the default buttons, without 'back'.
+        tutoStep('trace.tuto.run', '#traceRun', {
+          buttons: ['close', 'primary'],
+        }),
+        tutoStep('trace.tuto.openGui', '#traceOpenGui'),
+        tutoStep('trace.tuto.copyJson', '#traceCopyJson'),
+        tutoStep('trace.tuto.scope', '.trace-scope-select'),
+        tutoStep('trace.tuto.layout', '.trace-layout-slider'),
+      ],
+    },
+    {
+      title: 'trace.tuto.chapter.data',
+      steps: [
+        tutoStep('trace.tuto.data', '.trace-data-panel', {
+          placement: 'right',
+        }),
+        tutoStep('trace.tuto.sections', '.trace-section-header'),
+        tutoStep('trace.tuto.expected', '.trace-data-expected'),
+        tutoStep('trace.tuto.value', '.trace-data-value'),
+        tutoStep('trace.tuto.edit', '.trace-data-edit'),
+      ],
+    },
+    {
+      title: 'trace.tuto.chapter.trace',
+      steps: [
+        tutoStep('trace.tuto.filter', '.trace-filter'),
+        tutoStep('trace.tuto.expand', '.trace-expand-all'),
+        tutoStep('trace.tuto.tree', '.trace-tree'),
+        tutoStep('trace.tuto.selection', '.trace-tree'),
+      ],
+    },
+  ] satisfies Chapter[],
+  tutoWelcome.length
+);
+
+const tutoSteps: Step[] = [
+  ...tutoWelcome,
+  ...tutoChapters.flatMap((chapter) => chapter.steps),
+  tutoStep('trace.tuto.end', 'body', { placement: 'center' }),
+];
+
 function LayoutSlider({
   layout,
   onLayout,
@@ -345,7 +457,7 @@ function LayoutSlider({
     }
   };
   return (
-    <span style={layoutSliderStyle}>
+    <span className="trace-layout-slider" style={layoutSliderStyle}>
       <span className="trace-layout-label">
         <FormattedMessage id="trace.layout.data" />
       </span>

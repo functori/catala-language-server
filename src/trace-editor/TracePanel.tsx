@@ -163,7 +163,7 @@ function TraceTreeView({
       <ExpandContext.Provider value={expand ?? null}>
         <ExpectedContext.Provider value={expected}>
           <IndexContext.Provider value={stepIndices}>
-            <ul style={rootListStyle}>
+            <ul className="trace-tree" style={rootListStyle}>
               {roots.map((el, i) => (
                 <TraceNode
                   key={i}
@@ -284,6 +284,7 @@ export default function TracePanel({
         }}
       >
         <VscodeTextfield
+          className="trace-filter"
           placeholder={intl.formatMessage({
             id: 'trace.filterPlaceholder',
           })}
@@ -310,6 +311,7 @@ export default function TracePanel({
           />
         </VscodeTextfield>
         <VscodeButton
+          className="trace-expand-all"
           icon="expand-all"
           secondary
           title={intl.formatMessage({ id: 'trace.expandAllTitle' })}

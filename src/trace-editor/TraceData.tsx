@@ -364,7 +364,7 @@ export function DataPanel({
     ...variablesBelowRoot(test.variables, trVariable).keys(),
   ].map(pathSegments);
   return (
-    <div style={ioPanelStyle}>
+    <div className="trace-data-panel" style={ioPanelStyle}>
       <table style={tableStyle}>
         <tbody>
           <Section id="trace.section.inputs" intl={intl} first noExpected>
@@ -443,7 +443,11 @@ function Section({
           <td colSpan={4} style={sectionGapStyle} />
         </tr>
       )}
-      <tr style={{ cursor: 'pointer' }} onClick={() => setOpen((o) => !o)}>
+      <tr
+        className="trace-section-header"
+        style={{ cursor: 'pointer' }}
+        onClick={() => setOpen((o) => !o)}
+      >
         <td colSpan={4} style={sectionStyle}>
           <div style={sectionHeaderStyle}>
             <span style={nameCellStyle}>
@@ -641,6 +645,7 @@ function NodeRow({
         <td style={disabledCellStyle} />
       ) : (
         <td
+          className="trace-data-expected"
           style={tdStyle}
           onClick={(e) => {
             e.preventDefault();
@@ -651,6 +656,7 @@ function NodeRow({
         </td>
       )}
       <td
+        className="trace-data-value"
         style={tdStyle}
         onClick={(e) => {
           e.preventDefault();
@@ -661,7 +667,7 @@ function NodeRow({
       </td>
       <td style={tdStyle}>
         <span
-          className="codicon codicon-edit"
+          className="codicon codicon-edit trace-data-edit"
           style={{ cursor: 'pointer' }}
           onClick={(e) => {
             e.stopPropagation();
