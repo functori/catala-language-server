@@ -670,17 +670,19 @@ export function variablePath(prefix: string, v: TraceVariable): string {
   return prefix ? `${prefix}.${segment}` : segment;
 }
 
-export function findTraceValue(
+/** The variable at [path]: besides its value, it carries its own segment of
+ *  the path as [name], with no need to split the path back. */
+export function findTraceVariable(
   path: string,
   variables: TraceVariable[],
   prefix = ''
-): TraceValue | undefined {
+): TraceVariable | undefined {
   for (const v of variables) {
     const childPath = variablePath(prefix, v);
-    if (childPath === path) return v.value;
+    if (childPath === path) return v;
     if (v.kind === 'step') {
-      const tv = findTraceValue(path, v.variables, childPath);
-      if (tv !== undefined) return tv;
+      const found = findTraceVariable(path, v.variables, childPath);
+      if (found !== undefined) return found;
     }
   }
   return undefined;
@@ -699,16 +701,35 @@ function findScope(
   }
 }
 
+function skipTestingScope(
+  trace: TraceElement[],
+  testing_scope_name: string
+): TraceElement[] {
+  if (trace.length == 1) {
+    const testing_scope = trace[0];
+    if (
+      testing_scope.element.kind == 'scope_call' &&
+      testing_scope.element.name == testing_scope_name &&
+      testing_scope.trace !== undefined
+    ) {
+      return testing_scope.trace;
+    }
+  }
+  return trace;
+}
+
 export function traceVariablesForTest(
   trace: TraceElement[],
+  testing_scope: string,
   scope: string
-): [TraceVariable[], Record<string, TraceValue>] {
-  let variables: TraceVariable[] = [];
+): [TraceVariable | null, Record<string, TraceValue>] {
+  let variable: TraceVariable | null = null;
   let outputs: Record<string, TraceValue> = {};
   if (trace !== undefined) {
-    const testedScope = findScope(scope, traceVariables(trace));
+    const allVariables = traceVariables(skipTestingScope(trace, testing_scope));
+    const testedScope = findScope(scope, allVariables);
     if (testedScope !== undefined) {
-      variables = testedScope.variables;
+      variable = testedScope;
       if (testedScope.value?.kind === 'struct') {
         outputs = testedScope.value.fields;
       } else if (testedScope.value !== undefined) {
@@ -716,7 +737,7 @@ export function traceVariablesForTest(
       }
     }
   }
-  return [variables, outputs];
+  return [variable, outputs];
 }
 
 function readTraceTestVariables(x: JsonValue): Map<string, TraceValue | null> {
@@ -908,6 +929,27 @@ export type Expected = {
   variables: Map<string, TraceValue | null>;
   output: Map<string, Match>;
 };
+
+/** [variables] keyed by their path below the tested scope, as [stepPath]
+ *  builds them. The stored paths start with the tested scope's step, [root]
+ *  (e.g. `a.A`: the subscope variable of the testing scope, then the tested
+ *  scope): that step is cut off whole, since its name may hold dots. They keep
+ *  this prefix in the test file, where the compiler follows them from the
+ *  testing scope. Paths outside of [root] are dropped. */
+export function variablesBelowRoot<V>(
+  variables: Map<string, V>,
+  root: TraceVariable | null
+): Map<string, V> {
+  if (root === null) return new Map();
+  const rootPrefix = `${variablePath('', root)}.`;
+  const out = new Map<string, V>();
+  for (const [path, value] of variables) {
+    if (path.startsWith(rootPrefix)) {
+      out.set(path.slice(rootPrefix.length), value);
+    }
+  }
+  return out;
+}
 
 export function nodeMatchState(
   expected: Expected,

@@ -364,7 +364,7 @@ async function processGUITest(
 ): Promise<void> {
   try {
     const uri = vscode.Uri.file(file);
-    const res: TestRunResults = await runTestScope(file, scope);
+    const res: TestRunResults = await runTestScope(file, scope, false);
     if (res.kind === 'Ok') {
       if (hasTestFailures(res.value)) {
         // Prefer focusing the custom editor and displaying diffs there
@@ -618,7 +618,7 @@ function makeRunHandler(
       resultController.refresh(clerk_test_result);
       const { results, code, err_msg } = clerk_test_result;
       if (code != 0 && err_msg != '')
-        console.error(`Clerk exit code: ${code}, Output:\n{err_msg}`);
+        console.error(`Clerk exit code: ${code}, Output:\n${err_msg}`);
       let test_gui_threads: Array<Promise<void>> = [];
       results['test-results'].forEach(({ file, tests }) => {
         tests.scopes.forEach((scope_test_result) => {

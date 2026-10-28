@@ -95,21 +95,6 @@ let cmd_partial_read =
            file, and it must agree with $(b,read) wherever both succeed.")
     Term.(const Recovery.read_partial_test $ Cli.Flags.Global.options)
 
-(* The trace cannot be produced by this command: [Interpreter.evaluate_expr]
-   wraps every evaluation in a dummy [ScopeCall], so its root value is only
-   "<function>". The caller runs the scope through clerk with [--trace] and
-   hands the resulting file over here. *)
-let check_trace =
-  Arg.(
-    value
-    & opt (some string) None
-    & info ["check-trace"] ~docv:"FILE"
-        ~doc:
-          "Check the values declared by the $(b,#[testcase.variable]) \
-           attributes against the JSON trace in $(i,FILE), looking each \
-           variable up by name. Without this option the expected variables are \
-           not checked.")
-
 (* Mirrors clerk's own [--build-dir]: the caller may have compiled the
    dependencies elsewhere than the default, and the interpretation here loads
    the standard library and the tested modules from that directory. *)
@@ -142,7 +127,6 @@ let cmd_run =
       $ Cli.Flags.ex_scope
       $ Cli.Flags.scope_input
       $ build_dir
-      $ check_trace
       $ buffer_path)
 
 let cmd_write =
@@ -225,21 +209,13 @@ let register () =
   match value with
   | Shared_ast.String (s, _pos) -> Some (Model.TestTitle s)
   | _ -> failwith "unexpected test title");
-  (Driver.Plugin.register_attribute ~plugin:"testcase"
-     ~path:["array_item_label"] ~contexts:(function
-     | Desugared.Name_resolution.Expression _ -> true
-     | _ -> false)
-  @@ fun ~pos:_ value ->
-  match value with
-  | Shared_ast.String (s, _pos) -> Some (Model.ArrayItemLabel s)
-  | _ -> failwith "unexpected array item label");
-  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["variable"]
+  Driver.Plugin.register_attribute ~plugin:"testcase" ~path:["array_item_label"]
     ~contexts:(function
-    | Desugared.Name_resolution.ScopeDecl -> true
+    | Desugared.Name_resolution.Expression _ -> true
     | _ -> false)
   @@ fun ~pos:_ value ->
   match value with
-  | Shared_ast.String (s, _pos) -> Some (Model.ExpectedVariable s)
-  | _ -> failwith "unexpected variable label"
+  | Shared_ast.String (s, _pos) -> Some (Model.ArrayItemLabel s)
+  | _ -> failwith "unexpected array item label"
 
 let () = register ()

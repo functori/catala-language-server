@@ -20,6 +20,7 @@ import {
   formatTraceValue,
   traceValueFromRuntime,
   variablePath,
+  variablesBelowRoot,
   variableSegment,
   PANEL_HEIGHT_VAR,
 } from './traceUtils';
@@ -113,19 +114,23 @@ function nodesFromTrace(
         matched.add(path);
       }
       if (variable.kind === 'step') {
-        return [
-          {
-            label,
-            path,
-            children: nodesFromTrace(
-              variable.variables,
+        if (variable.name.includes('#')) {
+          return [];
+        } else {
+          return [
+            {
+              label,
               path,
-              expected,
-              matched,
-              intl
-            ),
-          },
-        ];
+              children: nodesFromTrace(
+                variable.variables,
+                path,
+                expected,
+                matched,
+                intl
+              ),
+            },
+          ];
+        }
       }
       const node = buildNode(
         label,
@@ -296,8 +301,9 @@ export function DataPanel({
   trace?: TraceElement[];
   intl: IntlShape;
 }): ReactElement {
-  const [trVariables, trOutputs] = traceVariablesForTest(
+  const [trVariable, trOutputs] = traceVariablesForTest(
     trace ?? [],
+    test.testing_scope,
     test.tested_scope.name
   );
 
@@ -307,15 +313,22 @@ export function DataPanel({
     )
   );
 
-  const hasTraceVars = trVariables.length > 0;
+  const hasTraceVars = trVariable !== null;
   const matched = new Set<string>();
-  const auxiliary = trVariables.filter(
-    (variable) =>
-      variable.kind === 'step' || trOutputs[variable.name] === undefined
-  );
+  // The tested scope only roots the paths, which start with it as the expected
+  // variables do: its variables are shown at the top level. Its outputs have
+  // their own section.
+  const rootPath = trVariable === null ? '' : variablePath('', trVariable);
+  const auxiliary =
+    trVariable?.kind === 'step'
+      ? trVariable.variables.filter(
+          (variable) =>
+            variable.kind === 'step' || trOutputs[variable.name] === undefined
+        )
+      : [];
   let internalNodes = nodesFromTrace(
     auxiliary,
-    '',
+    rootPath,
     test.variables,
     matched,
     intl
@@ -328,7 +341,16 @@ export function DataPanel({
       ...buildNode(name, name, expected ?? undefined, undefined, intl),
       missing: hasTraceVars,
     };
-    internalNodes = insertAt(internalNodes, pathSegments(name), '', leaf);
+    // The scope's own name may hold dots: cut it off whole, not by segments.
+    const underRoot = rootPath !== '' && name.startsWith(`${rootPath}.`);
+    internalNodes = underRoot
+      ? insertAt(
+          internalNodes,
+          pathSegments(name.slice(rootPath.length + 1)),
+          rootPath,
+          leaf
+        )
+      : insertAt(internalNodes, pathSegments(name), '', leaf);
   }
   internalNodes = sortTree(internalNodes);
 
@@ -338,9 +360,9 @@ export function DataPanel({
     )
   );
 
-  const variables = [...test.variables.keys()].map((value) =>
-    pathSegments(value)
-  );
+  const variables = [
+    ...variablesBelowRoot(test.variables, trVariable).keys(),
+  ].map(pathSegments);
   return (
     <div style={ioPanelStyle}>
       <table style={tableStyle}>

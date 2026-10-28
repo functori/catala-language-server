@@ -1,10 +1,4 @@
-import {
-  type ReactElement,
-  type Ref,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactElement, type Ref, useState } from 'react';
 import type { IntlShape } from 'react-intl';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { VscodeButton, VscodeTextfield } from '@vscode-elements/react-elements';
@@ -12,7 +6,7 @@ import {
   type TraceElement,
   type TraceVariable,
   type TraceValue,
-  findTraceValue,
+  findTraceVariable,
   formatTraceValue,
   traceVariablesForTest,
   traceValueEqual,
@@ -45,7 +39,6 @@ type Props = {
   trace?: TraceElement[];
   runTrace?: boolean;
   failures?: FailedTraceAssert[];
-  focusFailure?: boolean;
   onChange(next: Map<string, TraceValue | null>): void;
 };
 
@@ -212,7 +205,14 @@ function filterExpectedVariables(
   for (const tv of variables) {
     const pr = variablePath(prefix, tv);
     if (tv.kind === 'step') {
-      variables = filterExpectedVariables(tv.variables, {}, testVariables, pr);
+      // The list starts with the tested scope: its outputs are among its own
+      // variables, one level down, and nowhere deeper.
+      variables = filterExpectedVariables(
+        tv.variables,
+        prefix === '' ? outputs : {},
+        testVariables,
+        pr
+      );
       out.push({ ...tv, variables });
     } else if (
       outputs[tv.name] === undefined &&
@@ -230,7 +230,6 @@ export default function ExpectedVariablesEditor({
   trace,
   runTrace,
   failures,
-  focusFailure,
   onChange,
 }: Props): ReactElement {
   const [showCatalog, setShowCatalog] = useState(false);
@@ -249,38 +248,28 @@ export default function ExpectedVariablesEditor({
       }
     });
 
-  // The first row the compiler reported a mismatch on, in display order.
-  const firstFailure = [...testVariables.keys()].find((path) =>
-    failureByName.has(path)
-  );
-  const firstFailureRef = useRef<HTMLDivElement>(null);
-
-  // `failures` is a fresh array on every run, so a variable that fails twice in
-  // a row is focused twice, while edits elsewhere do not steal the focus back.
-  useEffect(() => {
-    const row = firstFailureRef.current;
-    if (focusFailure !== true || row === null) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      row.focus();
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 0);
-    return (): void => clearTimeout(timer);
-  }, [failures, focusFailure]);
-
-  const [trVariablesAux, outputs] = traceVariablesForTest(
+  const [trVariable, outputs] = traceVariablesForTest(
     trace ?? [],
+    test.testing_scope,
     test.tested_scope.name
   );
+  // Every hook is above: returning early here keeps their order stable.
+  if (trVariable === null) {
+    return (
+      <div className="test-section">
+        <FormattedMessage id="testEditor.noTraceVariable" />
+      </div>
+    );
+  }
+  const trVariablesAux = [trVariable];
   const trVariables = filterExpectedVariables(
     trVariablesAux,
     outputs,
     testVariables
   );
 
-  function computedOf(path: string): TraceValue | undefined {
-    return findTraceValue(path, trVariablesAux);
+  function variableOf(path: string): TraceVariable | undefined {
+    return findTraceVariable(path, trVariablesAux);
   }
 
   const hasTraceVars = trVariablesAux.length > 0;
@@ -307,17 +296,18 @@ export default function ExpectedVariablesEditor({
           {testVariables.size > 0 && (
             <div className="simple-items-container">
               {[...testVariables.entries()].map(([path, tv]) => {
-                const computed = computedOf(path);
+                const variable = variableOf(path);
+                const computed = variable?.value;
                 return (
                   <VariableRow
                     testing_scope={testing_scope}
                     key={path}
                     name={path}
+                    displayName={variable?.name}
                     expected={tv}
                     computed={computed}
                     missing={hasTraceVars && computed === undefined}
                     failure={failureByName.get(path)}
-                    rowRef={path === firstFailure ? firstFailureRef : undefined}
                     onSet={setVar}
                     onRemove={remove}
                   />
@@ -371,6 +361,7 @@ export default function ExpectedVariablesEditor({
 function VariableRow({
   testing_scope,
   name,
+  displayName,
   expected,
   computed,
   missing,
@@ -380,7 +371,11 @@ function VariableRow({
   onRemove,
 }: {
   testing_scope: string;
+  /** The full path of the variable, shown on hover and copied on click. */
   name: string;
+  /** Its last segment, as found in the trace; absent when the trace does not
+   *  have it, in which case the full path is shown. */
+  displayName?: string;
   expected: TraceValue | null;
   computed?: TraceValue;
   /** Expected here, but absent from the trace that ran. */
@@ -438,7 +433,7 @@ function VariableRow({
       }}
     >
       <label className="item-label body-1" style={{ textTransform: 'none' }}>
-        <Identifier name={name} />
+        <Identifier name={name} displayName={displayName} />
       </label>
       <div className="expected-variable-row">
         <div
@@ -523,6 +518,15 @@ function filterByName(vars: TraceVariable[], q: string): TraceVariable[] {
   return out;
 }
 
+function innerStep(
+  variables: TraceVariable[]
+): [string, TraceVariable[]] | undefined {
+  if (variables.length !== 1) return undefined;
+  const [root] = variables;
+  if (root.kind !== 'step') return undefined;
+  return [root.name, root.variables];
+}
+
 function VariableCatalog({
   testing_scope,
   trVariables,
@@ -537,8 +541,12 @@ function VariableCatalog({
   const intl = useIntl();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const filtered = q ? filterByName(trVariables, q) : trVariables;
+  const filteredStep = q ? filterByName(trVariables, q) : trVariables;
+  const [rootName, filtered] = innerStep(filteredStep) ?? ['', []];
   let [variables, stateVariables] = isolateStateVariable(filtered);
+  const onAddVar = (path: string, tv: TraceValue | null): void => {
+    onAdd(`${rootName}.${path}`, tv);
+  };
   return (
     <>
       <VscodeTextfield
@@ -570,7 +578,7 @@ function VariableCatalog({
               varName={stateName}
               nodes={nodes}
               crumbs={[]}
-              onAdd={onAdd}
+              onAdd={onAddVar}
             />
           ))}
           {variables
@@ -584,13 +592,13 @@ function VariableCatalog({
                 key={`v-${v.name}`}
                 node={v}
                 crumbs={[]}
-                onAdd={onAdd}
+                onAdd={onAddVar}
               />
             ))}
           {filtered
             .filter(
               (v): v is Extract<TraceVariable, { kind: 'step' }> =>
-                v.kind === 'step'
+                v.kind === 'step' && !v.name.includes('#')
             )
             .map((v) => (
               <StepRow
@@ -598,7 +606,7 @@ function VariableCatalog({
                 key={`s-${variableSegment(v)}`}
                 node={v}
                 crumbs={[]}
-                onAdd={onAdd}
+                onAdd={onAddVar}
                 filtering={q !== ''}
               />
             ))}
@@ -722,7 +730,7 @@ function StepRow({
           {node.variables
             .filter(
               (v): v is Extract<TraceVariable, { kind: 'step' }> =>
-                v.kind === 'step'
+                v.kind === 'step' && !v.name.includes('#')
             )
             .map((v) => (
               <StepRow
