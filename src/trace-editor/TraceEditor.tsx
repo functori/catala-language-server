@@ -24,7 +24,7 @@ import { fieldValue, PANEL_HEIGHT_VAR, readTraceTest } from './traceUtils';
 import { DataPanel } from './TraceData';
 import TracePanel, { preStyle, type FilterCommand } from './TracePanel';
 import { useJoyride } from 'react-joyride';
-import { HelpButton, TutoMenu, tutoLocale, tutoOptions } from '../shared/Tutorial';
+import { HelpButton, TutoLoader, TutoMenu, tutoLocale, tutoOptions } from '../shared/Tutorial';
 import { tutoChapters, tutoSteps } from './tutorial';
 
 type RunState =
@@ -91,6 +91,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     steps: tutoSteps,
     options: tutoOptions,
     locale: tutoLocale(intl),
+    loaderComponent: TutoLoader,
   });
 
   // The tour starts in three renders: the panes are laid out for it, then the
