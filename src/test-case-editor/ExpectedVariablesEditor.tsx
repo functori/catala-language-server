@@ -1,10 +1,4 @@
-import {
-  type ReactElement,
-  type Ref,
-  useEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactElement, type Ref, useState } from 'react';
 import type { IntlShape } from 'react-intl';
 import { FormattedMessage, useIntl } from 'react-intl';
 import { VscodeButton, VscodeTextfield } from '@vscode-elements/react-elements';
@@ -45,7 +39,6 @@ type Props = {
   trace?: TraceElement[];
   runTrace?: boolean;
   failures?: FailedTraceAssert[];
-  focusFailure?: boolean;
   onChange(next: Map<string, TraceValue | null>): void;
 };
 
@@ -237,7 +230,6 @@ export default function ExpectedVariablesEditor({
   trace,
   runTrace,
   failures,
-  focusFailure,
   onChange,
 }: Props): ReactElement {
   const [showCatalog, setShowCatalog] = useState(false);
@@ -255,26 +247,6 @@ export default function ExpectedVariablesEditor({
         testVariables.set(name, value);
       }
     });
-
-  // The first row the compiler reported a mismatch on, in display order.
-  const firstFailure = [...testVariables.keys()].find((path) =>
-    failureByName.has(path)
-  );
-  const firstFailureRef = useRef<HTMLDivElement>(null);
-
-  // `failures` is a fresh array on every run, so a variable that fails twice in
-  // a row is focused twice, while edits elsewhere do not steal the focus back.
-  useEffect(() => {
-    const row = firstFailureRef.current;
-    if (focusFailure !== true || row === null) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      row.focus();
-      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 0);
-    return (): void => clearTimeout(timer);
-  }, [failures, focusFailure]);
 
   const [trVariable, outputs] = traceVariablesForTest(
     trace ?? [],
@@ -334,7 +306,6 @@ export default function ExpectedVariablesEditor({
                     computed={computed}
                     missing={hasTraceVars && computed === undefined}
                     failure={failureByName.get(path)}
-                    rowRef={path === firstFailure ? firstFailureRef : undefined}
                     onSet={setVar}
                     onRemove={remove}
                   />
