@@ -511,6 +511,15 @@ function filterByName(vars: TraceVariable[], q: string): TraceVariable[] {
   return out;
 }
 
+function innerStep(
+  variables: TraceVariable[]
+): [string, TraceVariable[]] | undefined {
+  if (variables.length !== 1) return undefined;
+  const [root] = variables;
+  if (root.kind !== 'step') return undefined;
+  return [root.name, root.variables];
+}
+
 function VariableCatalog({
   testing_scope,
   trVariables,
@@ -525,8 +534,12 @@ function VariableCatalog({
   const intl = useIntl();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const filtered = q ? filterByName(trVariables, q) : trVariables;
+  const filteredStep = q ? filterByName(trVariables, q) : trVariables;
+  const [rootName, filtered] = innerStep(filteredStep) ?? ['', []];
   let [variables, stateVariables] = isolateStateVariable(filtered);
+  const onAddVar = (path: string, tv: TraceValue | null): void => {
+    onAdd(`${rootName}.${path}`, tv);
+  };
   return (
     <>
       <VscodeTextfield
@@ -558,7 +571,7 @@ function VariableCatalog({
               varName={stateName}
               nodes={nodes}
               crumbs={[]}
-              onAdd={onAdd}
+              onAdd={onAddVar}
             />
           ))}
           {variables
@@ -572,13 +585,13 @@ function VariableCatalog({
                 key={`v-${v.name}`}
                 node={v}
                 crumbs={[]}
-                onAdd={onAdd}
+                onAdd={onAddVar}
               />
             ))}
           {filtered
             .filter(
               (v): v is Extract<TraceVariable, { kind: 'step' }> =>
-                v.kind === 'step'
+                v.kind === 'step' && !v.name.includes('#')
             )
             .map((v) => (
               <StepRow
@@ -586,7 +599,7 @@ function VariableCatalog({
                 key={`s-${variableSegment(v)}`}
                 node={v}
                 crumbs={[]}
-                onAdd={onAdd}
+                onAdd={onAddVar}
                 filtering={q !== ''}
               />
             ))}
@@ -710,7 +723,7 @@ function StepRow({
           {node.variables
             .filter(
               (v): v is Extract<TraceVariable, { kind: 'step' }> =>
-                v.kind === 'step'
+                v.kind === 'step' && !v.name.includes('#')
             )
             .map((v) => (
               <StepRow

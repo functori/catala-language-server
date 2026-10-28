@@ -22,6 +22,7 @@ import {
   traceValueEqual,
   traceValueFromRuntime,
   traceVariablesForTest,
+  variablesBelowRoot,
 } from './traceUtils';
 import {
   CwdContext,
@@ -123,7 +124,7 @@ function TraceTreeView({
   let stepIndices: Map<TraceElement, number> = new Map();
   if (test !== undefined) {
     stepIndices = stepIndexMap(trace);
-    const [, outputs] = traceVariablesForTest(
+    const [root, outputs] = traceVariablesForTest(
       trace,
       test.testing_scope,
       test.tested_scope.name
@@ -137,7 +138,9 @@ function TraceTreeView({
         output.set(name, match);
       }
     }
-    expected = { variables: test.variables, output };
+    // Matched against the paths [stepPath] builds, which start below the
+    // tested scope.
+    expected = { variables: variablesBelowRoot(test.variables, root), output };
   }
 
   let testedScope = test ? test.tested_scope.name : undefined;
