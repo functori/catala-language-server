@@ -94,6 +94,36 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     locale: tutoLocale(intl),
   });
 
+  // The tour starts in three renders: the panes are laid out for it, then the
+  // steps are cut to what this layout shows, then Joyride is started on them.
+  const [tutoPhase, setTutoPhase] = useState<'idle' | 'layout' | 'start'>(
+    'idle'
+  );
+  // The layout of the tutorial, kept apart from the user's one so that the
+  // tutorial never changes it: once it is over, the panes are back as they
+  // were, slider position and dragged width included.
+  const [tuto, setTuto] = useState(false);
+  const shownLayout: PaneLayout = tuto ? 'both' : layout;
+
+  const startTuto = (): void => {
+    setTuto(true);
+    setTutoPhase('layout');
+  };
+  useEffect(() => {
+    if (tutoPhase === 'layout') {
+      setTutoPhase('start');
+    } else if (tutoPhase === 'start') {
+      // Joyride has been handed the steps just computed.
+      setTutoPhase('idle');
+      controls.start();
+    }
+  }, [tutoPhase, controls]);
+  useEffect(() => {
+    if (tutoState.status === 'finished' || tutoState.status === 'skipped') {
+      setTuto(false);
+    }
+  }, [tutoState.status]);
+
   const requestFilter = (filter: string): void =>
     setFilterRequest((prev) => ({ filter, nonce: (prev?.nonce ?? 0) + 1 }));
 
@@ -233,7 +263,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {Tour}
-      <HelpButton controls={controls} />
+      <HelpButton onStart={startTuto} />
       {tutoState.status === 'running' && (
         <TutoMenu
           state={tutoState}
@@ -288,7 +318,7 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           </VscodeButton>
         )}
         {scope.test !== undefined && (
-          <LayoutSlider layout={layout} onLayout={setLayout} />
+          <LayoutSlider layout={shownLayout} onLayout={setLayout} />
         )}
       </div>
 
@@ -332,7 +362,8 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
       >
         {scope.test !== undefined ? (
           <SplitPane
-            layout={layout}
+            layout={shownLayout}
+            tuto={tuto}
             left={
               <DataPanel
                 testing_scope={scope.test.testing_scope}
@@ -522,17 +553,32 @@ function post(vscode: WebviewApi<unknown>, message: TraceUpMessage): void {
   vscode.postMessage(message);
 }
 
+// Width of the data pane during the tutorial, whatever the user dragged it to,
+// as fractions of the split: the default one, widened as much as the data
+// overflows it, but never past the maximum, which leaves the trace room for
+// its steps.
+const TUTO_BASE_WIDTH = 0.25;
+const TUTO_MAX_WIDTH = 0.6;
+
 function SplitPane({
   left,
   right,
   layout,
+  tuto,
 }: {
   left: ReactElement;
   right: ReactElement;
   layout: PaneLayout;
+  /** During the tutorial, the width the user dragged is set aside, kept for
+   *  afterwards, and the panes can no longer be resized. */
+  tuto?: boolean;
 }): ReactElement {
   const intl = useIntl();
   const [leftWidth, setLeftWidth] = useState<number | null>(null);
+  const leftRef = useRef<HTMLDivElement>(null);
+  // Null until measured: the pane is first laid out at the base width, then
+  // widened by what overflows it at that width.
+  const [tutoWidth, setTutoWidth] = useState<number | null>(null);
   const draggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -566,6 +612,34 @@ function SplitPane({
   }, []);
 
   const split = layout === 'both';
+  const tutoSplit = tuto === true && split;
+
+  useLayoutEffect(() => {
+    const pane = leftRef.current;
+    const container = containerRef.current;
+    if (!tutoSplit) {
+      setTutoWidth(null);
+      return;
+    }
+    if (tutoWidth !== null || pane === null || container === null) {
+      return;
+    }
+    // The overflow may be the pane's own or that of the panel it holds, which
+    // scrolls by itself.
+    const overflow = Math.max(
+      ...[pane, pane.firstElementChild]
+        .filter((e) => e !== null)
+        .map((e) => e.scrollWidth - e.clientWidth)
+    );
+    const total = container.getBoundingClientRect().width;
+    setTutoWidth(
+      Math.min(total * TUTO_BASE_WIDTH + overflow, total * TUTO_MAX_WIDTH)
+    );
+  }, [tutoSplit, tutoWidth]);
+
+  const shownWidth = tutoSplit
+    ? (tutoWidth ?? `${TUTO_BASE_WIDTH * 100}%`)
+    : (leftWidth ?? '25%');
 
   // The inactive pane is hidden rather than dropped: changing the shape of the
   // tree would remount the panels and wipe their filters, view mode and
@@ -576,8 +650,9 @@ function SplitPane({
       style={{ display: 'flex', alignItems: 'stretch', width: '100%' }}
     >
       <div
+        ref={leftRef}
         style={{
-          width: split ? (leftWidth ?? '25%') : '100%',
+          width: split ? shownWidth : '100%',
           flex: split ? '0 0 auto' : '1 1 auto',
           minWidth: 0,
           overflow: 'auto',
@@ -588,7 +663,7 @@ function SplitPane({
       </div>
       <div
         onMouseDown={() => {
-          draggingRef.current = true;
+          draggingRef.current = tuto !== true;
         }}
         title={intl.formatMessage({ id: 'trace.dragToResize' })}
         style={{

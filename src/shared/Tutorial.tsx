@@ -124,7 +124,7 @@ export function TutoMenu({
 
 /** The floating button that starts the tour: partially hidden under the bottom
  *  edge of the view, it slides up on hover (see `.help-button`). */
-export function HelpButton({ controls }: { controls: Controls }): ReactElement {
+export function HelpButton({ onStart }: { onStart(): void }): ReactElement {
   const intl = useIntl();
   return (
     <button
@@ -135,7 +135,7 @@ export function HelpButton({ controls }: { controls: Controls }): ReactElement {
       })}
       onClick={(e) => {
         e.preventDefault();
-        controls.start();
+        onStart();
       }}
     >
       <span className="codicon codicon-question" />

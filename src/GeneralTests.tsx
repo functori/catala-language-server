@@ -1732,7 +1732,7 @@ export default function GeneralTests({
           filters={filters}
         />
       )}
-      <HelpButton controls={controls} />
+      <HelpButton onStart={() => controls.start()} />
     </div>
   );
 }
