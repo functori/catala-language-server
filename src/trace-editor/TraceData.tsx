@@ -367,7 +367,7 @@ export function DataPanel({
     ...variablesBelowRoot(test.variables, trVariable).keys(),
   ].map(pathSegments);
   return (
-    <div style={ioPanelStyle}>
+    <div className="trace-data-panel" style={ioPanelStyle}>
       <table style={tableStyle}>
         <tbody>
           <Section id="trace.section.inputs" intl={intl} first noExpected>
@@ -640,6 +640,7 @@ function NodeRow({
         <td style={disabledCellStyle} />
       ) : (
         <td
+          className="trace-data-expected"
           style={tdStyle}
           onClick={(e) => {
             e.preventDefault();
@@ -650,6 +651,7 @@ function NodeRow({
         </td>
       )}
       <td
+        className="trace-data-value"
         style={tdStyle}
         onClick={(e) => {
           e.preventDefault();
@@ -660,7 +662,7 @@ function NodeRow({
       </td>
       <td style={tdStyle}>
         <span
-          className="codicon codicon-edit"
+          className="codicon codicon-edit trace-data-edit"
           style={{ cursor: 'pointer' }}
           onClick={(e) => {
             e.stopPropagation();

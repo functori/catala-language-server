@@ -23,6 +23,9 @@ import type { TraceElement, TraceTest } from './traceUtils';
 import { fieldValue, PANEL_HEIGHT_VAR, readTraceTest } from './traceUtils';
 import { DataPanel } from './TraceData';
 import TracePanel, { preStyle, type FilterCommand } from './TracePanel';
+import { useJoyride } from 'react-joyride';
+import { TutoMenu, tutoLocale, tutoOptions } from '../shared/Tutorial';
+import { tutoChapters, tutoSteps } from './tutorial';
 
 type RunState =
   | { status: 'idle' }
@@ -78,6 +81,17 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(false), 1500);
   };
+
+  const {
+    controls,
+    state: tutoState,
+    Tour,
+  } = useJoyride({
+    continuous: true,
+    steps: tutoSteps,
+    options: tutoOptions,
+    locale: tutoLocale(intl),
+  });
 
   const requestFilter = (filter: string): void =>
     setFilterRequest((prev) => ({ filter, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -237,6 +251,15 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   return (
     <DependenciesContext.Provider value={dependencies}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {Tour}
+        {tutoState.status === 'running' && (
+          <TutoMenu
+            state={tutoState}
+            controls={controls}
+            chapters={tutoChapters}
+          />
+        )}
+
         <div style={titleRowStyle}>
           <h2 style={{ margin: 0 }}>
             <FormattedMessage id="trace.viewer.title" />
@@ -278,6 +301,22 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           {scope.test !== undefined && (
             <LayoutSlider layout={layout} onLayout={setLayout} />
           )}
+
+          <VscodeButton
+            icon="question"
+            secondary
+            // The slider, when there is one, already pushes it to the right.
+            style={
+              scope.test === undefined ? { marginLeft: 'auto' } : undefined
+            }
+            title={intl.formatMessage({ id: 'generalTests.tooltip.help' })}
+            onClick={(event) => {
+              event.preventDefault();
+              controls.start();
+            }}
+          >
+            <FormattedMessage id="generalTests.help" />
+          </VscodeButton>
         </div>
 
         {!scopePreset && scopes.size !== 1 && (
