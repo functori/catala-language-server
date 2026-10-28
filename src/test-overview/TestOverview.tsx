@@ -12,6 +12,7 @@ import { Loading } from './widgets';
 import { FilterPanel } from './Filter';
 import {
   HelpButton,
+  TutoLoader,
   TutoMenu,
   tutoLocale,
   tutoOptions,
@@ -56,6 +57,7 @@ export default function TestOverview({
     steps,
     options: tutoOptions,
     locale: tutoLocale(intl),
+    loaderComponent: TutoLoader,
   });
 
   const listIndex = steps.findIndex(({ id }) => id === 'tests_display_list');
