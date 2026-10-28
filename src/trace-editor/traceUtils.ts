@@ -928,6 +928,27 @@ export type Expected = {
   output: Map<string, Match>;
 };
 
+/** [variables] keyed by their path below the tested scope, as [stepPath]
+ *  builds them. The stored paths start with the tested scope's step, [root]
+ *  (e.g. `a.A`: the subscope variable of the testing scope, then the tested
+ *  scope): that step is cut off whole, since its name may hold dots. They keep
+ *  this prefix in the test file, where the compiler follows them from the
+ *  testing scope. Paths outside of [root] are dropped. */
+export function variablesBelowRoot<V>(
+  variables: Map<string, V>,
+  root: TraceVariable | null
+): Map<string, V> {
+  if (root === null) return new Map();
+  const rootPrefix = `${variablePath('', root)}.`;
+  const out = new Map<string, V>();
+  for (const [path, value] of variables) {
+    if (path.startsWith(rootPrefix)) {
+      out.set(path.slice(rootPrefix.length), value);
+    }
+  }
+  return out;
+}
+
 export function nodeMatchState(
   expected: Expected,
   path: string,
