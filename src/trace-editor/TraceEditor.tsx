@@ -449,8 +449,10 @@ const tutoChapters = placeChapters(
       steps: [
         tutoStep('trace.tuto.filter', '.trace-filter'),
         tutoStep('trace.tuto.expand', '.trace-expand-all'),
-        tutoStep('trace.tuto.tree', '.trace-tree'),
-        tutoStep('trace.tuto.selection', '.trace-tree'),
+        // On the left, over the data panel: the tree reaches down to the bottom
+        // of the view, which leaves no room for the tooltip above or below it.
+        tutoStep('trace.tuto.tree', '.trace-tree', { placement: 'left' }),
+        tutoStep('trace.tuto.selection', '.trace-tree', { placement: 'left' }),
       ],
     },
   ] satisfies Chapter[],
