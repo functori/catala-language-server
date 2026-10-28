@@ -175,7 +175,7 @@ function TraceTreeView({
         <ExpectedContext.Provider value={expected}>
           <IndexContext.Provider value={stepIndices}>
             <FilterKindContext.Provider value={filterKind}>
-              <ul style={rootListStyle}>
+              <ul className="trace-tree" style={rootListStyle}>
                 {roots.map((el, i) => (
                   <TraceNode
                     key={i}
@@ -302,6 +302,7 @@ export default function TracePanel({
         }}
       >
         <VscodeTextfield
+          className="trace-filter"
           placeholder={intl.formatMessage({
             id: 'trace.filterPlaceholder',
           })}
@@ -327,22 +328,24 @@ export default function TracePanel({
             slot="content-after"
           />
         </VscodeTextfield>
-        <VscodeButton
-          icon="expand-all"
-          secondary
-          title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
-          onClick={() => expandAll(true)}
-        >
-          <FormattedMessage id="trace.expandAll" />
-        </VscodeButton>
-        <VscodeButton
-          icon="collapse-all"
-          secondary
-          title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
-          onClick={() => expandAll(false)}
-        >
-          <FormattedMessage id="trace.collapseAll" />
-        </VscodeButton>
+        <div style={{ display: 'flex', gap: 8 }} className="trace-expand-coll">
+          <VscodeButton
+            icon="expand-all"
+            secondary
+            title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
+            onClick={() => expandAll(true)}
+          >
+            <FormattedMessage id="trace.expandAll" />
+          </VscodeButton>
+          <VscodeButton
+            icon="collapse-all"
+            secondary
+            title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
+            onClick={() => expandAll(false)}
+          >
+            <FormattedMessage id="trace.collapseAll" />
+          </VscodeButton>
+        </div>
       </div>
       <FilterPins
         filters={savedFilters}
