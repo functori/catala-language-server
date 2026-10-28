@@ -20,6 +20,7 @@ import {
   formatTraceValue,
   traceValueFromRuntime,
   variablePath,
+  variablesBelowRoot,
   variableSegment,
   PANEL_HEIGHT_VAR,
 } from './traceUtils';
@@ -113,19 +114,23 @@ function nodesFromTrace(
         matched.add(path);
       }
       if (variable.kind === 'step') {
-        return [
-          {
-            label,
-            path,
-            children: nodesFromTrace(
-              variable.variables,
+        if (variable.name.includes('#')) {
+          return [];
+        } else {
+          return [
+            {
+              label,
               path,
-              expected,
-              matched,
-              intl
-            ),
-          },
-        ];
+              children: nodesFromTrace(
+                variable.variables,
+                path,
+                expected,
+                matched,
+                intl
+              ),
+            },
+          ];
+        }
       }
       const node = buildNode(
         label,
@@ -355,9 +360,9 @@ export function DataPanel({
     )
   );
 
-  const variables = [...test.variables.keys()].map((value) =>
-    pathSegments(value)
-  );
+  const variables = [
+    ...variablesBelowRoot(test.variables, trVariable).keys(),
+  ].map(pathSegments);
   return (
     <div style={ioPanelStyle}>
       <table style={tableStyle}>
