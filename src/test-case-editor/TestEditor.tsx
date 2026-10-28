@@ -108,6 +108,7 @@ export default function TestEditor(props: Props): ReactElement {
       : [];
 
   const expectedSectionRef = useRef<HTMLDivElement>(null);
+  const intermediateSectionRef = useRef<HTMLDivElement>(null);
   // Scope for searching the first '.value-editor.invalid' or '.value-editor.unset' before running; used to scroll into view
   const unsetElementRef = useRef<HTMLDivElement>(null);
   const expectedAnchorId = `expected-${encodeURIComponent(props.test.testing_scope)}`;
@@ -115,13 +116,29 @@ export default function TestEditor(props: Props): ReactElement {
   // A failing run sends the user to what went wrong, and the scope results come
   // first: the expected variables only claim the focus when they are the sole
   // culprit.
-  const focusFailedTrace =
-    props.runState?.results?.kind === 'Ok' &&
-    !props.runState.results.value.assert_failures &&
-    failedTraceAssert.length > 0;
 
   useEffect(() => {
     const runState = props.runState;
+
+    const focusFailedTrace =
+      runState?.results?.kind === 'Ok' &&
+      !runState.results.value.assert_failures &&
+      failedTraceAssert.length > 0;
+
+    if (focusFailedTrace) {
+      setTimeout(() => {
+        intermediateSectionRef.current?.focus();
+        intermediateSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 0);
+    }
+  }, [props.runState]);
+
+  useEffect(() => {
+    const runState = props.runState;
+
     const shouldFocus =
       !!runState &&
       runState.results?.kind === 'Ok' &&
@@ -232,21 +249,22 @@ export default function TestEditor(props: Props): ReactElement {
               onTestInputsChange={onTestInputsChange}
             />
           </div>
-          <div
-            className="test-section"
-            id={expectedAnchorId}
-            ref={expectedSectionRef}
-            tabIndex={-1}
-          >
+          <div ref={intermediateSectionRef}>
             <ExpectedVariablesEditor
               testing_scope={props.testing_scope}
               test={props.test}
               trace={props.trace}
               runTrace={props.runTrace}
               failures={failedTraceAssert}
-              focusFailure={focusFailedTrace}
               onChange={onVariablesChange}
             />
+          </div>
+          <div
+            className="test-section"
+            id={expectedAnchorId}
+            ref={expectedSectionRef}
+            tabIndex={-1}
+          >
             <h2 className="test-section-title heading-h2">
               <FormattedMessage id="testEditor.expectedValues" />
             </h2>
