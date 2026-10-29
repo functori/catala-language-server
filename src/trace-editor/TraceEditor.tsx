@@ -148,6 +148,22 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           });
           break;
         }
+        case 'tests': {
+          const fresh = new Map<string, TraceTest | undefined>(
+            message.scopes.map(([s, json]) => [
+              s,
+              json !== null ? readTraceTest(json) : undefined,
+            ])
+          );
+          setScopes((prev) => new Map([...prev, ...fresh]));
+          setScope(
+            (prev: ScopeWithInfo): ScopeWithInfo =>
+              fresh.has(prev.scopeName)
+                ? { ...prev, test: fresh.get(prev.scopeName) }
+                : prev
+          );
+          break;
+        }
         case 'result':
           if (message.ok) {
             setRunState({ status: 'success', trace: message.trace });
