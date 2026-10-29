@@ -69,6 +69,10 @@ const tutoSelectionStep: Step = tutoStep('trace.tuto.selection', treeLabel, {
   },
 });
 
+// The slider, with the panes in the layout the step shows.
+const tutoLayoutStep = (id: string, layout: string): Step =>
+  tutoStep(id, '.trace-layout-slider', { data: { layout } });
+
 const tutoWelcome: Step[] = [
   // The message invites to open the menu: the click must go through.
   tutoStep('trace.tuto.welcome', '.tuto-menu', {
@@ -88,6 +92,9 @@ export const tutoChapters = placeChapters(
         tutoStep('trace.tuto.openGui', '#traceOpenGui'),
         tutoStep('trace.tuto.copyJson', '#traceCopyJson'),
         tutoStep('trace.tuto.scope', '.trace-scope-select'),
+        tutoLayoutStep('trace.tuto.layout.data', 'data'),
+        tutoLayoutStep('trace.tuto.layout.trace', 'trace'),
+        tutoLayoutStep('trace.tuto.layout.both', 'both'),
       ],
     },
     {

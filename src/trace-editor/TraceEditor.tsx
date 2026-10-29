@@ -103,7 +103,10 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   // tutorial never changes it: once it is over, the panes are back as they
   // were, slider position and dragged width included.
   const [tuto, setTuto] = useState(false);
-  const shownLayout: PaneLayout = tuto ? 'both' : layout;
+  // Both panes, but on the steps that show the other layouts.
+  const shownLayout: PaneLayout = tuto
+    ? (tutoSteps[tutoState.index]?.data?.layout ?? 'both')
+    : layout;
 
   const startTuto = (): void => {
     setTuto(true);
@@ -453,7 +456,7 @@ function LayoutSlider({
     }
   };
   return (
-    <span style={layoutSliderStyle}>
+    <span className="trace-layout-slider" style={layoutSliderStyle}>
       <span className="trace-layout-label">
         <FormattedMessage id="trace.layout.data" />
       </span>
