@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { existsSync, readFileSync } from 'fs';
+import { basename, dirname } from 'path';
 import type { LanguageClient } from 'vscode-languageclient/node';
 import { listEntrypoints } from './lspRequests';
 import type { CatalaEntrypoint } from './lspRequests';
@@ -164,10 +165,11 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
       ]);
 
     const scopesFromFile = async (
-      scope: string | undefined
+      scope: string | undefined,
+      content: string = document.getText()
     ): Promise<Map<string, Test | undefined>> => {
       const lang = file.match(/\.catala_(\w+)/)?.[1];
-      const parsed = await parseTestFile(document.getText(), file, lang, scope);
+      const parsed = await parseTestFile(content, file, lang, scope);
       if (parsed.kind !== 'Results') {
         logger.log(`Trace editor: could not parse tests (${parsed.kind}).`);
         return new Map();
@@ -188,8 +190,21 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
       return entrypoints.map(scopeName);
     };
 
+    let stale = false;
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(
+        vscode.Uri.file(dirname(file)),
+        basename(file)
+      ),
+      true,
+      false,
+      true
+    );
+    watcher.onDidChange(() => (stale = true));
+
     const sendInit = async (ins?: TraceEditorInputs): Promise<void> => {
       const scope = ins?.test ? ins.test.testing_scope : ins?.scope;
+      stale = false;
       const known: Map<string, Test | undefined> = ins?.test
         ? new Map([[ins.test.testing_scope, ins.test]])
         : await scopesFromFile(scope).catch((e) => {
@@ -240,6 +255,17 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
               error: 'No scope selected.',
             });
             return;
+          }
+          if (stale) {
+            stale = false;
+            const tests = await scopesFromFile(
+              scope,
+              readFileSync(file, 'utf8')
+            ).catch((e) => {
+              logger.log(`Trace editor: could not read tests: ${String(e)}`);
+              return new Map<string, Test | undefined>();
+            });
+            postToWebView({ kind: 'tests', scopes: asScopeList(tests) });
           }
           const result = await runTrace(file, scope);
           postToWebView({ kind: 'result', ...result });
@@ -332,6 +358,7 @@ export class TraceEditorProvider implements vscode.CustomTextEditorProvider {
     });
     webviewPanel.onDidDispose(() => {
       following.dispose();
+      watcher.dispose();
       if (TraceEditorProvider.openEditors.get(file)?.panel === webviewPanel) {
         TraceEditorProvider.openEditors.delete(file);
       }
