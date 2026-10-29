@@ -322,10 +322,10 @@
         "catala.enableCustomTestCaseEditor": {
           "type": "boolean",
           "default": true,
-          "description": "Enable the custom test case editor for Catala test files"
+          "description": "%configuration.catala.enableCustomTestCaseEditor.description%"
         },
         "catala-lsp.trace.server": {
-          "description": "Controls the logging output of the language server. Valid settings are `off`, `messages`, or `verbose`.",
+          "description": "%configuration.catala-lsp.trace.server.description%",
           "type": "string",
           "enum": [
             "off",
@@ -336,29 +336,29 @@
           "default": "messages"
         },
         "catala-lsp.enableProjectScan": {
-          "description": "Controls whether the LSP server should actively scan through the project to detect dependency breakage. This may be ressource-intensive on large projects. Switching this parameter requires a reload of VSCode to become effective.",
+          "description": "%configuration.catala-lsp.enableProjectScan.description%",
           "type": "boolean",
           "default": "true"
         },
         "catala.lspServerPath": {
           "type": "string",
           "default": null,
-          "description": "Custom path to the `catala-lsp` executable"
+          "description": "%configuration.catala.lspServerPath.description%"
         },
         "catala.catalaFormatPath": {
           "type": "string",
           "default": null,
-          "description": "Custom path to the `catala-format` executable"
+          "description": "%configuration.catala.catalaFormatPath.description%"
         },
         "catala.catalaPath": {
           "type": "string",
           "default": null,
-          "description": "Custom path to the `catala` executable"
+          "description": "%configuration.catala.catalaPath.description%"
         },
         "catala.clerkPath": {
           "type": "string",
           "default": null,
-          "description": "Custom path to the `clerk` executable"
+          "description": "%configuration.catala.clerkPath.description%"
         },
         "catala.language": {
           "type": "string",
@@ -370,54 +370,54 @@
             "file"
           ],
           "enumDescriptions": [
-            "Let each editor pick, as it did before there was a setting",
-            "English, whatever is being edited",
-            "French, whatever is being edited",
-            "Polish, whatever is being edited",
-            "The language of the file itself, from its .catala_xx suffix"
+            "%configuration.catala.language.enumDescriptions.default%",
+            "%configuration.catala.language.enumDescriptions.en%",
+            "%configuration.catala.language.enumDescriptions.fr%",
+            "%configuration.catala.language.enumDescriptions.pl%",
+            "%configuration.catala.language.enumDescriptions.file%"
           ],
           "default": "default",
-          "description": "Language the Catala editors present values in"
+          "description": "%configuration.catala.language.description%"
         },
         "catala.traceView.function_call": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show function call steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+          "markdownDescription": "%configuration.catala.traceView.function_call.markdownDescription%"
         },
         "catala.traceView.branch_condition": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show branch condition steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+          "markdownDescription": "%configuration.catala.traceView.branch_condition.markdownDescription%"
         },
         "catala.traceView.if_branching": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show if/then/else branching steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+          "markdownDescription": "%configuration.catala.traceView.if_branching.markdownDescription%"
         },
         "catala.traceView.match_branching": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show pattern-match branching steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+          "markdownDescription": "%configuration.catala.traceView.match_branching.markdownDescription%"
         },
         "catala.traceView.assertion": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show assertion steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+          "markdownDescription": "%configuration.catala.traceView.assertion.markdownDescription%"
         },
         "catala.traceView.exception": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Show exception steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+          "markdownDescription": "%configuration.catala.traceView.exception.markdownDescription%"
         },
         "catala.traceView.input_assignment": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Show the assignment of a scope call's inputs, listed directly under the call. When off, the step is removed and its sub-steps are shown in its place."
+          "markdownDescription": "%configuration.catala.traceView.input_assignment.markdownDescription%"
         },
         "catala.traceView.error": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Show error steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+          "markdownDescription": "%configuration.catala.traceView.error.markdownDescription%"
         }
       }
     },
