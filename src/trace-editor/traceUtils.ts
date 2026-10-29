@@ -13,7 +13,7 @@ import {
   readTestOutputs,
 } from '../generated/catala_types';
 import type { IntlShape } from 'react-intl';
-import type { Filter } from '../FilterPin';
+import type { Filter, FilterKind } from '../FilterPin';
 
 export type CodeLocation = {
   file: string;
@@ -987,7 +987,8 @@ export function subtreeHasMismatch(
 export function filterMatches(
   el: TraceElement,
   filters: Filter[],
-  intl: IntlShape
+  intl: IntlShape,
+  kind: FilterKind
 ): [Filter[], boolean] {
   const { label, detail } = describeKind(el.element, intl);
   const value =
@@ -1001,10 +1002,16 @@ export function filterMatches(
   ]
     .join(' ')
     .toLowerCase();
+  const anyIncluded =
+    kind === 'or' &&
+    filters.some((f) => f.option == 'include' && text.includes(f.filter));
   let remaining_filters = [];
   let exclusion = false;
   for (let filter of filters) {
-    if (text.includes(filter.filter) && filter.option == 'include') {
+    if (
+      filter.option == 'include' &&
+      (anyIncluded || text.includes(filter.filter))
+    ) {
       continue;
     } else if (filter.option == 'ignore') {
       continue;
@@ -1020,18 +1027,18 @@ export function filterMatches(
 export function subtreeMatches(
   el: TraceElement,
   filters: Filter[],
-  intl: IntlShape
+  intl: IntlShape,
+  kind: FilterKind
 ): boolean {
-  let [remaining_filters, forbidden] = filterMatches(el, filters, intl);
+  let [remaining_filters, forbidden] = filterMatches(el, filters, intl, kind);
   if (forbidden) {
     return false;
   }
-  let without_exclude = remaining_filters.filter((f) => f.option != 'exclude');
-  const children = Array.isArray(el.trace) ? el.trace : [];
-  if (without_exclude.length == 0 && children.length == 0) {
+  if (remaining_filters.every((f) => f.option == 'exclude')) {
     return true;
   }
-  return children.some((c) => subtreeMatches(c, remaining_filters, intl));
+  const children = Array.isArray(el.trace) ? el.trace : [];
+  return children.some((c) => subtreeMatches(c, remaining_filters, intl, kind));
 }
 
 function indexedSegment(
@@ -1088,6 +1095,7 @@ export function closestFilterMatch(
   roots: TraceElement[],
   filters: Filter[],
   intl: IntlShape,
+  kind: FilterKind,
   stepIndices: Map<TraceElement, number>,
   testedScope: string | undefined
 ): {
@@ -1101,13 +1109,15 @@ export function closestFilterMatch(
   let active = filters;
   let closest = { roots, prefix, testedScope: scope };
   for (;;) {
-    const matching = level.filter((el) => subtreeMatches(el, active, intl));
+    const matching = level.filter((el) =>
+      subtreeMatches(el, active, intl, kind)
+    );
     if (matching.length !== 1) {
       return closest;
     }
     const [only] = matching;
     closest = { roots: [only], prefix, testedScope: scope };
-    const [remaining, excluded] = filterMatches(only, active, intl);
+    const [remaining, excluded] = filterMatches(only, active, intl, kind);
     if (excluded || remaining.every((pin) => pin.option === 'exclude')) {
       return closest;
     }

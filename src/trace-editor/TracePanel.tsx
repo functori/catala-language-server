@@ -28,11 +28,12 @@ import {
   CwdContext,
   ExpandContext,
   ExpectedContext,
+  FilterKindContext,
   IndexContext,
 } from './traceContexts';
 import type { AddFilter } from './traceMenu';
 import { useTraceMenu } from './traceMenu';
-import { FilterPins, type Filter } from '../FilterPin';
+import { FilterPins, type Filter, type FilterKind } from '../FilterPin';
 import TraceNode from './TraceNode';
 import { useCatalaSettings } from '../shared/useSettings';
 import { showsTraceKind, traceViewKindOf } from '../shared/settings';
@@ -66,6 +67,7 @@ function TraceTreeView({
   expand,
   test,
   fromClosestMatch = false,
+  filterKind,
 }: {
   trace: TraceElement[];
   filters?: Filter[];
@@ -73,6 +75,7 @@ function TraceTreeView({
   expand?: boolean | null;
   test?: TraceTest;
   fromClosestMatch?: boolean;
+  filterKind: FilterKind;
 }): ReactElement {
   const intl = useIntl();
   const settings = useCatalaSettings();
@@ -111,7 +114,9 @@ function TraceTreeView({
       };
     })
     .filter((filter) => filter.filter.length > 0);
-  const anyVisible = f ? roots.some((el) => subtreeMatches(el, f, intl)) : true;
+  const anyVisible = f
+    ? roots.some((el) => subtreeMatches(el, f, intl, filterKind))
+    : true;
   if (!anyVisible) {
     return (
       <p style={{ color: 'var(--vscode-descriptionForeground)' }}>
@@ -150,6 +155,7 @@ function TraceTreeView({
       roots,
       f,
       intl,
+      filterKind,
       stepIndices,
       testedScope
     );
@@ -163,18 +169,20 @@ function TraceTreeView({
       <ExpandContext.Provider value={expand ?? null}>
         <ExpectedContext.Provider value={expected}>
           <IndexContext.Provider value={stepIndices}>
-            <ul style={rootListStyle}>
-              {roots.map((el, i) => (
-                <TraceNode
-                  key={i}
-                  te={el}
-                  depth={0}
-                  filters={f}
-                  prefix={rootPrefix}
-                  tested_scope={testedScope}
-                />
-              ))}
-            </ul>
+            <FilterKindContext.Provider value={filterKind}>
+              <ul style={rootListStyle}>
+                {roots.map((el, i) => (
+                  <TraceNode
+                    key={i}
+                    te={el}
+                    depth={0}
+                    filters={f}
+                    prefix={rootPrefix}
+                    tested_scope={testedScope}
+                  />
+                ))}
+              </ul>
+            </FilterKindContext.Provider>
           </IndexContext.Provider>
         </ExpectedContext.Provider>
       </ExpandContext.Provider>
@@ -216,6 +224,7 @@ export default function TracePanel({
     asPin(initialFilter)
   );
   const addFilter = createAddFilter(setSavedFilters);
+  const [filterKind, setFilterKind] = useState<FilterKind>('or');
 
   // Derived panel spawned by viewWithFilter command are stored here
   const [derived, setDerived] = useState<{ id: number; filter: string }[]>([]);
@@ -326,7 +335,12 @@ export default function TracePanel({
           <FormattedMessage id="trace.collapseAll" />
         </VscodeButton>
       </div>
-      <FilterPins filters={savedFilters} setFilters={setSavedFilters} />
+      <FilterPins
+        filters={savedFilters}
+        setFilters={setSavedFilters}
+        kind={filterKind}
+        setKind={setFilterKind}
+      />
       <TraceTreeView
         trace={trace}
         filters={savedFilters}
@@ -334,6 +348,7 @@ export default function TracePanel({
         expand={expand}
         fromClosestMatch={fromClosestMatch}
         test={test}
+        filterKind={filterKind}
       />
       {derived.map((d) => (
         <div key={d.id} style={derivedPanelStyle}>
