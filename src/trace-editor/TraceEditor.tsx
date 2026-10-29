@@ -111,7 +111,10 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   // tutorial never changes it: once it is over, the panes are back as they
   // were, slider position and dragged width included.
   const [tuto, setTuto] = useState(false);
-  const shownLayout: PaneLayout = tuto ? 'both' : layout;
+  // Both panes, but on the steps that show the other layouts.
+  const shownLayout: PaneLayout = tuto
+    ? (tutoSteps[tutoState.index]?.data?.layout ?? 'both')
+    : layout;
 
   const startTuto = (): void => {
     setTuto(true);
@@ -494,6 +497,10 @@ function tutoPillStep(id: string, labelId: string): Step {
   });
 }
 
+// The slider, with the panes in the layout the step shows.
+const tutoLayoutStep = (id: string, layout: PaneLayout): Step =>
+  tutoStep(id, '.trace-layout-slider', { data: { layout } });
+
 // The name of an internal variable, a likely text to filter on, is selected
 // for the user to right-click it: the menu is the one of VS Code, outside of
 // the page, which the tutorial can neither open nor point at.
@@ -533,6 +540,9 @@ const tutoChapters = placeChapters(
         tutoStep('trace.tuto.openGui', '#traceOpenGui'),
         tutoStep('trace.tuto.copyJson', '#traceCopyJson'),
         tutoStep('trace.tuto.scope', '.trace-scope-select'),
+        tutoLayoutStep('trace.tuto.layout.data', 'data'),
+        tutoLayoutStep('trace.tuto.layout.trace', 'trace'),
+        tutoLayoutStep('trace.tuto.layout.both', 'both'),
       ],
     },
     {
@@ -599,7 +609,7 @@ function LayoutSlider({
     }
   };
   return (
-    <span style={layoutSliderStyle}>
+    <span className="trace-layout-slider" style={layoutSliderStyle}>
       <span className="trace-layout-label">
         <FormattedMessage id="trace.layout.data" />
       </span>
