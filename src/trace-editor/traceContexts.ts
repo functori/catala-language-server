@@ -1,4 +1,5 @@
 import { createContext } from 'react';
+import type { FilterKind } from '../FilterPin';
 import type { Expected, TraceElement } from './traceUtils';
 
 /** Expand/collapse request broadcast to a whole tree. */
@@ -15,3 +16,6 @@ export const IndexContext = createContext<Map<TraceElement, number>>(new Map());
 
 /** Forced expansion state, or `null` when nodes decide for themselves. */
 export const ExpandContext = createContext<boolean | null>(null);
+
+/** How the include pins of the enclosing panel combine. */
+export const FilterKindContext = createContext<FilterKind>('and');
