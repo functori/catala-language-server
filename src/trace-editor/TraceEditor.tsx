@@ -506,6 +506,16 @@ const tutoChapters = placeChapters(
         // On the left, over the data panel: the tree reaches down to the bottom
         // of the view, which leaves no room for the tooltip above or below it.
         tutoStep('trace.tuto.tree', '.trace-tree', { placement: 'left' }),
+        // The kinds of the variables of a scope, on the first row of each.
+        tutoStep('trace.tuto.varInput', '.trace-tree .input', {
+          placement: 'left',
+        }),
+        tutoStep('trace.tuto.varInternal', '.trace-tree .internal', {
+          placement: 'left',
+        }),
+        tutoStep('trace.tuto.varOutput', '.trace-tree .output', {
+          placement: 'left',
+        }),
         tutoSelectionStep,
         tutoPillStep('trace.tuto.pillValue', 'trace.value'),
         tutoPillStep('trace.tuto.pillCode', 'trace.code'),
@@ -518,6 +528,8 @@ const tutoChapters = placeChapters(
 const tutoSteps: Step[] = [
   ...tutoWelcome,
   ...tutoChapters.flatMap((chapter) => chapter.steps),
+  // The settings are outside of the page: nothing to point at.
+  tutoStep('trace.tuto.sidebar', 'body', { placement: 'center' }),
   tutoStep('trace.tuto.end', 'body', { placement: 'center' }),
 ];
 
