@@ -1014,6 +1014,7 @@ export type Described = {
   symbol: string;
   label: string;
   detail?: string;
+  className?: string;
   tone: Tone;
   showsValue: boolean;
   showsCode: boolean;
@@ -1074,19 +1075,20 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
       };
     case 'scope_var': {
       const role = scopeVarRole(kind);
-      const [label, tone]: [string, Tone] =
+      const [label, tone, className]: [string, Tone, string] =
         role === 'context'
-          ? [t('trace.kind.scopeContextVariable'), 'context']
+          ? [t('trace.kind.scopeContextVariable'), 'context', 'context']
           : role === 'input'
-            ? ['', 'input']
+            ? ['', 'input', 'input']
             : role === 'output'
-              ? ['', 'output']
-              : [t('trace.kind.scopeVariable'), 'plain'];
+              ? ['', 'output', 'output']
+              : [t('trace.kind.scopeVariable'), 'plain', 'internal'];
       return {
         symbol: '≔',
         label,
         detail: detail(kind.name),
         tone,
+        className,
         showsValue: true,
         showsCode: true,
       };

@@ -266,6 +266,9 @@ export default function TraceNode({
     }
   }
   const described: Described = describeNode(te, intl);
+  // The kind of a scope variable: the targets of steps of the tutorial.
+  const kind =
+    te.element.kind === 'scope_var' ? described.className : undefined;
   const snippetPos = described.showsCode
     ? (te.codeSpan ?? elementCodeSpan(te))
     : undefined;
@@ -297,6 +300,7 @@ export default function TraceNode({
   return (
     <li style={liStyle}>
       <div
+        className={kind}
         style={{
           ...rowStyle,
           cursor: expandable ? 'pointer' : 'default',
@@ -434,7 +438,7 @@ export default function TraceNode({
         </div>
       )}
       {open && expandable && (
-        <div style={openContentStyle}>
+        <div className="expanded" style={openContentStyle}>
           {related.length > 0 && (
             <div style={relatedStyle}>
               <span style={{ color: 'var(--vscode-descriptionForeground)' }}>
