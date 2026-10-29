@@ -263,6 +263,8 @@
   "trace.tuto.varInput": "Zmienna wejściowa zakresu: jej wartość podaje wywołujący, tutaj test.",
   "trace.tuto.varInternal": "Zmienna wewnętrzna zakresu: jest obliczana wewnątrz i go nie opuszcza.",
   "trace.tuto.varOutput": "Zmienna wynikowa zakresu: jest obliczana wewnątrz i zwracana wywołującemu.",
+  "trace.tuto.pillValue": "Pigułka „wartość” pokazuje całą wartość zmiennej, gdy jest ona złożona (struktura, lista…). Kliknij ją, aby ją otworzyć lub zamknąć.",
+  "trace.tuto.pillCode": "Pigułka „kod” pokazuje fragment kodu źródłowego, który definiuje zmienną. Kliknij ją, aby go otworzyć lub zamknąć.",
   "trace.tuto.sidebar": "Możesz zmienić to, co jest wyświetlane w śladzie, w ustawieniach VS Code, dostępnych z panelu Catala na pasku aktywności.",
   "trace.tuto.end": "Samouczek zakończony! Możesz go uruchomić ponownie w dowolnej chwili i przejrzeć wybraną część za pomocą menu nawigacji.",
   "trace.filterPlaceholder": "Filtruj ślad…",
