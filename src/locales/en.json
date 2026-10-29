@@ -246,6 +246,8 @@
   "trace.tuto.expand": "These buttons expand or collapse every step of the trace.",
   "trace.tuto.tree": "The trace of the computation. Click a step to see the steps it is made of. The values compared with the ones the test expects are green when they match, red otherwise.",
   "trace.tuto.selection": "Select some text in the trace and right-click: you can add it to the filters, or open a new view of the trace filtered on that text.",
+  "trace.tuto.pillValue": "The “value” pill shows the whole value of the variable, when it is a compound one (structure, list…). Click it to open or close it.",
+  "trace.tuto.pillCode": "The “code” pill shows the excerpt of the source code that defines the variable. Click it to open or close it.",
   "trace.tuto.end": "The tutorial is over! You can start it again at any time and use the navigation menu to review a part of it.",
   "trace.filterPlaceholder": "Filter trace…",
   "trace.expandAll": "Expand",

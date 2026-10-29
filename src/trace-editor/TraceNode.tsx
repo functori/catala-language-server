@@ -123,6 +123,9 @@ function Pill({
 }): ReactElement {
   return (
     <span
+      // Found and opened by the tutorial, which shows what each pill does.
+      data-pill={labelId}
+      data-active={active}
       onClick={(e) => {
         e.stopPropagation();
         onToggle();

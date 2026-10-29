@@ -410,6 +410,29 @@ const tutoStep = (id: string, target: string, extra?: Partial<Step>): Step => ({
   ...extra,
 });
 
+// The first pill of this kind in the tree, whatever its row: a pill only
+// exists for the rows it applies to (a compound value, a position in the
+// code), so looking for the pill itself finds one whenever the trace has any.
+// With none, there is nothing to explain and Joyride skips the step.
+const treePill = (labelId: string): string =>
+  `.trace-tree [data-pill="${labelId}"]`;
+
+// The pill is opened before its step is shown, as a click on it would, so that
+// the step shows what it opens. Opened pills are left open.
+function tutoPillStep(id: string, labelId: string): Step {
+  return tutoStep(id, treePill(labelId), {
+    placement: 'right',
+    before: async () => {
+      const pill = document.querySelector<HTMLElement>(treePill(labelId));
+      if (pill !== null && pill.dataset.active !== 'true') {
+        pill.click();
+        // Lets React render what the pill opens before the step is placed.
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
+    },
+  });
+}
+
 const tutoWelcome: Step[] = [
   // The message invites to open the menu: the click must go through.
   tutoStep('trace.tuto.welcome', '.tuto-menu', {
@@ -456,6 +479,8 @@ const tutoChapters = placeChapters(
         tutoStep('trace.tuto.selection', '.trace-tree .internal', {
           placement: 'left',
         }),
+        tutoPillStep('trace.tuto.pillValue', 'trace.value'),
+        tutoPillStep('trace.tuto.pillCode', 'trace.code'),
       ],
     },
   ] satisfies Chapter[],

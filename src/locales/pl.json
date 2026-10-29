@@ -246,6 +246,8 @@
   "trace.tuto.expand": "Te przyciski rozwijają lub zwijają wszystkie kroki śladu.",
   "trace.tuto.tree": "Ślad obliczeń. Kliknij krok, aby zobaczyć kroki, z których się składa. Wartości porównywane z oczekiwanymi przez test są zielone, gdy się zgadzają, a czerwone w przeciwnym razie.",
   "trace.tuto.selection": "Zaznacz tekst w śladzie i kliknij prawym przyciskiem myszy: możesz dodać go do filtrów lub otworzyć nowy widok śladu przefiltrowany według tego tekstu.",
+  "trace.tuto.pillValue": "Pigułka „wartość” pokazuje całą wartość zmiennej, gdy jest ona złożona (struktura, lista…). Kliknij ją, aby ją otworzyć lub zamknąć.",
+  "trace.tuto.pillCode": "Pigułka „kod” pokazuje fragment kodu źródłowego, który definiuje zmienną. Kliknij ją, aby go otworzyć lub zamknąć.",
   "trace.tuto.end": "Samouczek zakończony! Możesz go uruchomić ponownie w dowolnej chwili i przejrzeć wybraną część za pomocą menu nawigacji.",
   "trace.filterPlaceholder": "Filtruj ślad…",
   "trace.expandAll": "Rozwiń",
