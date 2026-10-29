@@ -34,6 +34,7 @@ import {
   CwdContext,
   ExpandContext,
   ExpectedContext,
+  FilterKindContext,
   IndexContext,
 } from './traceContexts';
 import { FormattedMessage, useIntl } from 'react-intl';
@@ -169,6 +170,7 @@ export default function TraceNode({
   const filterKey = filters.map((f) => `${f.option}:${f.filter}`).join('\n');
   const expected = useContext(ExpectedContext);
   const stepIndices = useContext(IndexContext);
+  const filterKind = useContext(FilterKindContext);
   const intl = useIntl();
   const defaultExpanded = depth < 2;
   const [expanded, setExpanded] = useState(defaultExpanded);
@@ -176,7 +178,7 @@ export default function TraceNode({
     setExpanded(
       filters.some((f) => f.option == 'include') ? true : defaultExpanded
     );
-  }, [filterKey, defaultExpanded, filtering]);
+  }, [filterKey, filterKind, defaultExpanded, filtering]);
   const expandCmd = useContext(ExpandContext);
   useEffect(() => {
     if (expandCmd != null) {
@@ -194,10 +196,12 @@ export default function TraceNode({
     }
   }, [hasMismatch]);
   const open = expanded;
-  if (filtering && !subtreeMatches(te, filters, intl)) {
+  if (filtering && !subtreeMatches(te, filters, intl, filterKind)) {
     return null;
   }
-  const [childFilters] = filtering ? filterMatches(te, filters, intl) : [[]];
+  const [childFilters] = filtering
+    ? filterMatches(te, filters, intl, filterKind)
+    : [[]];
   let matchBackground: string | undefined;
   if (
     expected &&
