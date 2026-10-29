@@ -245,7 +245,7 @@
   "trace.tuto.filter": "Type some text and press Enter to filter the trace: only the steps matching it stay shown. Each filter then appears as a pin, which you can click to include, exclude or ignore it.",
   "trace.tuto.expand": "These buttons expand or collapse every step of the trace.",
   "trace.tuto.tree": "The trace of the computation. Click a step to see the steps it is made of. The values compared with the ones the test expects are green when they match, red otherwise.",
-  "trace.tuto.selection": "Select some text in the trace and right-click: you can add it to the filters, or open a new view of the trace filtered on that text.",
+  "trace.tuto.selection": "The name of this variable is selected: right-click it to add it to the filters, or to open a new view of the trace filtered on that text. This works with any text selected in the trace.",
   "trace.tuto.pillValue": "The “value” pill shows the whole value of the variable, when it is a compound one (structure, list…). Click it to open or close it.",
   "trace.tuto.pillCode": "The “code” pill shows the excerpt of the source code that defines the variable. Click it to open or close it.",
   "trace.tuto.end": "The tutorial is over! You can start it again at any time and use the navigation menu to review a part of it.",

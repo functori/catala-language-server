@@ -245,7 +245,7 @@
   "trace.tuto.filter": "Tapez du texte puis appuyez sur Entrée pour filtrer la trace : seules les étapes qui y correspondent restent affichées. Chaque filtre apparaît ensuite sous forme de pin, sur lequel vous pouvez cliquer pour l'inclure, l'exclure ou l'ignorer.",
   "trace.tuto.expand": "Ces boutons déplient ou replient toutes les étapes de la trace.",
   "trace.tuto.tree": "La trace du calcul. Cliquez sur une étape pour voir les étapes qui la composent. Les valeurs comparées à celles attendues par le test sont colorées en vert si elles correspondent, en rouge sinon.",
-  "trace.tuto.selection": "Sélectionnez du texte dans la trace puis faites un clic droit : vous pouvez l'ajouter aux filtres, ou ouvrir une nouvelle vue de la trace filtrée sur ce texte.",
+  "trace.tuto.selection": "Le nom de cette variable est sélectionné : faites un clic droit dessus pour l'ajouter aux filtres, ou ouvrir une nouvelle vue de la trace filtrée sur ce texte. Cela marche avec tout texte sélectionné dans la trace.",
   "trace.tuto.pillValue": "Le bouton « valeur » affiche en entier la valeur de la variable, quand elle est composée (structure, liste…). Cliquez dessus pour l'ouvrir ou la refermer.",
   "trace.tuto.pillCode": "Le bouton « code » affiche l'extrait du code source qui définit la variable. Cliquez dessus pour l'ouvrir ou le refermer.",
   "trace.tuto.end": "Le tutoriel est terminé ! Vous pouvez le relancer à tout moment pour revoir une partie grâce au menu de navigation.",

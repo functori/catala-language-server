@@ -277,7 +277,7 @@ export default function TraceNode({
           <HighlightText filters={filters} text={described.label} />
         </span>
         {described.detail && (
-          <span style={detailStyle}>
+          <span className="trace-node-label" style={detailStyle}>
             <HighlightText filters={filters} text={described.detail} />
           </span>
         )}
