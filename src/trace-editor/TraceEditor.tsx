@@ -448,12 +448,51 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
 // Most targets only exist once a trace has run, or for a scope that has a test:
 // Joyride skips the steps whose target is missing.
 
-const tutoStep = (id: string, target: string, extra?: Partial<Step>): Step => ({
+const tutoStep = (
+  id: string,
+  target: Step['target'],
+  extra?: Partial<Step>
+): Step => ({
   id,
   content: <FormattedMessage id={id} />,
   target,
   ...extra,
 });
+
+// The first pill of this kind in the tree: a pill only exists for the rows it
+// applies to (a compound value, a position in the code), so looking for the
+// pill itself finds one whenever the trace has any. One of an internal
+// variable first, which usually sits in the middle of the trace, then one of
+// any row, for the traces without internal variables. With none, there is
+// nothing to explain and Joyride skips the step.
+const treePill = (labelId: string): HTMLElement | null =>
+  document.querySelector<HTMLElement>(
+    `.trace-tree .internal [data-pill="${labelId}"]`
+  ) ??
+  document.querySelector<HTMLElement>(`.trace-tree [data-pill="${labelId}"]`);
+
+// Opens or closes the pill, as a click on it would.
+const clickOnPill =
+  (labelId: string, wantActive: boolean) => async (): Promise<void> => {
+    const pill = treePill(labelId);
+    if (pill !== null && pill.dataset.active !== `${wantActive}`) {
+      pill.click();
+      // Lets React render what the pill opens before the step is placed.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  };
+
+// The pill is opened before its step is shown, so that the step shows what it
+// opens, and closed after it.
+function tutoPillStep(id: string, labelId: string): Step {
+  return tutoStep(id, () => treePill(labelId), {
+    placement: 'top',
+    // Above, even with too little room at first: Joyride would flip it below.
+    floatingOptions: { flipOptions: false },
+    before: clickOnPill(labelId, true),
+    after: clickOnPill(labelId, false),
+  });
+}
 
 const tutoWelcome: Step[] = [
   // The message invites to open the menu: the click must go through.
@@ -506,6 +545,8 @@ const tutoChapters = placeChapters(
         tutoStep('trace.tuto.varOutput', '.trace-tree .expanded .output', {
           placement: 'left',
         }),
+        tutoPillStep('trace.tuto.pillValue', 'trace.value'),
+        tutoPillStep('trace.tuto.pillCode', 'trace.code'),
       ],
     },
   ] satisfies Chapter[],
