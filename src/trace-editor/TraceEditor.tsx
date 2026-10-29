@@ -15,6 +15,9 @@ import {
   VscodeTextfield,
 } from '@vscode-elements/react-elements';
 import { setVsCodeApi } from '../shared/webviewApi';
+import type { DependencyGraphs } from '../generated/catala_types';
+import { readDependencyGraphs } from '../generated/catala_types';
+import { DependenciesContext } from './traceContexts';
 import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { TraceElement, TraceTest } from './traceUtils';
 import { fieldValue, PANEL_HEIGHT_VAR, readTraceTest } from './traceUtils';
@@ -44,6 +47,9 @@ const BOTTOM_MARGIN = 12;
 export default function TraceEditor({ vscode }: Props): ReactElement {
   const intl = useIntl();
   const [cwd, setCwd] = useState('');
+  const [dependencies, setDependencies] = useState<DependencyGraphs | null>(
+    null
+  );
   const [scopes, setScopes] = useState<Map<string, TraceTest | undefined>>(
     new Map()
   );
@@ -164,6 +170,9 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
           );
           break;
         }
+        case 'dependencies':
+          setDependencies(readDependencyGraphs(message.graphs));
+          break;
         case 'result':
           if (message.ok) {
             setRunState({ status: 'success', trace: message.trace });
@@ -226,121 +235,125 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={titleRowStyle}>
-        <h2 style={{ margin: 0 }}>
-          <FormattedMessage id="trace.viewer.title" />
-          {(scopePreset || scopes.size === 1) &&
-            scope.scopeName &&
-            `  —  ${scope.scopeName}`}
-        </h2>
-        <VscodeButton icon="play" disabled={running} onClick={onRunScope}>
-          <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
-        </VscodeButton>
-        <VscodeButton
-          icon="tools"
-          onClick={(event) => {
-            event.preventDefault();
-            post(vscode, { kind: 'openInTestEditor' });
-          }}
-        >
-          <FormattedMessage id={'tooltip.openGui'} />
-        </VscodeButton>
-        {runState.status === 'success' && (
+    <DependenciesContext.Provider value={dependencies}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={titleRowStyle}>
+          <h2 style={{ margin: 0 }}>
+            <FormattedMessage id="trace.viewer.title" />
+            {(scopePreset || scopes.size === 1) &&
+              scope.scopeName &&
+              `  —  ${scope.scopeName}`}
+          </h2>
+          <VscodeButton icon="play" disabled={running} onClick={onRunScope}>
+            <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
+          </VscodeButton>
           <VscodeButton
-            icon={copied ? 'check' : 'copy'}
-            secondary
-            title={intl.formatMessage({
-              id: copied ? 'trace.copiedJson' : 'trace.copyJson',
-            })}
-            onClick={() => {
-              void navigator.clipboard.writeText(
-                JSON.stringify(runState.trace, null, 2)
-              );
-              markCopied();
+            icon="tools"
+            onClick={(event) => {
+              event.preventDefault();
+              post(vscode, { kind: 'openInTestEditor' });
             }}
           >
-            <FormattedMessage
-              id={copied ? 'trace.copiedJson' : 'trace.copyJson'}
-            />
+            <FormattedMessage id={'tooltip.openGui'} />
           </VscodeButton>
-        )}
-        {scope.test !== undefined && (
-          <LayoutSlider layout={layout} onLayout={setLayout} />
-        )}
-      </div>
-
-      {!scopePreset && scopes.size !== 1 && (
-        <label style={fieldStyle}>
-          <span style={{ fontWeight: 600 }}>
-            <FormattedMessage id="trace.scope" />
-          </span>
-          {scopes.size > 0 ? (
-            <VscodeSingleSelect
-              value={scope.scopeName}
-              onChange={(e) => {
-                const s = fieldValue(e);
-                setScope({ scopeName: s, test: scopes.get(s) });
+          {runState.status === 'success' && (
+            <VscodeButton
+              icon={copied ? 'check' : 'copy'}
+              secondary
+              title={intl.formatMessage({
+                id: copied ? 'trace.copiedJson' : 'trace.copyJson',
+              })}
+              onClick={() => {
+                void navigator.clipboard.writeText(
+                  JSON.stringify(runState.trace, null, 2)
+                );
+                markCopied();
               }}
-              style={{ width: '100%' }}
             >
-              {[...scopes.keys()].map((s) => (
-                <VscodeOption key={s} value={s}>
-                  {s}
-                </VscodeOption>
-              ))}
-            </VscodeSingleSelect>
+              <FormattedMessage
+                id={copied ? 'trace.copiedJson' : 'trace.copyJson'}
+              />
+            </VscodeButton>
+          )}
+          {scope.test !== undefined && (
+            <LayoutSlider layout={layout} onLayout={setLayout} />
+          )}
+        </div>
+
+        {!scopePreset && scopes.size !== 1 && (
+          <label style={fieldStyle}>
+            <span style={{ fontWeight: 600 }}>
+              <FormattedMessage id="trace.scope" />
+            </span>
+            {scopes.size > 0 ? (
+              <VscodeSingleSelect
+                value={scope.scopeName}
+                onChange={(e) => {
+                  const s = fieldValue(e);
+                  setScope({ scopeName: s, test: scopes.get(s) });
+                }}
+                style={{ width: '100%' }}
+              >
+                {[...scopes.keys()].map((s) => (
+                  <VscodeOption key={s} value={s}>
+                    {s}
+                  </VscodeOption>
+                ))}
+              </VscodeSingleSelect>
+            ) : (
+              <VscodeTextfield
+                value={scope.scopeName}
+                placeholder={intl.formatMessage({
+                  id: 'trace.scopePlaceholder',
+                })}
+                onInput={(e) => {
+                  const s = fieldValue(e);
+                  setScope({ scopeName: s, test: scopes.get(s) });
+                }}
+                style={{ width: '100%' }}
+              />
+            )}
+          </label>
+        )}
+
+        <div
+          ref={resultsRef}
+          style={{ [PANEL_HEIGHT_VAR]: panelHeight } as React.CSSProperties}
+        >
+          {scope.test !== undefined ? (
+            <SplitPane
+              layout={layout}
+              left={
+                <DataPanel
+                  testing_scope={scope.test.testing_scope}
+                  vscode={vscode}
+                  addFilter={requestFilter}
+                  test={scope.test}
+                  trace={
+                    runState.status === 'success' ? runState.trace : undefined
+                  }
+                  intl={intl}
+                />
+              }
+              right={
+                <TraceResult
+                  filterRequest={filterRequest}
+                  runState={runState}
+                  cwd={cwd}
+                  test={scope.test}
+                />
+              }
+            />
           ) : (
-            <VscodeTextfield
-              value={scope.scopeName}
-              placeholder={intl.formatMessage({ id: 'trace.scopePlaceholder' })}
-              onInput={(e) => {
-                const s = fieldValue(e);
-                setScope({ scopeName: s, test: scopes.get(s) });
-              }}
-              style={{ width: '100%' }}
+            <TraceResult
+              filterRequest={filterRequest}
+              runState={runState}
+              cwd={cwd}
             />
           )}
-        </label>
-      )}
-
-      <div
-        ref={resultsRef}
-        style={{ [PANEL_HEIGHT_VAR]: panelHeight } as React.CSSProperties}
-      >
-        {scope.test !== undefined ? (
-          <SplitPane
-            layout={layout}
-            left={
-              <DataPanel
-                testing_scope={scope.test.testing_scope}
-                vscode={vscode}
-                addFilter={requestFilter}
-                test={scope.test}
-                trace={
-                  runState.status === 'success' ? runState.trace : undefined
-                }
-                intl={intl}
-              />
-            }
-            right={
-              <TraceResult
-                filterRequest={filterRequest}
-                runState={runState}
-                cwd={cwd}
-                test={scope.test}
-              />
-            }
-          />
-        ) : (
-          <TraceResult
-            filterRequest={filterRequest}
-            runState={runState}
-            cwd={cwd}
-          />
-        )}
+        </div>
       </div>
-    </div>
+    </DependenciesContext.Provider>
   );
 }
 

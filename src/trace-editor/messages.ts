@@ -33,6 +33,7 @@ export type TraceDownMessage =
   | { kind: 'result'; ok: true; trace: TraceElement[] }
   | { kind: 'result'; ok: false; error: string }
   | { kind: 'extract'; id: number; text: string | null; file?: string }
+  | { kind: 'dependencies'; graphs: JsonValue }
   | { kind: 'viewWithFilter' }
   | { kind: 'addToFilter' };
 
