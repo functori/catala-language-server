@@ -310,23 +310,24 @@ export default function TracePanel({
             slot="content-after"
           />
         </VscodeTextfield>
-        <VscodeButton
-          className="trace-expand-all"
-          icon="expand-all"
-          secondary
-          title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
-          onClick={() => setExpand(true)}
-        >
-          <FormattedMessage id="trace.expandAll" />
-        </VscodeButton>
-        <VscodeButton
-          icon="collapse-all"
-          secondary
-          title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
-          onClick={() => setExpand(false)}
-        >
-          <FormattedMessage id="trace.collapseAll" />
-        </VscodeButton>
+        <div style={{ display: 'flex', gap: 8 }} className="trace-expand-coll">
+          <VscodeButton
+            icon="expand-all"
+            secondary
+            title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
+            onClick={() => setExpand(true)}
+          >
+            <FormattedMessage id="trace.expandAll" />
+          </VscodeButton>
+          <VscodeButton
+            icon="collapse-all"
+            secondary
+            title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
+            onClick={() => setExpand(false)}
+          >
+            <FormattedMessage id="trace.collapseAll" />
+          </VscodeButton>
+        </div>
       </div>
       <FilterPins filters={savedFilters} setFilters={setSavedFilters} />
       <TraceTreeView
