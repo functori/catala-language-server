@@ -494,6 +494,26 @@ function tutoPillStep(id: string, labelId: string): Step {
   });
 }
 
+// The name of an internal variable, a likely text to filter on, is selected
+// for the user to right-click it: the menu is the one of VS Code, outside of
+// the page, which the tutorial can neither open nor point at.
+const treeLabel = '.trace-tree .internal .trace-node-label';
+
+const tutoSelectionStep: Step = tutoStep('trace.tuto.selection', treeLabel, {
+  placement: 'left',
+  // The right click must go through.
+  blockTargetInteraction: false,
+  before: async () => {
+    const label = document.querySelector(treeLabel);
+    if (label !== null) {
+      window.getSelection()?.selectAllChildren(label);
+    }
+  },
+  after: async () => {
+    window.getSelection()?.removeAllRanges();
+  },
+});
+
 const tutoWelcome: Step[] = [
   // The message invites to open the menu: the click must go through.
   tutoStep('trace.tuto.welcome', '.tuto-menu', {
@@ -545,6 +565,7 @@ const tutoChapters = placeChapters(
         tutoStep('trace.tuto.varOutput', '.trace-tree .expanded .output', {
           placement: 'left',
         }),
+        tutoSelectionStep,
         tutoPillStep('trace.tuto.pillValue', 'trace.value'),
         tutoPillStep('trace.tuto.pillCode', 'trace.code'),
       ],
