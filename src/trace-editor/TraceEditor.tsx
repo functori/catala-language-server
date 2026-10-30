@@ -432,7 +432,7 @@ function tutoPillStep(id: string, labelId: string): Step {
     }
   };
   return tutoStep(id, treePill(labelId), {
-    placement: 'right',
+    placement: 'top',
     before: clickOnPill(true),
     after: clickOnPill(false),
   });
