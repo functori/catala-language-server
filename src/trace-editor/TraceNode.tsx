@@ -201,7 +201,8 @@ export default function TraceNode({
     return null;
   }
   const [childFilters] = filtering ? filterMatches(te, filters, intl) : [[]];
-  let matchBackground: string | undefined;
+  // Whether the value matches the one the test expects (see trace-editor.css).
+  let matchClass: 'successMatch' | 'failedMatch' | undefined;
   if (
     expected &&
     tested_scope === undefined &&
@@ -211,10 +212,7 @@ export default function TraceNode({
   ) {
     const state = nodeMatchState(expected, step.prefix, te.value);
     if (state !== undefined) {
-      matchBackground =
-        state === 'mismatch'
-          ? 'var(--vscode-diffEditor-removedTextBackground, rgba(255, 50, 50, 0.2))'
-          : 'var(--vscode-diffEditor-insertedTextBackground, rgba(35, 200, 60, 0.2))';
+      matchClass = state === 'mismatch' ? 'failedMatch' : 'successMatch';
     }
   }
   const described: Described = describeKind(te.element, intl);
@@ -251,11 +249,10 @@ export default function TraceNode({
   return (
     <li style={liStyle}>
       <div
-        className={kind}
+        className={[kind, matchClass].filter(Boolean).join(' ') || undefined}
         style={{
           ...rowStyle,
           cursor: expandable ? 'pointer' : 'default',
-          background: matchBackground,
         }}
         onClick={() =>
           expandable && !isSelectingText() && setExpanded((e) => !e)
