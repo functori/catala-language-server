@@ -13,7 +13,7 @@ import ValueEditor, {
 import { CompositeEditor, type EditorItem } from '../editors/CompositeEditor';
 import { containsUnset } from '../editors/unsetValidation';
 import { confirm } from '../messaging/confirm';
-import { Identifier } from '../editors/Identifier';
+import { Identifier, SplittedIdentifier } from '../editors/Identifier';
 import { focusTargetId } from '../shared/focusTarget';
 
 type InputFieldProps = {
@@ -133,23 +133,30 @@ export default function TestInputsEditor(props: Props): ReactElement {
         );
       }
 
-      const label = (
-        <>
-          {isContext ? (
-            <span className="context-var-label">
-              <span
-                className="context-var-badge"
-                title={intl.formatMessage({ id: 'testEditor.contextVarTitle' })}
-                aria-hidden="true"
-              >
-                C
-              </span>
-              <Identifier name={inputName} />
+      // The context sign, then the name: an Identifier, cut to the width of its
+      // item, but split at its underscores for an array, whose label goes on a
+      // tab header (see CompositeEditor), where it wraps.
+      const withBadge = (name: ReactNode): ReactNode =>
+        isContext ? (
+          <span className="context-var-label">
+            <span
+              className="context-var-badge"
+              title={intl.formatMessage({ id: 'testEditor.contextVarTitle' })}
+              aria-hidden="true"
+            >
+              C
             </span>
-          ) : (
-            <Identifier name={inputName} />
-          )}
-        </>
+            {name}
+          </span>
+        ) : (
+          name
+        );
+      const label = withBadge(
+        testIo.typ.kind === 'TArray' ? (
+          <SplittedIdentifier name={inputName} />
+        ) : (
+          <Identifier name={inputName} />
+        )
       );
 
       const rawValue = testIo.value?.value.value;
