@@ -282,7 +282,6 @@
   "trace.collapseAll": "Replier",
   "trace.collapseAllTitle": "Replier toutes les branches",
   "trace.dragToResize": "Glisser pour redimensionner",
-  "trace.col.name": "nom",
   "trace.col.expected": "attendu",
   "trace.col.value": "valeur",
   "trace.section.inputs": "Données",

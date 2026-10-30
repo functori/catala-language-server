@@ -282,7 +282,6 @@
   "trace.collapseAll": "Collapse",
   "trace.collapseAllTitle": "Collapse all branches",
   "trace.dragToResize": "Drag to resize",
-  "trace.col.name": "name",
   "trace.col.expected": "expected",
   "trace.col.value": "value",
   "trace.section.inputs": "Inputs",

@@ -448,10 +448,10 @@ function Section({
       )}
       <tr
         className="trace-section-header"
-        style={{ cursor: 'pointer' }}
+        style={sectionStyle}
         onClick={() => setOpen((o) => !o)}
       >
-        <td colSpan={4} style={sectionStyle}>
+        <td>
           <div style={sectionHeaderStyle}>
             <span style={nameCellStyle}>
               <span
@@ -460,46 +460,38 @@ function Section({
               />
               <FormattedMessage id={id} />
             </span>
-            <span
-              style={sectionActionsStyle}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <VscodeButton
-                icon="expand-all"
-                secondary
-                title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
-                onClick={() => expandAll(true)}
-              />
-              <VscodeButton
-                icon="collapse-all"
-                secondary
-                title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
-                onClick={() => expandAll(false)}
-              />
-            </span>
           </div>
+        </td>
+        <td style={thStyle}>
+          {noExpected ? null : <FormattedMessage id="trace.col.expected" />}
+        </td>
+        <td style={thStyle}>
+          <FormattedMessage id="trace.col.value" />
+        </td>
+        <td style={thStyle}>
+          <span
+            style={sectionActionsStyle}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <VscodeButton
+              icon="expand-all"
+              secondary
+              title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
+              onClick={() => expandAll(true)}
+            />
+            <VscodeButton
+              icon="collapse-all"
+              secondary
+              title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
+              onClick={() => expandAll(false)}
+            />
+          </span>
         </td>
       </tr>
       {open && (
-        <>
-          <tr>
-            <th style={nameThStyle}>
-              <FormattedMessage id="trace.col.name" />
-            </th>
-            <th style={thStyle}>
-              {noExpected ? null : <FormattedMessage id="trace.col.expected" />}
-            </th>
-            <th style={thStyle}>
-              <FormattedMessage id="trace.col.value" />
-            </th>
-            <th style={thStyle}>
-              <span className="codicon codicon-edit" />
-            </th>
-          </tr>
-          <ExpandContext.Provider value={expand}>
-            {children}
-          </ExpandContext.Provider>
-        </>
+        <ExpandContext.Provider value={expand}>
+          {children}
+        </ExpandContext.Provider>
       )}
     </>
   );
@@ -725,12 +717,8 @@ const nameTdStyle: CSSProperties = {
   paddingLeft: ROW_INSET,
 };
 
-const nameThStyle: CSSProperties = {
-  ...thStyle,
-  paddingLeft: ROW_INSET,
-};
-
 const sectionStyle: CSSProperties = {
+  cursor: 'pointer',
   fontWeight: 700,
   textTransform: 'uppercase',
   letterSpacing: '0.06em',
