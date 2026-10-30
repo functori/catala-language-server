@@ -322,7 +322,7 @@ export default function TraceNode({
         </div>
       )}
       {open && expandable && (
-        <div style={openContentStyle}>
+        <div className="expanded" style={openContentStyle}>
           {related.length > 0 && (
             <div style={relatedStyle}>
               <span style={{ color: 'var(--vscode-descriptionForeground)' }}>

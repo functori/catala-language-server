@@ -406,33 +406,44 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
 // Most targets only exist once a trace has run, or for a scope that has a test:
 // Joyride skips the steps whose target is missing.
 
-const tutoStep = (id: string, target: string, extra?: Partial<Step>): Step => ({
+const tutoStep = (
+  id: string,
+  target: Step['target'],
+  extra?: Partial<Step>
+): Step => ({
   id,
   content: <FormattedMessage id={id} />,
   target,
   ...extra,
 });
 
-// The first pill of this kind in the tree, whatever its row: a pill only
-// exists for the rows it applies to (a compound value, a position in the
-// code), so looking for the pill itself finds one whenever the trace has any.
-// With none, there is nothing to explain and Joyride skips the step.
-const treePill = (labelId: string): string =>
-  `.trace-tree .internal [data-pill="${labelId}"]`;
+// The first pill of this kind in the tree: a pill only exists for the rows it
+// applies to (a compound value, a position in the code), so looking for the
+// pill itself finds one whenever the trace has any. One of an internal
+// variable first, which usually sits in the middle of the trace, then one of
+// any row, for the traces without internal variables. With none, there is
+// nothing to explain and Joyride skips the step.
+const treePill = (labelId: string): HTMLElement | null =>
+  document.querySelector<HTMLElement>(
+    `.trace-tree .internal [data-pill="${labelId}"]`
+  ) ??
+  document.querySelector<HTMLElement>(`.trace-tree [data-pill="${labelId}"]`);
 
 // The pill is opened before its step is shown, as a click on it would, so that
 // the step shows what it opens. Opened pills are left open.
 function tutoPillStep(id: string, labelId: string): Step {
   const clickOnPill = (wantActive: boolean) => async (): Promise<void> => {
-    const pill = document.querySelector<HTMLElement>(treePill(labelId));
+    const pill = treePill(labelId);
     if (pill !== null && pill.dataset.active !== `${wantActive}`) {
       pill.click();
       // Lets React render what the pill opens before the step is placed.
       await new Promise((resolve) => requestAnimationFrame(resolve));
     }
   };
-  return tutoStep(id, treePill(labelId), {
+  return tutoStep(id, () => treePill(labelId), {
     placement: 'top',
+    // Above, even with too little room at first: Joyride would flip it below.
+    floatingOptions: { flipOptions: false },
     before: clickOnPill(true),
     after: clickOnPill(false),
   });
