@@ -524,7 +524,7 @@ const tutoChapters = placeChapters(
         tutoStep('trace.tuto.varInternal', '.trace-tree .internal', {
           placement: 'left',
         }),
-        tutoStep('trace.tuto.varOutput', '.trace-tree .output', {
+        tutoStep('trace.tuto.varOutput', '.trace-tree .expanded .output', {
           placement: 'left',
         }),
         // The rows whose value the test checks, on the first of each outcome.
