@@ -44,3 +44,18 @@
   color: var(--vscode-descriptionForeground);
   user-select: none;
 }
+
+/* The rows of the trace tree whose value the test checks. */
+.successMatch {
+  background: var(
+    --vscode-diffEditor-insertedTextBackground,
+    rgba(35, 200, 60, 0.2)
+  );
+}
+
+.failedMatch {
+  background: var(
+    --vscode-diffEditor-removedTextBackground,
+    rgba(255, 50, 50, 0.2)
+  );
+}
