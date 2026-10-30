@@ -187,7 +187,6 @@
   "trace.collapseAll": "Zwiń",
   "trace.collapseAllTitle": "Zwiń wszystkie gałęzie",
   "trace.dragToResize": "Przeciągnij, aby zmienić rozmiar",
-  "trace.col.name": "nazwa",
   "trace.col.expected": "oczekiwane",
   "trace.col.value": "wartość",
   "trace.section.inputs": "Dane wejściowe",
