@@ -250,6 +250,8 @@
   "trace.tuto.varInput": "An input variable of the scope: its value is given by the caller, here by the test.",
   "trace.tuto.varInternal": "An internal variable of the scope: it is computed inside and does not leave it.",
   "trace.tuto.varOutput": "An output variable of the scope: it is computed inside and returned to the caller.",
+  "trace.tuto.successMatch": "When a value is the one the test expects, the row is highlighted in green.",
+  "trace.tuto.failedMatch": "When a value is not the one the test expects, the row is highlighted in red. Its steps are unfolded automatically to help you find where the difference comes from.",
   "trace.tuto.selection": "The name of this variable is selected: right-click it to add it to the filters, or to open a new view of the trace filtered on that text. This works with any text selected in the trace.",
   "trace.tuto.pillValue": "The “value” pill shows the whole value of the variable, when it is a compound one (structure, list…). Click it to open or close it.",
   "trace.tuto.pillCode": "The “code” pill shows the excerpt of the source code that defines the variable. Click it to open or close it.",

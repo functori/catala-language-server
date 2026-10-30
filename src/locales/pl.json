@@ -250,6 +250,8 @@
   "trace.tuto.varInput": "Zmienna wejściowa zakresu: jej wartość podaje wywołujący, tutaj test.",
   "trace.tuto.varInternal": "Zmienna wewnętrzna zakresu: jest obliczana wewnątrz i go nie opuszcza.",
   "trace.tuto.varOutput": "Zmienna wynikowa zakresu: jest obliczana wewnątrz i zwracana wywołującemu.",
+  "trace.tuto.successMatch": "Gdy wartość jest zgodna z oczekiwaną przez test, wiersz jest podświetlony na zielono.",
+  "trace.tuto.failedMatch": "Gdy wartość nie jest zgodna z oczekiwaną przez test, wiersz jest podświetlony na czerwono. Jego kroki są rozwijane automatycznie, aby pomóc znaleźć źródło różnicy.",
   "trace.tuto.selection": "Nazwa tej zmiennej jest zaznaczona: kliknij ją prawym przyciskiem myszy, aby dodać ją do filtrów lub otworzyć nowy widok śladu przefiltrowany według tego tekstu. Działa to z każdym tekstem zaznaczonym w śladzie.",
   "trace.tuto.pillValue": "Pigułka „wartość” pokazuje całą wartość zmiennej, gdy jest ona złożona (struktura, lista…). Kliknij ją, aby ją otworzyć lub zamknąć.",
   "trace.tuto.pillCode": "Pigułka „kod” pokazuje fragment kodu źródłowego, który definiuje zmienną. Kliknij ją, aby go otworzyć lub zamknąć.",

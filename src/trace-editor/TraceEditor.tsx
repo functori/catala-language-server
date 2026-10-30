@@ -516,6 +516,13 @@ const tutoChapters = placeChapters(
         tutoStep('trace.tuto.varOutput', '.trace-tree .output', {
           placement: 'left',
         }),
+        // The rows whose value the test checks, on the first of each outcome.
+        tutoStep('trace.tuto.successMatch', '.trace-tree .successMatch', {
+          placement: 'left',
+        }),
+        tutoStep('trace.tuto.failedMatch', '.trace-tree .failedMatch', {
+          placement: 'left',
+        }),
         tutoSelectionStep,
         tutoPillStep('trace.tuto.pillValue', 'trace.value'),
         tutoPillStep('trace.tuto.pillCode', 'trace.code'),

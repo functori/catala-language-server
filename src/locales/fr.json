@@ -250,6 +250,8 @@
   "trace.tuto.varInput": "Une variable d'entrée du champ d'application : sa valeur est fournie par l'appelant, ici par le test.",
   "trace.tuto.varInternal": "Une variable interne du champ d'application : elle est calculée à l'intérieur et n'en sort pas.",
   "trace.tuto.varOutput": "Une variable de résultat du champ d'application : elle est calculée à l'intérieur et renvoyée à l'appelant.",
+  "trace.tuto.successMatch": "Lorsqu'une valeur correspond à celle attendue par le test, la ligne est surlignée en vert.",
+  "trace.tuto.failedMatch": "Lorsqu'une valeur ne correspond pas à celle attendue par le test, la ligne est surlignée en rouge. Ses étapes sont dépliées automatiquement pour vous aider à trouver d'où vient l'écart.",
   "trace.tuto.selection": "Le nom de cette variable est sélectionné : faites un clic droit dessus pour l'ajouter aux filtres, ou ouvrir une nouvelle vue de la trace filtrée sur ce texte. Cela marche avec tout texte sélectionné dans la trace.",
   "trace.tuto.pillValue": "Le bouton « valeur » affiche en entier la valeur de la variable, quand elle est composée (structure, liste…). Cliquez dessus pour l'ouvrir ou la refermer.",
   "trace.tuto.pillCode": "Le bouton « code » affiche l'extrait du code source qui définit la variable. Cliquez dessus pour l'ouvrir ou le refermer.",
