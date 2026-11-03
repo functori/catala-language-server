@@ -506,20 +506,34 @@ function traceVariables(trace: TraceElement[]): TraceVariable[] {
   return indexDuplicateSteps(mergeSteps(traceVariablesAux(trace)));
 }
 
+export function flattenSingleRules(trace: TraceElement[]): TraceElement[] {
+  return trace.map((te) => {
+    const children =
+      te.trace === undefined ? undefined : flattenSingleRules(te.trace);
+    const rules = (children ?? []).filter(
+      (c) => c.element.kind === 'exception'
+    );
+    return {
+      ...te,
+      trace:
+        te.element.kind === 'scope_var' && rules.length === 1
+          ? children?.flatMap((c) => (c === rules[0] ? (c.trace ?? []) : [c]))
+          : children,
+    };
+  });
+}
+
 export function flattenHiddenKinds(
   trace: TraceElement[],
-  shows: (kind: string, parentKind?: string) => boolean,
-  parentKind?: string
+  shows: (kind: string) => boolean
 ): TraceElement[] {
   return trace.flatMap((element) => {
     const kind = element.element.kind;
     const children =
       element.trace === undefined
         ? undefined
-        : flattenHiddenKinds(element.trace, shows, kind);
-    return shows(kind, parentKind)
-      ? [{ ...element, trace: children }]
-      : (children ?? []);
+        : flattenHiddenKinds(element.trace, shows);
+    return shows(kind) ? [{ ...element, trace: children }] : (children ?? []);
   });
 }
 
@@ -562,10 +576,83 @@ function asLocation(v: JsonValue | undefined): CodeLocation | undefined {
     : undefined;
 }
 
+function assignment(
+  kind: TraceKind
+): { name: string; pos?: CodeLocation } | undefined {
+  if (kind.kind !== 'exception') return undefined;
+  const v = kind.var as { name?: unknown; pos?: JsonValue } | null | undefined;
+  return v != null && typeof v.name === 'string'
+    ? { name: v.name, pos: asLocation(v.pos) }
+    : undefined;
+}
+
+function isInput(kind: TraceKind): boolean {
+  return (
+    kind.kind === 'scope_var' &&
+    (kind.input === 'only_input' || kind.input === 'reentrant')
+  );
+}
+
+export function attachAssignments(trace: TraceElement[]): TraceElement[] {
+  return trace.map((te) => {
+    const children =
+      te.trace === undefined ? undefined : attachAssignments(te.trace);
+    return {
+      ...te,
+      trace:
+        te.element.kind === 'scope_call' && children !== undefined
+          ? groupAssignments(children)
+          : children,
+    };
+  });
+}
+
+function groupAssignments(children: TraceElement[]): TraceElement[] {
+  const inputs = new Set(
+    children
+      .filter((c) => isInput(c.element))
+      .map((c) => c.element.name as string)
+  );
+  const assigned = new Map<string, TraceElement[]>();
+  const rest: TraceElement[] = [];
+  let current: TraceElement[] | undefined;
+  for (const child of children) {
+    const name = assignment(child.element)?.name;
+    if (name !== undefined) {
+      current = inputs.has(name) ? (assigned.get(name) ?? []) : undefined;
+      if (current !== undefined) assigned.set(name, current);
+    } else if (child.element.kind === 'scope_var') {
+      current = undefined;
+    }
+    (current ?? rest).push(child);
+  }
+  return rest.map((c) => {
+    const group = isInput(c.element)
+      ? assigned.get(c.element.name as string)
+      : undefined;
+    return group === undefined
+      ? c
+      : { ...c, trace: [...group, ...(c.trace ?? [])] };
+  });
+}
+
 const CALLS_ELSEWHERE = new Set(['scope_call', 'function_call']);
 
+function unfulfilled(el: TraceElement): boolean {
+  return (
+    el.element.kind === 'exception' &&
+    el.value?.kind === 'bool' &&
+    !el.value.value
+  );
+}
+
 export function definitionLocations(te: TraceElement): CodeLocation[] {
-  const collect = (el: TraceElement): CodeLocation[] => [
+  const collect = (el: TraceElement): CodeLocation[] =>
+    unfulfilled(el) ? [] : located(el);
+  const located = (el: TraceElement): CodeLocation[] => [
+    ...(assignment(el.element)?.pos === undefined
+      ? []
+      : [assignment(el.element)?.pos as CodeLocation]),
     ...(el.pos === undefined ? [] : [el.pos]),
     ...bindingLocations(el.element),
     ...(asLocation(el.element.cons_pos) === undefined
@@ -622,29 +709,31 @@ function bindingLocations(kind: TraceKind): CodeLocation[] {
 }
 
 export function elementCodeSpan(te: TraceElement): CodeLocation | undefined {
-  const ownIsDeclaration = sameLocation(te.pos, te.element.decl_pos);
+  const input = isInput(te.element);
+  // A state reports the variable's declaration as pos, and its own as decl_pos
+  const isState =
+    te.element.kind === 'scope_var' &&
+    typeof te.element.name === 'string' &&
+    te.element.name.includes('#');
+  const ownIsDeclaration = isState || sameLocation(te.pos, te.element.decl_pos);
   const bindings = bindingLocations(te.element);
   const locations = [
-    ...(te.pos !== undefined && !ownIsDeclaration ? [te.pos] : []),
+    ...(te.pos !== undefined && !ownIsDeclaration && !input ? [te.pos] : []),
     ...bindings,
-    ...definitionLocations(te),
+    ...(CALLS_ELSEWHERE.has(te.element.kind) ? [] : definitionLocations(te)),
   ];
   const first = locations[0];
-  if (first === undefined) return te.pos;
-  const start = bindings.reduce(
-    (p, b) => (b.file === first.file && before(b.start, p) ? b.start : p),
-    first.start
-  );
+  if (first === undefined) return input ? undefined : te.pos;
   return locations
     .filter((p) => p.file === first.file)
     .reduce(
       (span, p) => ({
         file: span.file,
-        start: span.start,
+        start: before(p.start, span.start) ? p.start : span.start,
         end: before(span.end, p.end) ? p.end : span.end,
         law_headings: span.law_headings,
       }),
-      { ...first, start }
+      first
     );
 }
 
@@ -823,7 +912,7 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
         detail: detail(kind.name),
         tone,
         showsValue: true,
-        showsCode: kind.input !== 'only_input',
+        showsCode: true,
       };
     }
     case 'local_var':

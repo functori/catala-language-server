@@ -13,9 +13,11 @@ import { VscodeButton, VscodeTextfield } from '@vscode-elements/react-elements';
 import type { Expected, Match, TraceElement, TraceTest } from './traceUtils';
 import {
   PANEL_HEIGHT_VAR,
+  attachAssignments,
   closestFilterMatch,
   fieldValue,
   flattenHiddenKinds,
+  flattenSingleRules,
   withCodeSpans,
   stepIndexMap,
   subtreeMatches,
@@ -36,7 +38,7 @@ import { useTraceMenu } from './traceMenu';
 import { FilterPins, type Filter, type FilterKind } from '../FilterPin';
 import TraceNode from './TraceNode';
 import { useCatalaSettings } from '../shared/useSettings';
-import { showsTraceKind, traceViewKindOf } from '../shared/settings';
+import { showsTraceKind } from '../shared/settings';
 
 type SetFilter = React.Dispatch<React.SetStateAction<Filter[]>>;
 
@@ -80,9 +82,9 @@ function TraceTreeView({
   const intl = useIntl();
   const settings = useCatalaSettings();
 
-  trace = withCodeSpans(trace);
-  trace = flattenHiddenKinds(trace, (kind, parentKind) =>
-    showsTraceKind(settings, traceViewKindOf(kind, parentKind))
+  trace = withCodeSpans(attachAssignments(trace));
+  trace = flattenHiddenKinds(flattenSingleRules(trace), (kind) =>
+    showsTraceKind(settings, kind)
   );
 
   let roots: TraceElement[] = trace;
