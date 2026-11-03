@@ -210,7 +210,7 @@
   "trace.empty": "Pusty ślad.",
   "trace.noMatches": "Żaden wpis śladu nie pasuje do filtra.",
   "trace.value": "wartość",
-  "trace.consequence": "Konsekwencja",
+  "trace.consequence": "konsekwencja",
   "trace.code": "kod",
   "trace.relatedLocations": "Powiązane lokalizacje:",
   "trace.fulfilled": "spełniony",

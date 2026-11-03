@@ -51,9 +51,9 @@ describe('scope variable labels', () => {
     ).toBe('trace.kind.scopeVariable');
   });
 
-  it('still hides the code pill only for pure inputs', () => {
+  it('shows the code pill for every scope variable, inputs included', () => {
     expect(describeKind(scopeVar('only_input', false), intl).showsCode).toBe(
-      false
+      true
     );
     expect(describeKind(scopeVar('no_input', true), intl).showsCode).toBe(true);
     expect(describeKind(scopeVar('no_input', false), intl).showsCode).toBe(

@@ -313,7 +313,11 @@ export default function TraceNode({
       )}
       {showCode && snippetPos && (
         <div style={openContentStyle}>
-          <LocationSnippet pos={snippetPos} filters={filters} />
+          <LocationSnippet
+            pos={snippetPos}
+            filters={filters}
+            withRuleHeader={te.element.kind === 'scope_var'}
+          />
         </div>
       )}
       {showConsequence && consPos && (

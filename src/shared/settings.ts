@@ -15,7 +15,6 @@ export const TRACE_VIEW_KINDS = [
   'match_branching',
   'assertion',
   'exception',
-  'input_assignment',
   'error',
 ] as const;
 
@@ -28,10 +27,7 @@ export type CatalaSettings = {
   traceView: TraceViewSettings;
 };
 
-const HIDDEN_BY_DEFAULT: readonly TraceViewKind[] = [
-  'exception',
-  'input_assignment',
-];
+const HIDDEN_BY_DEFAULT: readonly TraceViewKind[] = ['exception'];
 
 export const defaultSettings: CatalaSettings = {
   language: 'default',
@@ -39,12 +35,6 @@ export const defaultSettings: CatalaSettings = {
     TRACE_VIEW_KINDS.map((kind) => [kind, !HIDDEN_BY_DEFAULT.includes(kind)])
   ) as TraceViewSettings,
 };
-
-export function traceViewKindOf(kind: string, parentKind?: string): string {
-  return kind === 'exception' && parentKind === 'scope_call'
-    ? 'input_assignment'
-    : kind;
-}
 
 export function showsTraceKind(
   settings: CatalaSettings,
