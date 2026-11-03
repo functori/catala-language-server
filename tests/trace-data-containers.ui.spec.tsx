@@ -81,6 +81,25 @@ describe('DataPanel containers', () => {
     expect(screen.getByText('n')).toBeTruthy();
     expect(screen.getByText('42')).toBeTruthy();
   });
+
+  it('shows a constructor with a literal content as a plain value', () => {
+    renderPanel([['c', { kind: 'enum', ctor: 'Green', value: int(4) }]]);
+    expect(screen.getByText('Green 4')).toBeTruthy();
+    expect(screen.queryByText('Green')).toBeNull();
+  });
+
+  it('shows a constructor without content as a plain value', () => {
+    renderPanel([['c', { kind: 'enum', ctor: 'Red' }]]);
+    expect(screen.getByText('Red')).toBeTruthy();
+  });
+
+  it('keeps a constructor with a compound content as a container', () => {
+    renderPanel([
+      ['c', { kind: 'enum', ctor: 'Ok', value: struct({ a: int(1) }) }],
+    ]);
+    expect(screen.queryByText(/^Ok 1/)).toBeNull();
+    expect(screen.queryByText('1')).toBeNull();
+  });
 });
 
 // `traceVariablesAux` only considers an element that carries a `trace`, and
