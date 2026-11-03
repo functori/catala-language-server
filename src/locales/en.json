@@ -201,7 +201,7 @@
   "trace.empty": "Empty trace.",
   "trace.noMatches": "No trace entries match the filter.",
   "trace.value": "value",
-  "trace.consequence": "Consequence",
+  "trace.consequence": "consequence",
   "trace.code": "code",
   "trace.relatedLocations": "Related locations:",
   "trace.fulfilled": "fulfilled",

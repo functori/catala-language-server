@@ -88,6 +88,35 @@ function fetchExtract(files: string[], line: number): Promise<Extract> {
   });
 }
 
+// -- Rule headers --------------------------------------------------------------
+
+// A rule's position starts at its condition, which can sit a few lines below
+// `definition x under condition`: the header is recovered from the source.
+const RULE_PREFIX_WORD = '(?:label|étiquette|etykieta|exception|wyjątek)';
+const RULE_KEYWORD = '(?:definition|définition|definicja|rule|règle|zasada)';
+const RULE_HEADER = new RegExp(
+  `^\\s*(?:${RULE_PREFIX_WORD}\\s.*\\s)?${RULE_KEYWORD}(?:\\s|$)`
+);
+const RULE_PREFIX = new RegExp(`^\\s*${RULE_PREFIX_WORD}(?:\\s|$)`);
+const HEADER_LOOKBACK = 4;
+
+/** How many of the lines [above] the snippet, nearest last, start its rule. */
+function headerLines(above: string[], first: string): number {
+  let top = above.length;
+  if (!RULE_HEADER.test(first)) {
+    top--;
+    while (
+      top >= 0 &&
+      above[top].trim() !== '' &&
+      !RULE_HEADER.test(above[top])
+    )
+      top--;
+    if (top < 0 || above[top].trim() === '') return 0;
+  }
+  while (top > 0 && RULE_PREFIX.test(above[top - 1])) top--;
+  return above.length - top;
+}
+
 // -- Components ----------------------------------------------------------------
 
 function SnippetBlock({
@@ -140,18 +169,23 @@ function SnippetBlock({
 export function LocationSnippet({
   pos,
   filters,
+  withRuleHeader = false,
 }: {
   pos: CodeLocation;
   filters: Filter[];
+  withRuleHeader?: boolean;
 }): ReactElement | null {
   const cwd = useContext(CwdContext);
   const startLine = pos.start.line;
   const endLine = Math.max(startLine, pos.end.line);
+  const firstLine = withRuleHeader
+    ? Math.max(1, startLine - HEADER_LOOKBACK)
+    : startLine;
   const [extracts, setExtracts] = useState<Extract[] | null>(null);
   useEffect(() => {
     let cancelled = false;
     const nums: number[] = [];
-    for (let l = startLine; l <= endLine; l++) nums.push(l);
+    for (let l = firstLine; l <= endLine; l++) nums.push(l);
     void Promise.all(
       nums.map((l) => fetchExtract(candidatePaths(cwd, pos.file), l))
     ).then((found) => {
@@ -160,13 +194,19 @@ export function LocationSnippet({
     return (): void => {
       cancelled = true;
     };
-  }, [cwd, pos]);
+  }, [cwd, pos, firstLine]);
 
-  const file = extracts?.find((e) => e !== null)?.file;
+  const above = (extracts ?? [])
+    .slice(0, startLine - firstLine)
+    .map((e) => e?.text ?? '');
+  const body = (extracts ?? []).slice(startLine - firstLine);
+  const file = body.find((e) => e !== null)?.file;
   if (extracts === null || file === undefined) {
     return null;
   }
-  const text = extracts.map((e) => e?.text ?? '').join('\n');
+  const lines = body.map((e) => e?.text ?? '');
+  const header = above.slice(above.length - headerLines(above, lines[0]));
+  const text = [...header, ...lines].join('\n');
   return (
     <SnippetBlock pos={pos} file={file}>
       <HighlightText filters={filters} text={text} />
