@@ -12,21 +12,24 @@ import { createHash } from 'crypto';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import type { TraceResult } from './messages';
-import { type TraceElement, traceFromJson } from './traceUtils';
-import { getCwd } from '../shared/util_client';
+import { traceFromJson } from './traceUtils';
+import { type JsonValue, getCwd } from '../shared/util_client';
 import { logger } from '../extension/logger';
 
 export function readTraceFile(path: string): TraceResult {
   try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8'));
-    const trace = traceFromJson(parsed);
-    if (trace === null) {
-      return { ok: false, error: 'The file does not contain a Catala trace.' };
-    }
-    return { ok: true, trace };
+    return parseTrace(JSON.parse(readFileSync(path, 'utf8')));
   } catch (e) {
     return { ok: false, error: String(e) };
   }
+}
+
+function parseTrace(raw: JsonValue): TraceResult {
+  const trace = traceFromJson(raw);
+  if (trace === null) {
+    return { ok: false, error: 'The file does not contain a Catala trace.' };
+  }
+  return { ok: true, trace };
 }
 
 type CacheResult<T> = { scope: string; uri: string; result: T };
@@ -107,11 +110,13 @@ class PersistentCache<T, S> {
   }
 }
 
-let traceCache: PersistentCache<TraceElement[], TraceElement[]> | undefined;
+let traceCache: PersistentCache<JsonValue, JsonValue> | undefined;
 
 export function initTraceCache(storageDir: string): void {
-  traceCache = new PersistentCache<TraceElement[], TraceElement[]>(
-    join(storageDir, 'trace-cache.json'),
+  // Former cache, holding parsed traces.
+  rmSync(join(storageDir, 'trace-cache.json'), { force: true });
+  traceCache = new PersistentCache<JsonValue, JsonValue>(
+    join(storageDir, 'raw-trace-cache.json'),
     (v) => v,
     (v) => v
   );
@@ -149,7 +154,7 @@ export async function runTrace(
       const cached = traceCache.find(key, uri, scope);
       if (cached !== undefined) {
         logger.log(`Trace for scope "${scope}" (${uri}) served from cache.`);
-        return { ok: true, trace: cached };
+        return parseTrace(cached);
       }
     } else {
       traceCache.delete(key);
@@ -173,9 +178,10 @@ export async function runTrace(
       buildDir: '_build/_trace',
       ninjaOutput: '_build/_trace/clerk.ninja',
     });
-    const result = readTraceFile(traceOutputFile);
+    const raw: JsonValue = JSON.parse(readFileSync(traceOutputFile, 'utf8'));
+    const result = parseTrace(raw);
     if (result.ok && existsSync(ninjaFile)) {
-      traceCache?.set(hashNinjaFile(ninjaFile), uri, scope, result.trace);
+      traceCache?.set(hashNinjaFile(ninjaFile), uri, scope, raw);
     }
     return result;
   } catch (e) {

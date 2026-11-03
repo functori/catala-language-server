@@ -131,6 +131,13 @@ function traceValueFromJson(value: JsonValue): TraceValue | undefined {
       const inner = Array.isArray(x) && x.length > 0 ? x[0] : x;
       return traceValueFromJson(inner);
     }
+    if (keys.length === 1 && /^\p{Lu}/u.test(keys[0])) {
+      return {
+        kind: 'enum',
+        ctor: keys[0],
+        value: traceValueFromJson(o[keys[0]]),
+      };
+    }
 
     if (
       typeof o.years === 'number' &&
@@ -280,13 +287,13 @@ export function formatTraceValue(
     }
     case 'absent':
       return 'Absent';
-    case 'enum':
+    case 'enum': {
       if (v.value === undefined) {
         return v.ctor;
       }
-      return all
-        ? `${v.ctor} ${formatTraceValue(v.value, intl, lang, all, indent) ?? ''}`
-        : undefined;
+      const content = formatTraceValue(v.value, intl, lang, all, indent);
+      return content === undefined ? undefined : `${v.ctor} ${content}`;
+    }
     case 'struct':
       if (!all) return undefined;
       if (Object.keys(v.fields).length === 0) return '{}';

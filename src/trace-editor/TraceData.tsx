@@ -155,9 +155,14 @@ function isArray(v?: TraceValue): v is Extract<TraceValue, { kind: 'array' }> {
 }
 
 function isWrapper(
-  v?: TraceValue
+  v: TraceValue | undefined,
+  intl: IntlShape
 ): v is Extract<TraceValue, { kind: 'enum' }> & { value: TraceValue } {
-  return v?.kind === 'enum' && v.value !== undefined;
+  return (
+    v?.kind === 'enum' &&
+    v.value !== undefined &&
+    formatTraceValue(v.value, intl) === undefined
+  );
 }
 
 function buildNode(
@@ -223,11 +228,11 @@ function buildNode(
   }
 
   const sameCtor =
-    !isWrapper(expected) ||
-    !isWrapper(computed) ||
+    !isWrapper(expected, intl) ||
+    !isWrapper(computed, intl) ||
     expected.ctor === computed.ctor;
-  if (sameCtor && (isWrapper(expected) || isWrapper(computed))) {
-    const ctor = isWrapper(expected)
+  if (sameCtor && (isWrapper(expected, intl) || isWrapper(computed, intl))) {
+    const ctor = isWrapper(expected, intl)
       ? expected.ctor
       : (computed as { ctor: string }).ctor;
     return {
@@ -238,8 +243,8 @@ function buildNode(
         buildNode(
           ctor,
           `${path}.${ctor}`,
-          isWrapper(expected) ? expected.value : undefined,
-          isWrapper(computed) ? computed.value : undefined,
+          isWrapper(expected, intl) ? expected.value : undefined,
+          isWrapper(computed, intl) ? computed.value : undefined,
           intl,
           expand
         ),
@@ -257,9 +262,7 @@ function buildNode(
 }
 
 function leafText(v: TraceValue, intl: IntlShape): string | undefined {
-  return v.kind === 'enum' && v.value !== undefined
-    ? v.ctor
-    : formatTraceValue(v, intl);
+  return formatTraceValue(v, intl) ?? (v.kind === 'enum' ? v.ctor : undefined);
 }
 
 function ioValue(io: TestIo | undefined): TraceValue | undefined {
