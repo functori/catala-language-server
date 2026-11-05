@@ -193,7 +193,7 @@ export default function TraceNode({
   const expandCmd = useContext(ExpandContext);
   useEffect(() => {
     if (expandCmd != null) {
-      setExpanded(expandCmd);
+      setExpanded(expandCmd.open);
     }
   }, [expandCmd]);
   const step = stepPath(te, { prefix, testedScope: tested_scope }, stepIndices);

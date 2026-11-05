@@ -29,6 +29,7 @@ import {
 import {
   CwdContext,
   ExpandContext,
+  type ExpandCommand,
   ExpectedContext,
   FilterKindContext,
   IndexContext,
@@ -75,7 +76,7 @@ function TraceTreeView({
   trace: TraceElement[];
   filters?: Filter[];
   cwd?: string;
-  expand?: boolean | null;
+  expand?: ExpandCommand | null;
   test?: TraceTest;
   addFilter: AddFilter;
   fromClosestMatch?: boolean;
@@ -223,7 +224,9 @@ export default function TracePanel({
   fromClosestMatch?: boolean;
 }): ReactElement {
   const intl = useIntl();
-  const [expand, setExpand] = useState<boolean | null>(null);
+  const [expand, setExpand] = useState<ExpandCommand | null>(null);
+  const expandAll = (open: boolean): void =>
+    setExpand((prev) => ({ open, nonce: (prev?.nonce ?? 0) + 1 }));
   const [filter, setFilter] = useState<string>('');
 
   const [savedFilters, setSavedFilters] = useState<Filter[]>(() =>
@@ -328,7 +331,7 @@ export default function TracePanel({
           icon="expand-all"
           secondary
           title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
-          onClick={() => setExpand(true)}
+          onClick={() => expandAll(true)}
         >
           <FormattedMessage id="trace.expandAll" />
         </VscodeButton>
@@ -336,7 +339,7 @@ export default function TracePanel({
           icon="collapse-all"
           secondary
           title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
-          onClick={() => setExpand(false)}
+          onClick={() => expandAll(false)}
         >
           <FormattedMessage id="trace.collapseAll" />
         </VscodeButton>
