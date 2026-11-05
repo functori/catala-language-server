@@ -15,8 +15,9 @@ export const ExpectedContext = createContext<Expected | null>(null);
 /** Occurrence index of repeated steps, used to build variable paths. */
 export const IndexContext = createContext<Map<TraceElement, number>>(new Map());
 
-/** Forced expansion state, or `null` when nodes decide for themselves. */
-export const ExpandContext = createContext<boolean | null>(null);
+/** Last expand/collapse request, or `null` when nodes decide for themselves.
+ *  The nonce makes a repeated click count after filters reset the nodes. */
+export const ExpandContext = createContext<ExpandCommand | null>(null);
 
 /** How the include pins of the enclosing panel combine. */
 export const FilterKindContext = createContext<FilterKind>('and');
