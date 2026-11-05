@@ -403,27 +403,27 @@
         },
         "catala.traceView.function_call": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "markdownDescription": "Show function call steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
         },
         "catala.traceView.branch_condition": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "markdownDescription": "Show branch condition steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
         },
         "catala.traceView.if_branching": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "markdownDescription": "Show if/then/else branching steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
         },
         "catala.traceView.match_branching": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "markdownDescription": "Show pattern-match branching steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
         },
         "catala.traceView.assertion": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "markdownDescription": "Show assertion steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
         },
         "catala.traceView.exception": {
@@ -433,7 +433,7 @@
         },
         "catala.traceView.error": {
           "type": "boolean",
-          "default": true,
+          "default": false,
           "markdownDescription": "Show error steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
         }
       }

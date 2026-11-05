@@ -27,12 +27,10 @@ export type CatalaSettings = {
   traceView: TraceViewSettings;
 };
 
-const HIDDEN_BY_DEFAULT: readonly TraceViewKind[] = ['exception'];
-
 export const defaultSettings: CatalaSettings = {
   language: 'default',
   traceView: Object.fromEntries(
-    TRACE_VIEW_KINDS.map((kind) => [kind, !HIDDEN_BY_DEFAULT.includes(kind)])
+    TRACE_VIEW_KINDS.map((kind) => [kind, false])
   ) as TraceViewSettings,
 };
 
