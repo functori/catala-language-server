@@ -81,42 +81,30 @@ describe('flattenHiddenKinds', () => {
 });
 
 describe('showsTraceKind', () => {
-  const hiddenByDefault = ['exception'];
-
-  it('shows every optional kind by default, except exceptions', () => {
+  it('hides every optional kind by default', () => {
     for (const kind of TRACE_VIEW_KINDS) {
-      expect(showsTraceKind(defaultSettings, kind)).toBe(
-        !hiddenByDefault.includes(kind)
-      );
+      expect(showsTraceKind(defaultSettings, kind)).toBe(false);
     }
-  });
-
-  it('hides exceptions by default', () => {
-    expect(showsTraceKind(defaultSettings, 'exception')).toBe(false);
   });
 
   it('is always true for scopes and variables, which have no setting', () => {
-    const allOff = readSettings({
-      traceView: Object.fromEntries(TRACE_VIEW_KINDS.map((k) => [k, false])),
-    });
     for (const kind of ['scope_call', 'scope_var', 'local_var', 'local_tup']) {
-      expect(showsTraceKind(allOff, kind)).toBe(true);
+      expect(showsTraceKind(defaultSettings, kind)).toBe(true);
     }
-    expect(showsTraceKind(allOff, 'assertion')).toBe(false);
   });
 });
 
 describe('readSettings', () => {
   it('fills in missing trace-view keys with their default', () => {
-    const s = readSettings({ language: 'fr', traceView: { assertion: false } });
+    const s = readSettings({ language: 'fr', traceView: { assertion: true } });
     expect(s.language).toBe('fr');
-    expect(s.traceView.assertion).toBe(false);
-    expect(s.traceView.function_call).toBe(true);
+    expect(s.traceView.assertion).toBe(true);
+    expect(s.traceView.function_call).toBe(false);
   });
 
   it('ignores non-boolean values', () => {
     const s = readSettings({ traceView: { assertion: 'nope' } });
-    expect(s.traceView.assertion).toBe(true);
+    expect(s.traceView.assertion).toBe(false);
   });
 
   it('survives a missing or malformed traceView section', () => {
