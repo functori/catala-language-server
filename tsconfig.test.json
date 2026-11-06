@@ -6,8 +6,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "module": "Node16",
-    "moduleResolution": "Node16"
+    "moduleResolution": "Node16",
+    "rootDir": "./src",
+    "outDir": "./dist"
   },
-  "files": ["src/extension.ts"],
-  "include": ["src/test/**/*", "src/e2e/**/*"]
+  "include": ["src/extension.ts", "src/test/**/*.ts", "src/**/*.d.ts"]
 }
