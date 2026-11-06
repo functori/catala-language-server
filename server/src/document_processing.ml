@@ -23,7 +23,8 @@ open Server_types
 open Shared_ast
 
 let err_severity = function
-  | Catala_utils.Message.Lexing | Parsing | Typing | Generic | AssertFailure ->
+  | Catala_utils.Message.Lexing | Parsing | Typing | Generic | AssertFailure
+  | TraceAssertFails ->
     DiagnosticSeverity.Error
   | Warning -> Warning
 
