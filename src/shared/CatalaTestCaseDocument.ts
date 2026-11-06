@@ -98,7 +98,10 @@ export class CatalaTestCaseDocument
     const dataFile =
       typeof backupId === 'string' ? vscode.Uri.parse(backupId) : uri;
     const fileData = await CatalaTestCaseDocument.readFile(dataFile);
-    const document = new CatalaTestCaseDocument(uri, fileData);
+    const parseResults = stampParseResultsUids(
+      await parseContents(fileData, uri, getLanguageFromUri(uri))
+    );
+    const document = new CatalaTestCaseDocument(uri, fileData, parseResults);
     await document.statWorkingCopy();
     return document;
   }
@@ -238,7 +241,7 @@ export class CatalaTestCaseDocument
     const diskContent = await CatalaTestCaseDocument.readFile(this.uri);
     this._sourceText = new TextDecoder('utf-8').decode(diskContent);
     this._parseResults = stampParseResultsUids(
-      parseContents(diskContent, this._uri, this._language)
+      await parseContents(diskContent, this._uri, this._language)
     );
     this._rebuilt = rebuiltFrom(this._parseResults);
     this._originalReads = false;
@@ -478,16 +481,18 @@ export class CatalaTestCaseDocument
     });
   }
 
-  private constructor(uri: vscode.Uri, initialContent: Uint8Array) {
+  private constructor(
+    uri: vscode.Uri,
+    initialContent: Uint8Array,
+    parseResults: ParseResults
+  ) {
     // Disposable wants a dispose callback; ours has nothing extra to release.
     super(() => {});
     this._uri = uri;
     this._language = getLanguageFromUri(this._uri);
     this._sourceText = new TextDecoder('utf-8').decode(initialContent);
 
-    this._parseResults = stampParseResultsUids(
-      parseContents(initialContent, this._uri, this._language)
-    );
+    this._parseResults = parseResults;
     this._rebuilt = rebuiltFrom(this._parseResults);
 
     this._editManager = new EditManager(this, (t) => this._setContents(t));

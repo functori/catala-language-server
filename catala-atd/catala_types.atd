@@ -352,6 +352,9 @@ type test_run_request = {
   reset_outputs: bool;
   in_shell: bool;
   debug: bool;
+  (* Whether the test declares trace assertions: only then is the run worth
+     instrumenting with "--trace". *)
+  has_trace_assert: bool;
 }
 
 type test_generate_request = {
@@ -430,12 +433,19 @@ type test_scope_result = {
   order: bool
 }
 
+type trace_data = [
+   | Input of string
+   | Internal of string
+   | Result of string
+]
+
 type down_message = [
   | Update of update
   | TestRunResults of test_run_results_msg
   | TestScopeResult of test_scope_result
   | ConfirmResult of confirm_result
   | AllTests of test_debugger_list
+  | FocusData of (string * trace_data)
 ]
 
 type scope_success = {

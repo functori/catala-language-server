@@ -38,6 +38,7 @@ import {
  * Empty-vs-Actual boundary.
  */
 type ArrayEditorProps = {
+  id?: string;
   elementType: Typ;
   valueDef?: ValueDef;
   onValueChange(newValue: RuntimeValue): void;
@@ -86,6 +87,7 @@ function isEmptyValue(value: RuntimeValue): boolean {
 
 export function ArrayEditor(props: ArrayEditorProps): ReactElement {
   const {
+    id,
     elementType,
     valueDef,
     onValueChange,
@@ -241,7 +243,7 @@ export function ArrayEditor(props: ArrayEditorProps): ReactElement {
   };
 
   return (
-    <div className="array-editor">
+    <div id={id} className="array-editor">
       {/* Toggle to switch back to table view when available */}
       {schemaResult.ok && forceTreeView && (
         <div className="table-view-toggle">

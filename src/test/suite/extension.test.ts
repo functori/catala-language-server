@@ -10,6 +10,24 @@ import * as path from 'path';
 import { execSync } from 'child_process';
 import * as vscode from 'vscode';
 import { CatalaTestCaseDocument } from '../../shared/CatalaTestCaseDocument';
+import { TestCaseEditorProvider } from '../../extension/testCaseEditorProvider';
+import { ResultController } from '../../extension/testAndCoverage';
+import type { SettingsSource } from '../../extension/settingsStore';
+import { defaultSettings } from '../../shared/settings';
+
+/**
+ * A memento that forgets everything. Registration only stores its
+ * collaborators without reading them, so nothing here needs to persist.
+ */
+const dummyStorage: vscode.Memento = {
+  keys: () => [],
+  get: <T>(_key: string, defaultValue?: T): T | undefined => defaultValue,
+  update: () => Promise.resolve(),
+};
+
+/** The provider only stores this collaborator; it is never called here. */
+const checkTraceAssert = (_clerk_toml_dir: string): Promise<boolean> =>
+  Promise.resolve(false);
 
 const fixtures = path.resolve(__dirname, '../../../tests/round_trip');
 
@@ -27,6 +45,9 @@ function within<T>(ms: number, what: string, p: Thenable<T>): Promise<T> {
 
 suite('Extension, end to end', function () {
   this.timeout(180_000);
+  suiteTeardown(() => {
+    vscode.window.showInformationMessage('All tests done!');
+  });
 
   test('starts, and opens a test in the test case editor', async () => {
     const ext = vscode.extensions.getExtension('catalalang.catala');
@@ -63,5 +84,25 @@ suite('Extension, end to end', function () {
 
     const document = await CatalaTestCaseDocument.create(uri, undefined);
     assert.strictEqual(document.parseResults.kind, 'Results');
+  });
+
+  test('Extension registers successfully', () => {
+    const context = {} as vscode.ExtensionContext; // Mock context
+    const resultController = new ResultController(dummyStorage, 'catala_en');
+    // A real controller rather than a stub: the test host provides one for
+    // free, and it has to be disposed either way.
+    const settings: SettingsSource = {
+      get: () => defaultSettings,
+      follow: () => new vscode.Disposable(() => {}),
+    };
+    const disposable = TestCaseEditorProvider.register(
+      context,
+      resultController,
+      'codicon.css',
+      checkTraceAssert,
+      settings
+    );
+    assert.ok(disposable);
+    disposable.dispose();
   });
 });
