@@ -107,6 +107,11 @@
         "icon": "$(debug-alt)"
       },
       {
+        "command": "catala.openWithTraceEditor",
+        "icon": "$(graph)",
+        "title": "%command.catala.openWithTraceEditor.title%"
+      },
+      {
         "command": "catala.openWithTestEditor",
         "title": "%command.catala.openWithTestEditor.title%",
         "category": "%category.catala%",
@@ -143,6 +148,14 @@
         "icon": "$(sync-compact)"
       },
       {
+        "command": "catala.trace.viewWithFilter",
+        "title": "%command.catala.trace.viewWithFilter.title%"
+      },
+      {
+        "command": "catala.trace.addToFilter",
+        "title": "%command.catala.trace.addToFilter.title%"
+      },
+      {
         "command": "catala.openSettings",
         "category": "catala",
         "title": "%command.catala.openSettings.title%",
@@ -157,6 +170,14 @@
         },
         {
           "command": "catala.refreshSwitches",
+          "when": "false"
+        },
+        {
+          "command": "catala.trace.viewWithFilter",
+          "when": "false"
+        },
+        {
+          "command": "catala.trace.addToFilter",
           "when": "false"
         }
       ],
@@ -177,6 +198,11 @@
           "command": "catala.openWithTestEditor",
           "when": "config.catala.enableCustomTestCaseEditor && resourceFilename =~ /.*[tT][eE][sS][tT].*\\.catala_(en|fr|pl)$/",
           "group": "navigation@2"
+        },
+        {
+          "command": "catala.openWithTraceEditor",
+          "when": "resourceFilename =~ /\\.catala_(en|fr)$/",
+          "group": "navigation@3"
         }
       ],
       "editor/context": [
@@ -216,6 +242,21 @@
           "command": "catala.openWithTestEditor",
           "when": "config.catala.enableCustomTestCaseEditor && (editorLangId == catala_en || editorLangId == catala_fr || editorLangId == catala_pl) && resourceFilename =~ /.*[tT][eE][sS][tT].*\\.catala_(en|fr|pl)$/",
           "group": "navigation@2"
+        },
+        {
+          "command": "catala.openWithTraceEditor",
+          "when": "editorLangId == catala_fr || editorLangId == catala_en",
+          "group": "navigation@13"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "catala.trace.viewWithFilter",
+          "when": "webviewSection == 'tracePanelSelection'"
+        },
+        {
+          "command": "catala.trace.addToFilter",
+          "when": "webviewSection == 'tracePanelSelection'"
         }
       ]
     },
@@ -359,6 +400,41 @@
           ],
           "default": "default",
           "description": "Language the Catala editors present values in"
+        },
+        "catala.traceView.function_call": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show function call steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+        },
+        "catala.traceView.branch_condition": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show branch condition steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+        },
+        "catala.traceView.if_branching": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show if/then/else branching steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+        },
+        "catala.traceView.match_branching": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show pattern-match branching steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+        },
+        "catala.traceView.assertion": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show assertion steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+        },
+        "catala.traceView.exception": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show exception steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
+        },
+        "catala.traceView.error": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show error steps in the trace tree. When off, the step is removed and its sub-steps are shown in its place."
         }
       }
     },
@@ -369,6 +445,16 @@
         "selector": [
           {
             "filenamePattern": "*test*.catala_*"
+          }
+        ],
+        "priority": "option"
+      },
+      {
+        "viewType": "catala.traceEditor",
+        "displayName": "Catala Trace Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.catala_*"
           }
         ],
         "priority": "option"

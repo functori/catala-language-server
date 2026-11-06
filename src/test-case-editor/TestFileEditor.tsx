@@ -1,4 +1,10 @@
-import { useEffect, useState, type ReactElement, useCallback } from 'react';
+import {
+  useEffect,
+  useState,
+  type ReactElement,
+  useCallback,
+  useRef,
+} from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
   type Update,
@@ -12,6 +18,7 @@ import {
   type CannotOpenCause,
   readDownMessage,
   writeUpMessage,
+  type TraceData,
 } from '../generated/catala_types';
 import TestEditor from './TestEditor';
 import BrokenTestView from './BrokenTestView';
@@ -22,6 +29,26 @@ import type { WebviewApi } from 'vscode-webview';
 import { setVsCodeApi } from '../shared/webviewApi';
 import { confirm, resolveConfirmResult } from '../messaging/confirm';
 import { replaceLosses } from './testCaseUtils';
+import { focusExpectedVariables, focusTargetId } from '../shared/focusTarget';
+import type { TraceElement } from '../trace-editor/traceUtils';
+
+/**
+ * Hand-written message (outside the ATD DownMessage protocol) carrying the
+ * trace computed by running a test's scope with tracing.
+ */
+type TraceMessage = {
+  kind: 'trace';
+  scope: string;
+  trace: TraceElement[];
+};
+
+function isTraceMessage(data: unknown): data is TraceMessage {
+  return (
+    data !== null &&
+    typeof data === 'object' &&
+    (data as { kind?: unknown }).kind === 'trace'
+  );
+}
 
 // Note:
 //
@@ -57,6 +84,10 @@ type TestRunState = {
   };
 };
 
+// Kept in step with the `focus-flash` animation in `misc.css`.
+const FOCUS_FLASH_CLASS = 'focus-flash';
+const FOCUS_FLASH_MS = 2000;
+
 type Props = { contents: UIState; vscode: WebviewApi<unknown> };
 
 /** Editor for a collection of tests in a single file */
@@ -66,6 +97,17 @@ export default function TestFileEditor({
 }: Props): ReactElement {
   const [state, setState] = useState(contents);
   const [testRunState, setTestRunState] = useState<TestRunState>({});
+  // Trace computed per test scope (from running the scope with tracing).
+  const [traces, setTraces] = useState<Record<string, TraceElement[]>>({});
+  // Pending focus request from the trace editor, if any.
+  const [focusOnData, setFocusOnData] = useState<
+    [string, TraceData] | undefined
+  >(undefined);
+  // Field flashed by the last focus request, with the timer that ends its
+  // flash; see the effect below.
+  const flashing = useRef<
+    { element: HTMLElement; timer: ReturnType<typeof setTimeout> } | undefined
+  >(undefined);
   useEffect(() => {
     setVsCodeApi(vscode);
   }, [vscode]);
@@ -93,6 +135,76 @@ export default function TestFileEditor({
     [state, vscode, setTestRunState]
   );
 
+  // Focus is an imperative DOM action, so the request is resolved here rather
+  // than passed down to the field as a prop: the field only has to carry the
+  // matching id. Clearing the request once handled is what makes a second
+  // click on the same trace value focus again.
+  useEffect(() => {
+    if (focusOnData === undefined) return;
+    const testing_scope = focusOnData[0];
+    const traceData = focusOnData[1];
+    let element: HTMLElement | null;
+    if (traceData.kind == 'Internal' && state.state == 'success') {
+      let test = state.tests.find(
+        (test) => test.testing_scope == testing_scope
+      );
+      if (test !== undefined && !test.variables.has(traceData.value)) {
+        // The variable doesn't exist
+        let newTest = {
+          ...test,
+          variables: new Map(test.variables).set(traceData.value, null),
+        };
+        onTestChange(newTest, false);
+        // Focus on the global variable editor as the element doesn't exist in the document
+        element = document.getElementById(
+          focusExpectedVariables(testing_scope)
+        );
+      } else {
+        element = document.getElementById(
+          focusTargetId(traceData, testing_scope)
+        );
+      }
+    } else {
+      element = document.getElementById(
+        focusTargetId(traceData, testing_scope)
+      );
+    }
+    if (element !== null) {
+      // `tabIndex` is what makes a plain container focusable at all; -1 keeps
+      // it out of the tab order, so it is only ever reached this way.
+      if (!element.hasAttribute('tabindex')) {
+        element.tabIndex = -1;
+      }
+      // `focus` scrolls on its own, instantly, which would cut the smooth
+      // scroll short; and it does not scroll at all when the element is
+      // already partly visible, as a whole section often is.
+      element.focus({ preventScroll: true });
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const pending = flashing.current;
+      if (pending !== undefined) {
+        clearTimeout(pending.timer);
+        pending.element.classList.remove(FOCUS_FLASH_CLASS);
+      }
+      void element.offsetWidth;
+      element.classList.add(FOCUS_FLASH_CLASS);
+      flashing.current = {
+        element,
+        timer: setTimeout(() => {
+          element.classList.remove(FOCUS_FLASH_CLASS);
+          flashing.current = undefined;
+        }, FOCUS_FLASH_MS),
+      };
+    } else {
+      // No field carries that id: the request names a path no editor renders
+      // (nested fields currently reuse their parent's id). Logged rather than
+      // ignored, or the focus silently does nothing.
+      console.warn(
+        `No field to focus for ${focusTargetId(traceData, testing_scope)} (${traceData.kind} ${traceData.value})`
+      );
+    }
+    setFocusOnData(undefined);
+  }, [focusOnData]);
+
   const onTestDelete = useCallback(
     (testScope: string): void => {
       if (state.state === 'success') {
@@ -113,8 +225,11 @@ export default function TestFileEditor({
     [state, vscode]
   );
 
+  // `has_trace_assert` is a parameter rather than something read from `state`: the
+  // callbacks below are memoized on `[vscode]`, so a closure over `state` would
+  // stay frozen at the first render.
   const _onTestRun = (resetOutputs: boolean) => {
-    return (testScope: string): void => {
+    return (testScope: string, has_trace_assert: boolean): void => {
       setTestRunState((prev) => ({
         ...prev,
         [testScope]: { status: 'running' },
@@ -127,6 +242,7 @@ export default function TestFileEditor({
             reset_outputs: resetOutputs,
             in_shell: false,
             debug: false,
+            has_trace_assert,
           },
         })
       );
@@ -228,6 +344,13 @@ export default function TestFileEditor({
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
+      // Intercept the hand-written trace message before the strict ATD
+      // `readDownMessage`, which would reject its unknown kind.
+      if (isTraceMessage(event.data)) {
+        const { scope, trace } = event.data;
+        setTraces((prev) => ({ ...prev, [scope]: trace }));
+        return;
+      }
       if (isSettingsMessage(event.data)) {
         return;
       }
@@ -252,6 +375,10 @@ export default function TestFileEditor({
             }
             return next;
           });
+          break;
+        }
+        case 'FocusData': {
+          setFocusOnData(message.value);
           break;
         }
         case 'ConfirmResult': {
@@ -327,6 +454,7 @@ export default function TestFileEditor({
                   reset_outputs: false,
                   in_shell: false,
                   debug: false,
+                  has_trace_assert: false,
                 },
               })
             );
@@ -365,6 +493,7 @@ export default function TestFileEditor({
           {banner}
           {state.tests.map((test) => (
             <TestEditor
+              testing_scope={test.testing_scope}
               test={test}
               key={test.testing_scope}
               onTestChange={onTestChange}
@@ -372,6 +501,7 @@ export default function TestFileEditor({
               onTestRun={onTestRun}
               onTestOutputsReset={onTestOutputsReset}
               runState={testRunState[test.testing_scope]}
+              trace={traces[test.testing_scope]}
               onDiffResolved={onDiffResolved}
               onInvalidateDiffs={onInvalidateDiffs}
             />

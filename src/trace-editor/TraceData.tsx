@@ -1,0 +1,803 @@
+import {
+  type CSSProperties,
+  type ReactElement,
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
+import type { IntlShape } from 'react-intl';
+import { FormattedMessage } from 'react-intl';
+import { VscodeButton } from '@vscode-elements/react-elements';
+import type { TestIo } from '../generated/catala_types';
+import type { ExpandCommand } from './traceContexts';
+import {
+  type TraceElement,
+  type TraceTest,
+  type TraceValue,
+  type TraceVariable,
+  traceVariablesForTest,
+  formatTraceValue,
+  traceValueFromRuntime,
+  variablePath,
+  variablesBelowRoot,
+  variableSegment,
+  PANEL_HEIGHT_VAR,
+} from './traceUtils';
+import type { AddFilter } from './traceMenu';
+import type { WebviewApi } from 'vscode-webview';
+import type { TraceUpMessage } from './messages';
+
+const ExpandContext = createContext<ExpandCommand | null>(null);
+
+function useExpandAll(setOpen: (open: boolean) => void): void {
+  const command = useContext(ExpandContext);
+  useEffect(() => {
+    if (command) {
+      setOpen(command.open);
+    }
+  }, [command, setOpen]);
+}
+
+type DataNode = {
+  label: string;
+  path: string;
+  kind?: string;
+  expected?: string;
+  value?: string;
+  children?: DataNode[];
+  missing?: boolean;
+};
+
+function isFoldable(node: DataNode): boolean {
+  return node.children !== undefined && node.children.length > 0;
+}
+
+function leavesFirst(nodes: DataNode[]): DataNode[] {
+  return [...nodes.filter((n) => !isFoldable(n)), ...nodes.filter(isFoldable)];
+}
+
+function pathSegments(name: string): string[] {
+  return name.split('.').filter((segment) => segment !== '');
+}
+
+function insertAt(
+  nodes: DataNode[],
+  segments: string[],
+  prefix: string,
+  leaf: DataNode
+): DataNode[] {
+  const [head, ...rest] = segments;
+  if (head === undefined) {
+    return nodes;
+  }
+  const path = prefix ? `${prefix}.${head}` : head;
+  if (rest.length === 0) {
+    return [...nodes, { ...leaf, label: head, path }];
+  }
+  const index = nodes.findIndex((node) => node.path === path);
+  if (index === -1) {
+    return [
+      ...nodes,
+      { label: head, path, children: insertAt([], rest, path, leaf) },
+    ];
+  }
+  const parent = nodes[index];
+  return nodes.with(index, {
+    ...parent,
+    children: insertAt(parent.children ?? [], rest, path, leaf),
+  });
+}
+
+function sortTree(nodes: DataNode[]): DataNode[] {
+  return leavesFirst(
+    nodes.map((node) =>
+      node.children === undefined
+        ? node
+        : { ...node, children: sortTree(node.children) }
+    )
+  );
+}
+
+function nodesFromTrace(
+  variables: TraceVariable[],
+  prefix: string,
+  expected: Map<string, TraceValue | null>,
+  matched: Set<string>,
+  intl: IntlShape
+): DataNode[] {
+  return leavesFirst(
+    variables.flatMap((variable): DataNode[] => {
+      const label = variableSegment(variable);
+      const path = variablePath(prefix, variable);
+      if (expected.has(path)) {
+        matched.add(path);
+      }
+      if (variable.kind === 'step') {
+        if (variable.name.includes('#')) {
+          return [];
+        } else {
+          return [
+            {
+              label,
+              path,
+              children: nodesFromTrace(
+                variable.variables,
+                path,
+                expected,
+                matched,
+                intl
+              ),
+            },
+          ];
+        }
+      }
+      const node = buildNode(
+        label,
+        path,
+        expected.get(path) ?? undefined,
+        variable.value,
+        intl
+      );
+      return [node];
+    })
+  );
+}
+
+function isStruct(
+  v?: TraceValue
+): v is Extract<TraceValue, { kind: 'struct' }> {
+  return v?.kind === 'struct';
+}
+
+function isArray(v?: TraceValue): v is Extract<TraceValue, { kind: 'array' }> {
+  return v?.kind === 'array';
+}
+
+function isWrapper(
+  v: TraceValue | undefined,
+  intl: IntlShape
+): v is Extract<TraceValue, { kind: 'enum' }> & { value: TraceValue } {
+  return (
+    v?.kind === 'enum' &&
+    v.value !== undefined &&
+    formatTraceValue(v.value, intl) === undefined
+  );
+}
+
+function buildNode(
+  label: string,
+  path: string,
+  expected: TraceValue | undefined,
+  computed: TraceValue | undefined,
+  intl: IntlShape,
+  expand = false
+): DataNode {
+  const shape = expected ?? computed;
+
+  if (isStruct(expected) || isStruct(computed)) {
+    if (!expand || !isStruct(computed)) {
+      return { label, path, kind: 'struct' };
+    }
+    const fields = Object.keys(computed.fields);
+    if (fields.length === 0) {
+      return { label, path, kind: 'struct', value: '{}' };
+    }
+    return {
+      label,
+      path,
+      kind: 'struct',
+      children: leavesFirst(
+        fields.map((field) =>
+          buildNode(
+            field,
+            `${path}.${field}`,
+            undefined,
+            computed.fields[field],
+            intl,
+            expand
+          )
+        )
+      ),
+    };
+  }
+
+  if (isArray(expected) || isArray(computed)) {
+    if (!expand || !isArray(computed)) {
+      return { label, path, kind: 'array' };
+    }
+    if (computed.values.length === 0) {
+      return { label, path, kind: 'array', value: '[]' };
+    }
+    return {
+      label,
+      path,
+      kind: 'array',
+      children: computed.values.map(([item, name], index) => {
+        const segment = name ?? String(index);
+        return buildNode(
+          `[${segment}]`,
+          `${path}[${segment}]`,
+          undefined,
+          item,
+          intl,
+          expand
+        );
+      }),
+    };
+  }
+
+  const sameCtor =
+    !isWrapper(expected, intl) ||
+    !isWrapper(computed, intl) ||
+    expected.ctor === computed.ctor;
+  if (sameCtor && (isWrapper(expected, intl) || isWrapper(computed, intl))) {
+    const ctor = isWrapper(expected, intl)
+      ? expected.ctor
+      : (computed as { ctor: string }).ctor;
+    return {
+      label,
+      path,
+      kind: 'enum',
+      children: [
+        buildNode(
+          ctor,
+          `${path}.${ctor}`,
+          isWrapper(expected, intl) ? expected.value : undefined,
+          isWrapper(computed, intl) ? computed.value : undefined,
+          intl,
+          expand
+        ),
+      ],
+    };
+  }
+
+  return {
+    label,
+    path,
+    kind: shape?.kind,
+    expected: expected !== undefined ? leafText(expected, intl) : undefined,
+    value: computed !== undefined ? leafText(computed, intl) : undefined,
+  };
+}
+
+function leafText(v: TraceValue, intl: IntlShape): string | undefined {
+  return formatTraceValue(v, intl) ?? (v.kind === 'enum' ? v.ctor : undefined);
+}
+
+function ioValue(io: TestIo | undefined): TraceValue | undefined {
+  return io?.value ? traceValueFromRuntime(io.value.value) : undefined;
+}
+
+// -- Type icons ---------------------------------------------------------------
+
+const TYPE_ICON: Record<string, string> = {
+  money: '$',
+  integer: '#',
+  decimal: '≈',
+  bool: '✓',
+  date: '▦',
+  duration: '⧖',
+  struct: '{}',
+  array: '[]',
+  enum: '◆',
+};
+
+function typeIcon(kind?: string): string {
+  return (kind !== undefined ? TYPE_ICON[kind] : undefined) ?? '·';
+}
+
+// -- Components ----------------------------------------------------------------
+
+export function DataPanel({
+  testing_scope,
+  vscode,
+  test,
+  trace,
+  intl,
+  addFilter,
+}: {
+  testing_scope: string;
+  vscode: WebviewApi<unknown>;
+  test: TraceTest;
+  addFilter: AddFilter;
+  trace?: TraceElement[];
+  intl: IntlShape;
+}): ReactElement {
+  const [trVariable, trOutputs] = traceVariablesForTest(
+    trace ?? [],
+    test.testing_scope,
+    test.tested_scope.name
+  );
+
+  const inputNodes = leavesFirst(
+    [...test.test_inputs.entries()].map(([name, io]) =>
+      buildNode(name, name, undefined, ioValue(io), intl, true)
+    )
+  );
+
+  const hasTraceVars = trVariable !== null;
+  const matched = new Set<string>();
+  // The tested scope only roots the paths, which start with it as the expected
+  // variables do: its variables are shown at the top level. Its outputs have
+  // their own section.
+  const rootPath = trVariable === null ? '' : variablePath('', trVariable);
+  const auxiliary =
+    trVariable?.kind === 'step'
+      ? trVariable.variables.filter(
+          (variable) =>
+            variable.kind === 'step' || trOutputs[variable.name] === undefined
+        )
+      : [];
+  let internalNodes = nodesFromTrace(
+    auxiliary,
+    rootPath,
+    test.variables,
+    matched,
+    intl
+  );
+  for (const [name, expected] of test.variables) {
+    if (matched.has(name)) {
+      continue;
+    }
+    const leaf = {
+      ...buildNode(name, name, expected ?? undefined, undefined, intl),
+      missing: hasTraceVars,
+    };
+    // The scope's own name may hold dots: cut it off whole, not by segments.
+    const underRoot = rootPath !== '' && name.startsWith(`${rootPath}.`);
+    internalNodes = underRoot
+      ? insertAt(
+          internalNodes,
+          pathSegments(name.slice(rootPath.length + 1)),
+          rootPath,
+          leaf
+        )
+      : insertAt(internalNodes, pathSegments(name), '', leaf);
+  }
+  internalNodes = sortTree(internalNodes);
+
+  const outputNodes = leavesFirst(
+    [...test.test_outputs.entries()].map(([name, io]) =>
+      buildNode(name, name, ioValue(io), trOutputs[name], intl)
+    )
+  );
+
+  const variables = [
+    ...variablesBelowRoot(test.variables, trVariable).keys(),
+  ].map(pathSegments);
+  return (
+    <div style={ioPanelStyle}>
+      <table style={tableStyle}>
+        <tbody>
+          <Section id="trace.section.inputs" intl={intl} first noExpected>
+            {inputNodes.map((node, i) => (
+              <NodeRow
+                testing_scope={testing_scope}
+                vscode={vscode}
+                kind="Input"
+                key={`in-${node.path}-${i}`}
+                node={node}
+                crumbs={[]}
+                noExpected
+                addFilter={addFilter}
+              />
+            ))}
+          </Section>
+          <Section id="trace.section.internal" intl={intl}>
+            {internalNodes.map((node, i) => (
+              <NodeRow
+                testing_scope={testing_scope}
+                vscode={vscode}
+                key={`int-${node.path}-${i}`}
+                kind="Internal"
+                node={node}
+                crumbs={[]}
+                addFilter={addFilter}
+                variablesCrumbs={variables}
+              />
+            ))}
+          </Section>
+          <Section id="trace.section.outputs" intl={intl}>
+            {outputNodes.map((node, i) => (
+              <NodeRow
+                testing_scope={testing_scope}
+                vscode={vscode}
+                kind="Result"
+                key={`out-${node.path}-${i}`}
+                node={node}
+                crumbs={[]}
+                addFilter={addFilter}
+              />
+            ))}
+          </Section>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Section({
+  id,
+  intl,
+  first,
+  noExpected,
+  children,
+}: {
+  id: string;
+  intl: IntlShape;
+  first?: boolean;
+  noExpected?: boolean;
+  children: ReactElement[];
+}): ReactElement {
+  const [open, setOpen] = useState(true);
+  const [expand, setExpand] = useState<ExpandCommand | null>(null);
+  const expandAll = (all: boolean): void => {
+    if (all) {
+      setOpen(true);
+    }
+    setExpand((prev) => ({ open: all, nonce: (prev?.nonce ?? 0) + 1 }));
+  };
+
+  return (
+    <>
+      {!first && (
+        <tr aria-hidden>
+          <td colSpan={4} style={sectionGapStyle} />
+        </tr>
+      )}
+      <tr style={{ cursor: 'pointer' }} onClick={() => setOpen((o) => !o)}>
+        <td colSpan={4} style={sectionStyle}>
+          <div style={sectionHeaderStyle}>
+            <span style={nameCellStyle}>
+              <span
+                style={chevronStyle}
+                className={`codicon codicon-chevron-${open ? 'down' : 'right'}`}
+              />
+              <FormattedMessage id={id} />
+            </span>
+            <span
+              style={sectionActionsStyle}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <VscodeButton
+                icon="expand-all"
+                secondary
+                title={intl.formatMessage({ id: 'trace.expandAllTitle' })}
+                onClick={() => expandAll(true)}
+              />
+              <VscodeButton
+                icon="collapse-all"
+                secondary
+                title={intl.formatMessage({ id: 'trace.collapseAllTitle' })}
+                onClick={() => expandAll(false)}
+              />
+            </span>
+          </div>
+        </td>
+      </tr>
+      {open && (
+        <>
+          <tr>
+            <th style={nameThStyle}>
+              <FormattedMessage id="trace.col.name" />
+            </th>
+            <th style={thStyle}>
+              {noExpected ? null : <FormattedMessage id="trace.col.expected" />}
+            </th>
+            <th style={thStyle}>
+              <FormattedMessage id="trace.col.value" />
+            </th>
+            <th style={thStyle}>
+              <span className="codicon codicon-edit" />
+            </th>
+          </tr>
+          <ExpandContext.Provider value={expand}>
+            {children}
+          </ExpandContext.Provider>
+        </>
+      )}
+    </>
+  );
+}
+
+function Breadcrumb({
+  crumbs,
+  addFilter,
+}: {
+  crumbs: string[];
+  addFilter: AddFilter;
+}): ReactElement {
+  const last = crumbs.length - 1;
+  return (
+    <>
+      {crumbs.map((crumb, i) => (
+        <span key={i}>
+          {i > 0 && !crumb.startsWith('[') && (
+            <span style={crumbSeparatorStyle}>/</span>
+          )}
+          <span
+            style={{
+              ...(i === last ? crumbLastStyle : crumbStyle),
+              cursor: 'pointer',
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              addFilter(crumb);
+            }}
+          >
+            {crumb}
+          </span>
+        </span>
+      ))}
+    </>
+  );
+}
+
+function NodeRow({
+  testing_scope,
+  vscode,
+  node,
+  kind,
+  crumbs,
+  noExpected,
+  addFilter,
+  variablesCrumbs,
+}: {
+  testing_scope: string;
+  vscode: WebviewApi<unknown>;
+  node: DataNode;
+  kind: 'Internal' | 'Input' | 'Result';
+  crumbs: string[];
+  noExpected?: boolean;
+  addFilter: AddFilter;
+  variablesCrumbs?: string[][];
+}): ReactElement {
+  const selfCrumbs = [...crumbs, ...pathSegments(node.label)];
+  const remainingCrumbs = variablesCrumbs?.filter(
+    (value) =>
+      value.length >= selfCrumbs.length &&
+      selfCrumbs.every((crumb, index) => crumb === value[index])
+  );
+  let openByDefault = remainingCrumbs ? remainingCrumbs.length > 0 : false;
+  const [open, setOpen] = useState(openByDefault);
+  useExpandAll(setOpen);
+  const children = node.children;
+  const missing = node.missing;
+  const warning =
+    'var(--vscode-inputValidation-warningBackground, rgba(255, 200, 0, 0.2))';
+
+  if (children !== undefined && children.length > 0) {
+    return (
+      <>
+        <tr
+          style={{
+            cursor: 'pointer',
+            background: missing ? warning : undefined,
+          }}
+          onClick={() => setOpen((o) => !o)}
+        >
+          <td colSpan={4} style={pathRowStyle}>
+            <span style={nameCellStyle}>
+              <span
+                style={chevronStyle}
+                className={`codicon codicon-chevron-${open ? 'down' : 'right'}`}
+              />
+              <span style={typeIconStyle} title={node.kind}>
+                {typeIcon(node.kind)}
+              </span>
+              <span>
+                <Breadcrumb crumbs={selfCrumbs} addFilter={addFilter} />
+              </span>
+            </span>
+          </td>
+        </tr>
+        {open &&
+          children.map((child, i) => (
+            <NodeRow
+              testing_scope={testing_scope}
+              vscode={vscode}
+              key={`${child.path}-${i}`}
+              kind={kind}
+              node={child}
+              crumbs={selfCrumbs}
+              noExpected={noExpected}
+              addFilter={addFilter}
+              variablesCrumbs={remainingCrumbs}
+            />
+          ))}
+      </>
+    );
+  }
+
+  const comparable =
+    !noExpected && node.expected !== undefined && node.value !== undefined;
+  const background = missing
+    ? warning
+    : !comparable
+      ? undefined
+      : node.expected === node.value
+        ? 'var(--vscode-diffEditor-insertedTextBackground, rgba(35, 200, 60, 0.2))'
+        : 'var(--vscode-diffEditor-removedTextBackground, rgba(255, 50, 50, 0.2))';
+
+  return (
+    <tr style={{ background }}>
+      <td style={nameTdStyle}>
+        <span style={nameCellStyle}>
+          <span style={chevronStyle} />
+          <span style={typeIconStyle} title={node.kind}>
+            {typeIcon(node.kind)}
+          </span>
+          <span
+            style={{ cursor: 'pointer' }}
+            onClick={(e) => {
+              e.preventDefault();
+              addFilter(node.label);
+            }}
+          >
+            {node.label}
+          </span>
+        </span>
+      </td>
+      {noExpected || node.expected === undefined ? (
+        <td style={disabledCellStyle} />
+      ) : (
+        <td
+          style={tdStyle}
+          onClick={(e) => {
+            e.preventDefault();
+            addFilter(node.expected ?? '');
+          }}
+        >
+          {node.expected}
+        </td>
+      )}
+      <td
+        style={tdStyle}
+        onClick={(e) => {
+          e.preventDefault();
+          addFilter(node.value ?? '');
+        }}
+      >
+        {node.value ?? ''}
+      </td>
+      <td style={tdStyle}>
+        <span
+          className="codicon codicon-edit"
+          style={{ cursor: 'pointer' }}
+          onClick={(e) => {
+            e.stopPropagation();
+            let message: TraceUpMessage = {
+              kind: 'updateData',
+              value: [testing_scope, { kind: kind, value: node.path }],
+            };
+            vscode.postMessage(message);
+          }}
+        />
+      </td>
+    </tr>
+  );
+}
+
+// -- Styles --------------------------------------------------------------------
+
+const ioPanelStyle: CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  border: '1px solid var(--vscode-panel-border, transparent)',
+  borderRadius: 2,
+  fontSize: '0.9em',
+  maxHeight: `var(${PANEL_HEIGHT_VAR}, 70vh)`,
+  overflow: 'auto',
+};
+
+const tableStyle: CSSProperties = {
+  borderCollapse: 'collapse',
+  width: '100%',
+};
+
+const thStyle: CSSProperties = {
+  textAlign: 'left',
+  padding: '1px 8px 1px 0',
+  color: 'var(--vscode-descriptionForeground)',
+  fontWeight: 400,
+  borderBottom: '1px solid var(--vscode-panel-border, transparent)',
+};
+
+const tdStyle: CSSProperties = {
+  textAlign: 'left',
+  padding: '1px 8px 1px 0',
+  verticalAlign: 'middle',
+};
+
+const ROW_INSET = 8;
+
+const nameTdStyle: CSSProperties = {
+  ...tdStyle,
+  fontWeight: 600,
+  paddingLeft: ROW_INSET,
+};
+
+const nameThStyle: CSSProperties = {
+  ...thStyle,
+  paddingLeft: ROW_INSET,
+};
+
+const sectionStyle: CSSProperties = {
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  fontSize: '0.9em',
+  padding: `6px 6px 5px ${ROW_INSET}px`,
+  background: 'var(--vscode-editorGroupHeader-tabsBackground, transparent)',
+  color: 'var(--vscode-foreground)',
+  borderTop: '1px solid var(--vscode-panel-border, transparent)',
+  borderBottom: '1px solid var(--vscode-panel-border, transparent)',
+};
+
+const sectionHeaderStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 8,
+};
+
+const sectionActionsStyle: CSSProperties = {
+  display: 'flex',
+  flex: '0 0 auto',
+  gap: 2,
+  cursor: 'default',
+};
+
+const sectionGapStyle: CSSProperties = {
+  height: 16,
+  padding: 0,
+};
+
+const pathRowStyle: CSSProperties = {
+  padding: `2px 6px 2px ${ROW_INSET}px`,
+  background: 'var(--vscode-sideBarSectionHeader-background)',
+};
+
+const crumbStyle: CSSProperties = {
+  color: 'var(--vscode-descriptionForeground)',
+  fontWeight: 400,
+};
+
+const crumbLastStyle: CSSProperties = {
+  fontWeight: 600,
+};
+
+const crumbSeparatorStyle: CSSProperties = {
+  color: 'var(--vscode-descriptionForeground)',
+  margin: '0 0.4em',
+};
+
+const nameCellStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+};
+
+const chevronStyle: CSSProperties = {
+  flex: '0 0 auto',
+  width: 16,
+  marginRight: 4,
+  textAlign: 'center',
+  cursor: 'pointer',
+};
+
+const typeIconStyle: CSSProperties = {
+  flex: '0 0 auto',
+  width: '1.1em',
+  textAlign: 'center',
+  color: 'var(--vscode-descriptionForeground)',
+  fontWeight: 400,
+};
+
+const disabledCellStyle: CSSProperties = {
+  ...tdStyle,
+  color: 'var(--vscode-descriptionForeground)',
+  opacity: 0.5,
+};

@@ -1,6 +1,7 @@
 import { type ReactElement } from 'react';
 import TestFileEditor from './test-case-editor/TestFileEditor';
 import ScopeInputEditor from './scope-editor/ScopeInputEditor';
+import TraceEditor from './trace-editor/TraceEditor';
 
 import { type WebviewApi } from 'vscode-webview';
 import { CatalaSettingsProvider } from './shared/useSettings';
@@ -37,6 +38,14 @@ export function GeneralTestsUi({ language, vscode }: Props): ReactElement {
   return (
     <CatalaSettingsProvider language={language}>
       <TestOverview vscode={vscode} />
+    </CatalaSettingsProvider>
+  );
+}
+
+export function TraceApp({ language, vscode }: Props): ReactElement {
+  return (
+    <CatalaSettingsProvider language={language}>
+      <TraceEditor vscode={vscode} />
     </CatalaSettingsProvider>
   );
 }

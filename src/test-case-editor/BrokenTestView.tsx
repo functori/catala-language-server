@@ -459,6 +459,7 @@ function ScopePicker({
 }
 
 function TestPanes({
+  testing_scope,
   authored,
   rebuilt,
   onChange,
@@ -473,6 +474,7 @@ function TestPanes({
   onSplit,
   picker,
 }: {
+  testing_scope: string;
   authored: Test | undefined;
   rebuilt: Test | undefined;
   onChange: (next: Test) => void;
@@ -556,6 +558,7 @@ function TestPanes({
               {/* The ordinary editors, read-only: same layout as the right
                   pane, so the two sides stay comparable. */}
               <TestInputsEditor
+                testing_scope={testing_scope}
                 test_inputs={authored.test_inputs}
                 tested_scope={authored.tested_scope}
                 onTestInputsChange={(): void => {}}
@@ -569,6 +572,7 @@ function TestPanes({
                     <FormattedMessage id="broken.expected" />
                   </h5>
                   <TestOutputsEditor
+                    testing_scope={testing_scope}
                     test={authored}
                     onTestChange={(): void => {}}
                     readOnly
@@ -608,6 +612,7 @@ function TestPanes({
                     </div>
                   )}
                 <TestInputsEditor
+                  testing_scope={testing_scope}
                   test_inputs={rebuilt.test_inputs}
                   tested_scope={rebuilt.tested_scope}
                   onTestInputsChange={(inputs): void =>
@@ -622,6 +627,7 @@ function TestPanes({
                       <FormattedMessage id="broken.expected" />
                     </h5>
                     <TestOutputsEditor
+                      testing_scope={testing_scope}
                       test={rebuilt}
                       onTestChange={onChange}
                       diffs={runDiffs}
@@ -782,6 +788,7 @@ export default function BrokenTestView({
         const live = rebuilt.find((t) => t.testing_scope === scope);
         return (
           <TestPanes
+            testing_scope={scope}
             key={scope + String(i)}
             authored={authored}
             rebuilt={live}

@@ -26,7 +26,6 @@ import { getCwd } from '../shared/util_client';
 import type { SettingsSource } from '../extension/settingsStore';
 import { resolveLanguage } from '../shared/settings';
 
-
 // Path of a test file relative to the workspace folder it belongs to, which is
 // what the 'debug all tests' panel displays: an absolute path is both too long
 // for a table column and mostly noise, the interesting part being where the
@@ -83,7 +82,8 @@ export class TestMacroController {
             filename: filename,
             relative_filename: relativeFilename(filename),
             test: e.entrypoint.value,
-            success: res.success,
+            success:
+              res.success && (res.failed_trace_assert ?? []).length === 0,
             date: res.date,
           };
           this.tests.push(testEntrypoint);
@@ -201,7 +201,12 @@ export class TestMacroController {
                   kind: 'TestScopeResult',
                   value: {
                     entry: testElt.test,
-                    scope_success: res,
+                    scope_success: {
+                      success:
+                        res.success &&
+                        (res.failed_trace_assert ?? []).length === 0,
+                      date: res.date,
+                    },
                     index,
                     order,
                   },
@@ -250,7 +255,12 @@ export class TestMacroController {
                     kind: 'TestScopeResult',
                     value: {
                       entry: test.test,
-                      scope_success: res,
+                      scope_success: {
+                        success:
+                          res.success &&
+                          (res.failed_trace_assert ?? []).length === 0,
+                        date: res.date,
+                      },
                       index,
                       order,
                     },

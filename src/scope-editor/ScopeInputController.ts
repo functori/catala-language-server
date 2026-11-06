@@ -119,6 +119,7 @@ export class ScopeInputController {
             const results: TestRunResults = runTestScope(
               file,
               scope,
+              false,
               this.test.test_inputs
             );
             this.postMessageToWebView({
