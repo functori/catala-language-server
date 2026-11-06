@@ -29,17 +29,6 @@
   vertical-align: top;
 }
 
-/* Apply max-width constraint only to primitive editors (simple inputs) */
-/* Primitive editors: int, bool, rat, date, duration, money */
-.value-editor.int-editor-wrapper,
-.value-editor.bool-editor-wrapper,
-.value-editor.rat-editor-wrapper,
-.value-editor.date-editor-wrapper,
-.value-editor.duration-editor,
-.value-editor.money-editor {
-  max-width: var(--field-width);
-}
-
 .date-editor-wrapper {
   position: relative;
 }
@@ -109,7 +98,6 @@
 
 /* Same box as the inputs, so the row keeps its size when a value is set. */
 .option-absent-field {
-  max-width: var(--field-width);
   padding: var(--control-pad-y) var(--control-pad-x);
   border: 1px dashed var(--vscode-input-border, currentColor);
   border-radius: var(--radius-control);
