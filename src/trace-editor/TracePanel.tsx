@@ -69,6 +69,7 @@ function TraceTreeView({
   cwd,
   expand,
   test,
+  addFilter,
   fromClosestMatch = false,
   filterKind,
 }: {
@@ -77,6 +78,7 @@ function TraceTreeView({
   cwd?: string;
   expand?: ExpandCommand | null;
   test?: TraceTest;
+  addFilter: AddFilter;
   fromClosestMatch?: boolean;
   filterKind: FilterKind;
 }): ReactElement {
@@ -182,6 +184,8 @@ function TraceTreeView({
                     filters={f}
                     prefix={rootPrefix}
                     tested_scope={testedScope}
+                    frames={[{ nodes: roots, before: i }]}
+                    addFilter={addFilter}
                   />
                 ))}
               </ul>
@@ -354,6 +358,7 @@ export default function TracePanel({
         fromClosestMatch={fromClosestMatch}
         test={test}
         filterKind={filterKind}
+        addFilter={addFilter}
       />
       {derived.map((d) => (
         <div key={d.id} style={derivedPanelStyle}>
