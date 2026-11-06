@@ -27,6 +27,9 @@ function within<T>(ms: number, what: string, p: Thenable<T>): Promise<T> {
 
 suite('Extension, end to end', function () {
   this.timeout(180_000);
+  suiteTeardown(() => {
+    vscode.window.showInformationMessage('All tests done!');
+  });
 
   test('starts, and opens a test in the test case editor', async () => {
     const ext = vscode.extensions.getExtension('catalalang.catala');

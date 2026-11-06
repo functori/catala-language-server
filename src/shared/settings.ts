@@ -1,3 +1,7 @@
+import {
+  type WebviewSettings,
+  type TraceViewKinds,
+} from '../generated/catala_types';
 import enMessages from '../locales/en.json';
 import frMessages from '../locales/fr.json';
 import plMessages from '../locales/pl.json';
@@ -8,17 +12,37 @@ export const allMessages: Record<string, Record<string, string>> = {
   pl: plMessages,
 };
 
-export type LanguageSetting = 'file' | 'vscode';
-
-const LANGUAGE_SETTINGS: readonly LanguageSetting[] = ['file', 'vscode'];
-
-export type CatalaSettings = {
-  language: LanguageSetting;
+export const defaultSettings: WebviewSettings = {
+  language: { kind: 'File' }, // the default of `catala.language` in package.json
+  trace_view: {
+    function_call: false,
+    branch_condition: false,
+    if_branching: false,
+    match_branching: false,
+    assertion_: false,
+    exception_: false,
+    error: false,
+  },
 };
 
-const defaultSettings: CatalaSettings = {
-  language: 'file',
-};
+export function showsTraceKind(
+  settings: WebviewSettings,
+  kind: string
+): boolean {
+  // `assertion`/`exception` are OCaml keywords: the ATD fields end with `_`
+  const key = kind === 'assertion' || kind === 'exception' ? `${kind}_` : kind;
+  return isTraceKindKey(settings.trace_view, key)
+    ? settings.trace_view[key]
+    : // kinds without a setting are always shown
+      true;
+}
+
+function isTraceKindKey(
+  traceView: TraceViewKinds,
+  key: string
+): key is keyof TraceViewKinds {
+  return Object.hasOwn(traceView, key);
+}
 
 function primarySubtag(locale: string): string {
   return locale.split(/[-_]/)[0].toLowerCase();
@@ -33,26 +57,14 @@ export function fileLanguage(file: string | undefined): string | undefined {
 }
 
 export function resolveLanguage(
-  settings: CatalaSettings,
-  file: string | undefined,
-  locale: string
+  settings: WebviewSettings,
+  file_language: string | undefined,
+  env_language: string
 ): string {
-  switch (settings.language) {
-    case 'file':
-      return fileLanguage(file) ?? primarySubtag(locale);
-    case 'vscode':
-      return primarySubtag(locale);
+  switch (settings.language.kind) {
+    case 'File':
+      return file_language ?? primarySubtag(env_language);
+    case 'Vscode':
+      return primarySubtag(env_language);
   }
-}
-
-export function readSettings(stored: unknown): CatalaSettings {
-  if (stored === null || typeof stored !== 'object') {
-    return defaultSettings;
-  }
-  const language = (stored as { language?: unknown }).language;
-  return {
-    language: LANGUAGE_SETTINGS.includes(language as LanguageSetting)
-      ? (language as LanguageSetting)
-      : defaultSettings.language,
-  };
 }

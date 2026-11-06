@@ -1,4 +1,27 @@
+const fs = require('fs');
 const path = require('path');
+const { Compilation, sources } = require('webpack');
+
+class EmitCodiconsCss {
+  apply(compiler) {
+    compiler.hooks.thisCompilation.tap('EmitCodiconsCss', (compilation) => {
+      compilation.hooks.processAssets.tap(
+        {
+          name: 'EmitCodiconsCss',
+          stage: Compilation.PROCESS_ASSETS_STAGE_ADDITIONAL,
+        },
+        () => {
+          const file = require.resolve('@vscode/codicons/dist/codicon.css');
+          compilation.fileDependencies.add(file);
+          compilation.emitAsset(
+            'codicon.css',
+            new sources.RawSource(fs.readFileSync(file))
+          );
+        }
+      );
+    });
+  }
+}
 
 const commonConfig = {
   devtool: 'inline-source-map',
@@ -47,6 +70,7 @@ const extensionConfig = {
   externals: {
     vscode: 'commonjs vscode',
   },
+  plugins: [new EmitCodiconsCss()],
 };
 
 const uiConfig = {
