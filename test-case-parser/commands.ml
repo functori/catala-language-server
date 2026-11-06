@@ -495,7 +495,7 @@ let read_failure ~test_file ~misfit (errors : Message.lsp_error list) :
       (fun (e : Message.lsp_error) ->
         match e.kind with
         | Lexing | Parsing | Typing | Generic -> true
-        | Warning | AssertFailure -> false)
+        | TraceAssertFails | Warning | AssertFailure -> false)
       errors
   in
   let in_test (e : Message.lsp_error) =
