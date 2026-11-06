@@ -3,11 +3,19 @@ import type {
   Executable,
   LanguageClientOptions,
   ServerOptions,
+  Command,
 } from 'vscode-languageclient/node';
 import { LanguageClient } from 'vscode-languageclient/node';
 import { TestCaseEditorProvider } from './extension/testCaseEditorProvider';
+import { TraceEditorProvider } from './extension/traceEditorProvider';
+import { initTraceCache } from './trace-editor/traceRunner';
+// Emitted to dist as `codicon.css`; linked into the trace-editor webview so the
+// vscode-elements icon component can find the Codicons font.
+import codiconsCssPath from '@vscode/codicons/dist/codicon.css?url';
 import { logger } from './extension/logger';
 import * as net from 'net';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { spawn } from 'child_process';
 import {
   exceptionsViewProvider,
@@ -23,16 +31,46 @@ import {
   spawnStdout,
   tryBinaryPath,
 } from './shared/util_client';
-import type { RunArgs } from './shared/util_client';
-import { initTests } from './extension/testAndCoverage';
+import type { Binary, RunArgs } from './shared/util_client';
+import { initTests, ResultController } from './extension/testAndCoverage';
 import type { CatalaEntrypoint } from './extension/lspRequests';
-import { listEntrypoints, rescanProjects } from './extension/lspRequests';
+import {
+  checkTraceAssert,
+  listEntrypoints,
+  rescanProjects,
+} from './extension/lspRequests';
 import { ScopeInputController } from './scope-editor/ScopeInputController';
 import {
   catalaFoldingRanges,
   codeBlockRanges,
 } from './extension/catalaFolding';
 import path from 'path';
+import { TestMacroController } from './extension/TestMacroController';
+import { SettingsStore } from './extension/settingsStore';
+
+const itemMessagesFR = {
+  generalTestsTitle: 'Vue globale des tests',
+  openCatalaBook: 'Ouvrir le manuel de Catala',
+  github: 'Ouvrir le répertoire GitHub de Catala',
+};
+
+const itemMessagesEN = {
+  generalTestsTitle: 'General tests view',
+  openCatalaBook: 'Open Catala book',
+  github: 'Open the Catala GitHub repository',
+};
+
+const itemMessagesPL = {
+  generalTestsTitle: 'Przegląd testów',
+  openCatalaBook: 'Otwórz podręcznik Catala',
+  github: 'Otwórz repozytorium Catala na GitHubie',
+};
+
+const itemMessages: Record<string, Record<string, string>> = {
+  fr: itemMessagesFR,
+  en: itemMessagesEN,
+  pl: itemMessagesPL,
+};
 
 // `icon` are codicon id, the (id without the `codicon-` prefix).
 // `new vscode.ThemeIcon('github')`
@@ -114,8 +152,6 @@ export class tree_view implements vscode.TreeDataProvider<Item> {
     }
   }
 }
-
-type Binary = { path: string; version?: string };
 
 type Toolchain = {
   catalaPath?: Binary;
@@ -313,12 +349,82 @@ async function selectScope(with_inputs: boolean): Promise<RunArgs | undefined> {
   }
 }
 
+function asyncRun(
+  command: string,
+  args: string[],
+  cwd: string | undefined
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const options = cwd ? { cwd } : undefined;
+    const proc = spawn(command, args, options);
+    proc.stdout.on('data', (data: Buffer) => {
+      logger.log(data.toString());
+    });
+    proc.stderr.on('data', (data: Buffer) => {
+      logger.log(data.toString());
+    });
+    proc.on('error', reject);
+    proc.on('close', () => resolve());
+  });
+}
+
 async function runScope(args?: RunArgs): Promise<void> {
   const inputs = args?.inputs;
   args ??= await selectScope(inputs ? true : false);
-  if (args) {
-    const cwd = getCwd(args.uri);
-    const termName = `${args.scope} execution`;
+  if (!args) {
+    return;
+  }
+  const cwd = getCwd(args.uri);
+  // Single-quote a shell argument so spaces in paths survive. PowerShell
+  // escapes an embedded quote by doubling it; POSIX shells by '\''.
+  const sq = (s: string): string =>
+    args.headless
+      ? s
+      : process.platform === 'win32'
+        ? `'${s.replace(/'/g, "''")}'`
+        : `'${s.replace(/'/g, "'\\''")}'`;
+
+  let inputArgs: string[] = [];
+  if (inputs) {
+    const json = JSON.stringify(inputs);
+    // Single-quote the JSON; on Windows (PowerShell) also backslash-escape the
+    // inner double quotes so they survive the native-command re-parse.
+    const input = args.headless
+      ? json
+      : process.platform === 'win32'
+        ? `'${json.replace(/"/g, '\\"')}'`
+        : `'${json}'`;
+    inputArgs = ['--input', input];
+  }
+
+  let traceOutputFile = args.traceOutputFile;
+  if (args.withTrace && traceOutputFile === undefined) {
+    traceOutputFile = join(tmpdir(), `${args.scope}_trace.json`);
+  }
+  const traceArgs =
+    args.withTrace && traceOutputFile !== undefined
+      ? ['--trace', traceOutputFile]
+      : [];
+  const buildDirArgs = args.buildDir ? ['--build-dir', sq(args.buildDir)] : [];
+  const ninjaOutputArgs = args.ninjaOutput
+    ? ['--ninja-output-file', sq(args.ninjaOutput)]
+    : [];
+
+  const clerkArgs = [
+    'run',
+    sq(args.uri),
+    '--scope',
+    args.scope,
+    ...inputArgs,
+    ...traceArgs,
+    ...buildDirArgs,
+    ...ninjaOutputArgs,
+  ];
+
+  if (args.headless) {
+    await asyncRun(clerkPath, clerkArgs, cwd);
+  } else {
+    const termName = `${args.scope} ${args.withTrace ? 'trace' : 'execution'}`;
     vscode.window.terminals.find((t) => t.name === termName)?.dispose();
     const term = vscode.window.createTerminal({
       name: termName,
@@ -327,34 +433,8 @@ async function runScope(args?: RunArgs): Promise<void> {
       // (cmd.exe would need the opposite escaping).
       ...(process.platform === 'win32' && { shellPath: 'powershell.exe' }),
     });
-    // Single-quote a shell argument so spaces in paths survive. PowerShell
-    // escapes an embedded quote by doubling it; POSIX shells by '\''.
-    const sq = (s: string): string =>
-      process.platform === 'win32'
-        ? `'${s.replace(/'/g, "''")}'`
-        : `'${s.replace(/'/g, "'\\''")}'`;
-    let extra_args: string[] = [];
-    if (inputs) {
-      const json = JSON.stringify(inputs);
-      // Single-quote the JSON; on Windows (PowerShell) also backslash-escape the
-      // inner double quotes so they survive the native-command re-parse.
-      const quoted =
-        process.platform === 'win32'
-          ? `'${json.replace(/"/g, '\\"')}'`
-          : `'${json}'`;
-      extra_args = ['--input', quoted];
-    }
     term.show();
-    term.sendText(
-      [
-        clerkPath,
-        'run',
-        sq(args.uri),
-        '--scope',
-        args.scope,
-        ...extra_args,
-      ].join(' ')
-    );
+    term.sendText([clerkPath, ...clerkArgs].join(' '));
   }
 }
 
@@ -421,6 +501,18 @@ async function debugScope(args?: RunArgs): Promise<void> {
 export async function activate(
   context: vscode.ExtensionContext
 ): Promise<void> {
+  // Enable the persistent trace cache (stored under global storage).
+  initTraceCache(context.globalStorageUri.fsPath);
+
+  const settingsStore = new SettingsStore(context);
+  context.subscriptions.push(
+    vscode.commands.registerCommand('catala.openSettings', () =>
+      vscode.commands.executeCommand(
+        'workbench.action.openSettings',
+        '@ext:catalalang.catala'
+      )
+    )
+  );
   vscode.debug.registerDebugAdapterDescriptorFactory('catala-debugger', {
     createDebugAdapterDescriptor(_session) {
       const dap_path = resolveBinaryPath('catala-dap', context, 'main_dap.exe');
@@ -472,12 +564,20 @@ export async function activate(
     )
   );
 
+  const ctrl = vscode.tests.createTestController('catalaTests', 'Catala Tests');
+  // Placeholder to display something while tests are retrieved
+  ctrl.items.add(ctrl.createTestItem('loading', 'Loading tests...'));
+
   const lsp_path = resolveBinaryPath(
     'catala-lsp',
     context,
     'main_lsp.exe',
     getConfig('lspServerPath')
   );
+
+  const language = vscode.env.language;
+
+  let resultController = new ResultController(context.workspaceState, language);
   if (lsp_path) {
     const run: Executable = {
       command: lsp_path,
@@ -523,7 +623,36 @@ export async function activate(
       serverOptions,
       clientOptions
     );
-    await Promise.all([client.start(), initTests(context, client)]);
+
+    let entrypointsRequest = listEntrypoints(
+      client,
+      [{ kind: 'GUI' }, { kind: 'Test' }],
+      undefined,
+      false,
+      true
+    ).finally(() => ctrl.items.replace([]));
+
+    initTests(entrypointsRequest, context, client, ctrl, resultController);
+
+    const macroTestsView = new TestMacroController(settingsStore);
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        'catala.debugAllTests',
+        async (_arg?: vscode.Uri | { resourceUri: vscode.Uri }) => {
+          const columnToShowIn = vscode.window.activeTextEditor
+            ? vscode.window.activeTextEditor.viewColumn
+            : undefined;
+          macroTestsView.show(
+            client,
+            context,
+            entrypointsRequest,
+            resultController,
+            ctrl,
+            columnToShowIn
+          );
+        }
+      )
+    );
   }
 
   vscode.commands.registerCommand(
@@ -578,34 +707,62 @@ export async function activate(
     await switchTree.refresh();
   });
 
+  // Can't use Intl to retrieve message from the json, also tried
+  // to retrieve it manually but encountered an undefined
+  const itemMsg = itemMessages[language];
+
+  const titleAllTests = itemMsg['generalTestsTitle'];
+  let command: Command = {
+    title: titleAllTests,
+    command: 'catala.debugAllTests',
+  };
+  let catala_tests = new Item({
+    label: titleAllTests,
+    icon: new vscode.ThemeIcon('beaker'),
+    command,
+  });
+  context.subscriptions.push(
+    // note: we need to provide the same name here as we added in the package.json file
+    vscode.window.registerTreeDataProvider(
+      'catala.openAllTests',
+      new tree_view([catala_tests])
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('catala.settings', new tree_view([]))
+  );
+
+  logger.log(`Register "Catala Tests" data in th Tree data provider`);
+
   context.subscriptions.push(
     // note: we need to provide the same name here as we added in the package.json file
     vscode.window.registerTreeDataProvider('catala.switches', switchTree)
   );
 
-  const language = vscode.env.language;
-
+  let titleBook = itemMsg['openCatalaBook'];
   let command_books: vscode.Command = {
-    title: 'Open Catala book',
+    title: titleBook,
     command: 'vscode.open',
     arguments: [
       vscode.Uri.parse(`https://book.catala-lang.org/${language}/0-intro.html`),
     ],
   };
   let catala_books = new Item({
-    label: 'Learn how to do catala',
+    label: titleBook,
     icon: new vscode.ThemeIcon('book'),
     command: command_books,
   });
-  catala_books.iconPath;
+
+  let titleGithub = itemMsg['github'];
 
   let command_github: vscode.Command = {
-    title: 'Open Github',
+    title: titleGithub,
     command: 'vscode.open',
     arguments: [vscode.Uri.parse(`https://github.com/CatalaLang/catala`)],
   };
   let catala_github = new Item({
-    label: 'Catala Github repository',
+    label: titleGithub,
     icon: new vscode.ThemeIcon('github'),
     command: command_github,
   });
@@ -616,9 +773,50 @@ export async function activate(
       new tree_view([catala_books, catala_github])
     )
   );
+  logger.log(
+    `Register "Catala Help and feedback" data in th Tree data provider`
+  );
 
-  // Always register the custom editor provider
-  context.subscriptions.push(TestCaseEditorProvider.register(context));
+  // Always register the custom editor providers
+  context.subscriptions.push(
+    TestCaseEditorProvider.register(
+      context,
+      resultController,
+      codiconsCssPath,
+      checkTraceAssert(() => client),
+      settingsStore
+    )
+  );
+  context.subscriptions.push(
+    TraceEditorProvider.register(
+      context,
+      () => client,
+      codiconsCssPath,
+      settingsStore
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'catala.openWithTraceEditor',
+      async (arg?: vscode.Uri | { resourceUri: vscode.Uri }) => {
+        const uri =
+          arg instanceof vscode.Uri
+            ? arg
+            : hasResourceUri(arg)
+              ? arg.resourceUri
+              : vscode.window.activeTextEditor?.document.uri;
+        if (!uri) {
+          return;
+        }
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          uri,
+          TraceEditorProvider.viewType
+        );
+      }
+    )
+  );
 
   context.subscriptions.push(
     vscode.languages.registerFoldingRangeProvider(
@@ -649,6 +847,15 @@ export async function activate(
   );
 
   context.subscriptions.push(
+    vscode.commands.registerCommand('catala.trace.addToFilter', () =>
+      TraceEditorProvider.snippetMenuItem('addToFilter')
+    ),
+    vscode.commands.registerCommand('catala.trace.viewWithFilter', () =>
+      TraceEditorProvider.snippetMenuItem('viewWithFilter')
+    )
+  );
+
+  context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       'catala.exceptionsView',
       exceptionsViewProvider
@@ -658,8 +865,7 @@ export async function activate(
       showExceptionsAtCursor(client)
     )
   );
-
-  // register_memoryFileProvider(context);
+  logger.log(`Register "Catala Exception View"`);
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
@@ -670,7 +876,7 @@ export async function activate(
           if (y == undefined) return;
           x = y;
         }
-        const inputWebView = new ScopeInputController();
+        const inputWebView = new ScopeInputController(settingsStore);
         inputWebView.createWebview(context, x.uri, x.scope);
       }
     )
@@ -678,6 +884,7 @@ export async function activate(
 
   // Ensure the logger is disposed when the extension is deactivated
   context.subscriptions.push({ dispose: () => logger.dispose() });
+  logger.log(`Activate Catala extension`);
 }
 
 export function deactivate(): Thenable<void> | undefined {

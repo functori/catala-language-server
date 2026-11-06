@@ -2,15 +2,24 @@ import type { ChangeEvent } from 'react';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 import {
+  type Option,
+  type RuntimeValue,
   type Test,
   type TestInputs,
   type TestRunResults,
   type PathSegment,
+  type FailedTraceAssert,
 } from '../generated/catala_types';
 import TestInputsEditor from './TestInputsEditor';
 import TestOutputsEditor from './TestOutputsEditor';
 import { ReadinessChip } from './RunControl';
+import ExpectedVariablesEditor from './ExpectedVariablesEditor';
 import { type TestRunStatus } from './TestFileEditor';
+import {
+  type TraceElement,
+  type TraceValue,
+  traceValueToRuntime,
+} from '../trace-editor/traceUtils';
 import { confirm } from '../messaging/confirm';
 import { RevealContext, type Reveal } from '../editors/reveal';
 import {
@@ -18,18 +27,23 @@ import {
   scrollToFirstInvalidOrUnset,
   firstUnsetPath,
 } from '../editors/unsetValidation';
+import { getVsCodeApi } from '../shared/webviewApi';
 
 type Props = {
+  testing_scope: string;
   test: Test;
   onTestChange(newValue: Test, mayBeBatched: boolean): void;
   onTestDelete(testScope: string): void;
-  onTestRun(testScope: string): void;
-  onTestOutputsReset(testScope: string): void;
+  onTestRun(testScope: string, hasExpected: boolean): void;
+  onTestOutputsReset(testScope: string, hasExpected: boolean): void;
   runState?: {
     status: TestRunStatus;
     results?: TestRunResults;
     stale?: boolean;
   };
+  trace?: TraceElement[];
+  /** When false, the trace is not run and the expected-variable catalog is hidden. */
+  runTrace?: boolean;
   onDiffResolved(scope: string, path: PathSegment[]): void;
   onInvalidateDiffs(scope: string, pathPrefix: PathSegment[]): void;
 };
@@ -69,13 +83,62 @@ export default function TestEditor(props: Props): ReactElement {
     );
   }
 
+  function onVariablesChange(next: Map<string, TraceValue | null>): void {
+    const variables: Map<string, Option<RuntimeValue>> = new Map();
+    next.forEach((value, name) => {
+      if (value === null) {
+        variables.set(name, null);
+      } else {
+        const rv = traceValueToRuntime(value);
+        if (rv !== undefined) {
+          variables.set(name, { value: { value: rv, attrs: [] } });
+        }
+      }
+    });
+    props.onTestChange({ ...props.test, variables }, false);
+  }
+
+  // Mismatches on the auxiliary variables, as reported by the compiler for the
+  // last run. Empty until a run happened.
+  const failedTraceAssert: FailedTraceAssert[] =
+    props.runState?.results?.kind === 'Ok'
+      ? props.runState.results.value.failed_trace_assert.filter((failure) =>
+          props.test.variables.has(failure.name)
+        )
+      : [];
+
   const expectedSectionRef = useRef<HTMLDivElement>(null);
+  const intermediateSectionRef = useRef<HTMLDivElement>(null);
   // Scope for searching the first '.value-editor.invalid' or '.value-editor.unset' before running; used to scroll into view
   const unsetElementRef = useRef<HTMLDivElement>(null);
   const expectedAnchorId = `expected-${encodeURIComponent(props.test.testing_scope)}`;
 
+  // A failing run sends the user to what went wrong, and the scope results come
+  // first: the expected variables only claim the focus when they are the sole
+  // culprit.
+
   useEffect(() => {
     const runState = props.runState;
+
+    const focusFailedTrace =
+      runState?.results?.kind === 'Ok' &&
+      !runState.results.value.assert_failures &&
+      failedTraceAssert.length > 0;
+
+    if (focusFailedTrace) {
+      setTimeout(() => {
+        intermediateSectionRef.current?.focus();
+        intermediateSectionRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        });
+      }, 0);
+    }
+  }, [props.runState]);
+
+  useEffect(() => {
+    const runState = props.runState;
+
     const shouldFocus =
       !!runState &&
       runState.results?.kind === 'Ok' &&
@@ -93,6 +156,10 @@ export default function TestEditor(props: Props): ReactElement {
   }, [props.runState]);
 
   const [reveal, setReveal] = useState<Reveal | undefined>(undefined);
+  // The trace is what the compiler checks the expected variables against, so
+  // it is only worth producing when the test declares some.
+  const hasExpected = props.test.variables.size > 0;
+
   const scrollToFirstUnset = (): void => {
     const path = firstUnsetPath(props.test);
     if (path) setReveal((r) => ({ path, nonce: (r?.nonce ?? 0) + 1 }));
@@ -105,7 +172,15 @@ export default function TestEditor(props: Props): ReactElement {
       const confirmed = await confirm('RunTestWithUnsetValues');
       if (!confirmed) return;
     }
-    props.onTestRun(props.test.testing_scope);
+    props.onTestRun(props.test.testing_scope, hasExpected);
+  };
+
+  const openTraceEditor = (): void => {
+    getVsCodeApi().postMessage({
+      kind: 'openTraceEditor',
+      scope: props.test.testing_scope,
+      trace: props.trace,
+    });
   };
 
   const resetWithUnsetCheck = async (): Promise<void> => {
@@ -114,7 +189,7 @@ export default function TestEditor(props: Props): ReactElement {
       const confirmed = await confirm('RunTestWithUnsetValues');
       if (!confirmed) return;
     }
-    props.onTestOutputsReset(props.test.testing_scope);
+    props.onTestOutputsReset(props.test.testing_scope, hasExpected);
   };
 
   return (
@@ -155,7 +230,6 @@ export default function TestEditor(props: Props): ReactElement {
               <textarea
                 value={props.test.description}
                 onChange={onDescriptionChange}
-                onBlur={onDescriptionChange}
                 placeholder={intl.formatMessage({
                   id: 'testEditor.descriptionPlaceholder',
                 })}
@@ -169,9 +243,20 @@ export default function TestEditor(props: Props): ReactElement {
               <FormattedMessage id="testEditor.inputs" />
             </h2>
             <TestInputsEditor
+              testing_scope={props.testing_scope}
               test_inputs={props.test.test_inputs}
               tested_scope={props.test.tested_scope}
               onTestInputsChange={onTestInputsChange}
+            />
+          </div>
+          <div ref={intermediateSectionRef}>
+            <ExpectedVariablesEditor
+              testing_scope={props.testing_scope}
+              test={props.test}
+              trace={props.trace}
+              runTrace={props.runTrace}
+              failures={failedTraceAssert}
+              onChange={onVariablesChange}
             />
           </div>
           <div
@@ -204,12 +289,20 @@ export default function TestEditor(props: Props): ReactElement {
                   ></span>{' '}
                   {intl.formatMessage({ id: 'testEditor.runTest' })}
                 </button>
+                <button
+                  className="button-action-dvp body-b3"
+                  title={intl.formatMessage({ id: 'testEditor.openTrace' })}
+                  onClick={openTraceEditor}
+                >
+                  <span className="codicon codicon-graph"></span> Trace
+                </button>
                 <ReadinessChip test={props.test} onJump={scrollToFirstUnset} />
               </div>
               <div className="test-result">
                 {props.runState?.status === 'success' &&
                   props.runState?.results?.kind === 'Ok' &&
-                  !props.runState.results.value.assert_failures && (
+                  !props.runState.results.value.assert_failures &&
+                  failedTraceAssert.length === 0 && (
                     <p className="test-run-result test-run-success body-1">
                       <span className="codicon codicon-check-all"></span>
                       <FormattedMessage
@@ -220,7 +313,8 @@ export default function TestEditor(props: Props): ReactElement {
                   )}
                 {(props.runState?.status === 'error' ||
                   (props.runState?.results?.kind === 'Ok' &&
-                    props.runState.results.value.assert_failures)) && (
+                    (props.runState.results.value.assert_failures ||
+                      failedTraceAssert.length > 0))) && (
                   <div className="test-result-information">
                     <p className="test-run-result test-run-error body-1">
                       <span className="codicon codicon-warning"></span>
@@ -246,6 +340,7 @@ export default function TestEditor(props: Props): ReactElement {
             </div>
 
             <TestOutputsEditor
+              testing_scope={props.testing_scope}
               test={props.test}
               onTestChange={(test) => {
                 props.onTestChange(test, true);

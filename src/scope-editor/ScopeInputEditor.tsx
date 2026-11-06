@@ -19,6 +19,7 @@ import { resolveConfirmResult } from '../messaging/confirm';
 import { setVsCodeApi } from '../shared/webviewApi';
 import type { WebviewApi } from 'vscode-webview';
 import { assertUnreachable } from '../shared/util';
+import { isSettingsMessage } from '../shared/settings';
 import ScopeOutputs from './ScopeOutputs';
 import {
   hasUnsetInTest,
@@ -85,6 +86,9 @@ export default function ScopeInputEditor({
           reset_outputs: false,
           in_shell: args.action == 'Terminal',
           debug: args.action == 'Debug',
+          // Running a scope against ad-hoc inputs is not a test: no expected
+          // variables to check against a trace.
+          has_trace_assert: false,
         },
       })
     );
@@ -104,21 +108,41 @@ export default function ScopeInputEditor({
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
+      if (isSettingsMessage(event.data)) {
+        return;
+      }
       const message = readDownMessage(event.data);
       switch (message.kind) {
         case 'Update':
           setState(parseResultsToUiState(message.value.results));
           break;
         case 'TestRunResults': {
-          setTestRunState((_prev) => {
-            const next: TestRunState = _resultsToState(message.value.results);
-            return next;
-          });
+          const results = message.value.results;
+          setTestRunState((_prev) => _resultsToState(results));
+          if (results.kind !== 'Cancelled') {
+            // Record the run outcome on the test (and reflect it back to the
+            // controller through a GuiEdit, like any other test edit).
+            setState((prev) => {
+              if (prev.state !== 'success') {
+                return prev;
+              }
+              return { state: 'success', test: prev.test };
+            });
+          }
           break;
         }
         case 'ConfirmResult': {
           resolveConfirmResult(message.value.id, message.value.confirmed);
           break;
+        }
+        case 'AllTests': {
+          throw Error('Wrong AllTests message posted');
+        }
+        case 'TestScopeResult': {
+          throw Error(`This view can't trigger a TestScopeResult`);
+        }
+        case 'FocusData': {
+          throw Error(`This view has no data panel to focus`);
         }
         default:
           assertUnreachable(message);
@@ -178,7 +202,9 @@ function ParsingErrorWarning({
       <button
         className="test-editor-open-text"
         onClick={() =>
-          vscode.postMessage(writeUpMessage({ kind: 'OpenInTextEditor' }))
+          vscode.postMessage(
+            writeUpMessage({ kind: 'OpenInTextEditor', value: null })
+          )
         }
       >
         <span className="codicon codicon-edit"></span>

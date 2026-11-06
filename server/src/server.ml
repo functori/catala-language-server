@@ -491,6 +491,129 @@ let server_initialized, resolve_init =
 
 let ongoing_project_scan = ref false
 
+let dependency_pos (pos : Pos.t) : Catala_types_t.dependency_pos =
+  {
+    file = Pos.get_file pos;
+    start =
+      { line = Pos.get_start_line pos; character = Pos.get_start_column pos };
+    end_ = { line = Pos.get_end_line pos; character = Pos.get_end_column pos };
+  }
+
+module Dep_graph (G : Graph.Sig.G with type E.label = Pos.t) = struct
+  let to_atd (format : Format.formatter -> G.V.t -> unit) (g : G.t) :
+      Catala_types_t.dependency_graph =
+    let nodes =
+      G.fold_vertex
+        (fun v acc ->
+          (string_of_int (G.V.hash v), Format.asprintf "%a" format v) :: acc)
+        g []
+    in
+    let edges =
+      G.fold_edges_e
+        (fun e acc ->
+          {
+            Catala_types_t.from_ = G.V.hash (G.E.src e);
+            to_ = G.V.hash (G.E.dst e);
+            pos = dependency_pos (G.E.label e);
+          }
+          :: acc)
+        g []
+    in
+    { Catala_types_t.nodes; edges }
+end
+
+module Scope_graph = Dep_graph (Scopelang.Dependency.SDependencies)
+module Type_graph = Dep_graph (Scopelang.Dependency.TDependencies)
+module Var_graph = Dep_graph (Desugared.Dependency.ScopeDependencies)
+
+let format_scope_vertex ppf : Scopelang.Dependency.vertex -> unit = function
+  | Scope (s, _) -> Shared_ast.ScopeName.format ppf s
+  | Topdef t -> Shared_ast.TopdefName.format ppf t
+
+let intra_scope_graphs ~whole_program (desugared : Desugared.Ast.program) =
+  let graphs_of_modul (m : Desugared.Ast.modul) =
+    Shared_ast.ScopeName.Map.bindings m.module_scopes
+    |> List.map (fun (name, scope) ->
+        ( Shared_ast.ScopeName.to_string name,
+          Desugared.Dependency.build_scope_dependencies scope
+          |> Var_graph.to_atd Desugared.Dependency.Vertex.format ))
+  in
+  let modules =
+    if not whole_program then []
+    else
+      Shared_ast.ModuleName.Map.fold
+        (fun _ m acc -> graphs_of_modul m @ acc)
+        desugared.program_modules []
+  in
+  graphs_of_modul desugared.program_root @ modules
+
+let whole_program_module_loading () : Surface.Parser_driver.module_loading =
+  let cache = Hashtbl.create 16 in
+  fun ~allow_notmodules ~is_stdlib options file ->
+    match Hashtbl.find_opt cache file with
+    | Some content -> content
+    | None ->
+      let content =
+        Surface.Parser_driver.load_module ~allow_notmodules ~is_stdlib options
+          file
+      in
+      Hashtbl.replace cache file content;
+      content
+
+let whole_program_result document : Server_state.valid_result option =
+  let resolve_file_content path = Global.FileName (File.clean_path path) in
+  let get_module_content = whole_program_module_loading () in
+  let result =
+    Document_processing.process ~whole_program:true ~get_module_content
+      ~resolve_file_content document
+  in
+  match result with
+  | Server_state.Valid (_, r) | Server_state.Partial (_, r) -> Some r
+  | Server_state.Skipped | Server_state.Faulty _ -> None
+
+let dependency_graphs_of
+    (kinds : Catala_types_t.dependency_kind list)
+    ~whole_program
+    (desugared : Desugared.Ast.program)
+    (prg : Shared_ast.typed Scopelang.Ast.program) :
+    Catala_types_t.dependency_graphs =
+  let when_wanted kind f = if List.mem kind kinds then Some (f ()) else None in
+  {
+    intra_scopes =
+      when_wanted `IntraScopes (fun () ->
+          intra_scope_graphs ~whole_program desugared);
+    inter_scopes =
+      when_wanted `InterScopes (fun () ->
+          Scopelang.Dependency.build_program_dep_graph prg
+          |> Scope_graph.to_atd format_scope_vertex);
+    types =
+      when_wanted `Types (fun () ->
+          Scopelang.Dependency.build_type_graph prg.program_ctx.ctx_structs
+            prg.program_ctx.ctx_enums
+          |> Type_graph.to_atd Shared_ast.TypeIdent.format);
+  }
+
+let dependency_graph_json ~kinds ~whole_program document desugared prg =
+  let saved = Global.options.whole_program in
+  Fun.protect
+    ~finally:(fun () -> ignore (Global.enforce_options ~whole_program:saved ()))
+    (fun () ->
+      ignore (Global.enforce_options ~whole_program ());
+      let programs =
+        if not whole_program then Some (desugared, prg)
+        else
+          Option.map
+            (fun (r : Server_state.valid_result) -> r.desugared, r.prg)
+            (whole_program_result document)
+      in
+      Option.map
+        (fun (desugared, prg) ->
+          let buf = Buffer.create 1024 in
+          Catala_types_j.write_dependency_graphs buf
+            (dependency_graphs_of kinds ~whole_program desugared prg);
+          Yojson.Safe.from_string ~buf (Buffer.contents buf))
+        programs)
+
 class catala_lsp_server =
   let open Linol_lwt in
   object (self)
@@ -864,6 +987,68 @@ class catala_lsp_server =
               m "catala.exceptionsAt failed: %s" (Printexc.to_string exn));
           Lwt.return `Null)
 
+    method private dependency_graph (params : Yojson.Safe.t option) :
+        Yojson.Safe.t Lwt.t =
+      let* () = server_initialized in
+      St.use_when_ready server_state
+      @@ fun { open_documents; _ } ->
+      Lwt.catch
+        (fun () ->
+          match params with
+          | None -> Lwt.return `Null
+          | Some json -> (
+            let { Catala_types_t.uri; kinds; whole_program } =
+              Yojson.Safe.to_string json
+              |> Catala_types_j.dependency_graph_params_of_string
+            in
+            let kinds =
+              Option.value kinds ~default:[`IntraScopes; `InterScopes; `Types]
+            in
+            let whole_program = Option.value whole_program ~default:false in
+            let doc_id = Doc_id.of_lsp_uri (Uri0.of_string uri) in
+            match Doc_id.Map.find_opt doc_id open_documents with
+            | Some
+                ({ last_valid_result = Some { prg; desugared; _ }; _ } as
+                 document) -> (
+              match
+                dependency_graph_json ~kinds ~whole_program document desugared
+                  prg
+              with
+              | Some json -> Lwt.return json
+              | None ->
+                Log.err (fun m ->
+                    m "catala.dependencyGraph: whole-program processing failed");
+                Lwt.return `Null)
+            | _ -> Lwt.return `Null))
+        (fun exn ->
+          Log.err (fun m ->
+              m "catala.dependencyGraph failed: %s" (Printexc.to_string exn));
+          Lwt.return `Null)
+
+    method private get_trace_assert (params : Yojson.Safe.t option) :
+        Yojson.Safe.t Lwt.t =
+      Lwt.catch
+        (fun () ->
+          match params with
+          | None -> Lwt.return `Null
+          | Some json -> (
+            let clerk_toml_dir =
+              Yojson.Safe.Util.(json |> member "clerk_toml_dir" |> to_string)
+            in
+            (* [process_clerk_toml] only absorbs [Message.CompilerError]: a
+               missing or unreadable directory still raises [Sys_error]. *)
+            match process_clerk_toml clerk_toml_dir with
+            | None -> Lwt.return `Null
+            | Some (config, _) ->
+              Lwt.return
+              @@ Option.fold ~none:(`Bool false)
+                   ~some:(fun b -> `Bool b)
+                   config.global.check_trace_assertion))
+        (fun exn ->
+          Log.err (fun m ->
+              m "catala.getTraceAssert failed: %s" (Printexc.to_string exn));
+          Lwt.return `Null)
+
     method private list_entrypoints (params : Yojson.Safe.t option) :
         Yojson.Safe.t Lwt.t =
       let* () = server_initialized in
@@ -887,15 +1072,27 @@ class catala_lsp_server =
                      no_variables = None;
                    }
           in
-          let all_projects = Projects.elements projects in
+          (* Rescan every project before listing. [projects] is the snapshot
+             taken when the workspace was loaded: a file created since then is
+             absent from [project_files], and both the file filtering below and
+             [get_prog] would skip it. Diagnostics produced by the scan are
+             dropped, this request only reports entrypoints — the files get
+             their own when opened or saved. *)
+          let _scan_errors, on_error = make_error_handler () in
+          let all_projects =
+            List.map
+              (fun project -> fst (reload_project ~on_error project projects))
+              (Projects.elements projects)
+          in
           let* entrypoint_list =
             Lwt_list.map_s
               (fun project ->
                 let get_prog doc_id =
                   Doc_id.Map.find_opt doc_id open_documents
                   |> function
-                  | Some { last_valid_result = Some { prg; _ }; _ } ->
-                    Lwt.return_some prg
+                  | Some { last_valid_result = Some { prg; desugared; _ }; _ }
+                    ->
+                    Lwt.return_some (prg, desugared.program_root.module_scopes)
                   | _ -> (
                     let*? project_file =
                       Lwt.return
@@ -916,7 +1113,9 @@ class catala_lsp_server =
                     in
                     match validation_result with
                     | Skipped | Faulty _ | Partial _ -> Lwt.return_none
-                    | Valid (_, r) -> Lwt.return_some r.prg)
+                    | Valid (_, r) ->
+                      Lwt.return_some
+                        (r.prg, r.desugared.program_root.module_scopes))
                 in
                 list_entrypoints ~get_prog project params)
               all_projects
@@ -969,12 +1168,18 @@ class catala_lsp_server =
         | UnknownRequest { meth = "catala.listEntrypoints"; params } ->
           self#list_entrypoints
             (Option.map Linol_jsonrpc.Jsonrpc.Structured.yojson_of_t params)
+        | UnknownRequest { meth = "catala.getTraceAssert"; params } ->
+          self#get_trace_assert
+            (Option.map Linol_jsonrpc.Jsonrpc.Structured.yojson_of_t params)
         | UnknownRequest { meth = "catala.exceptionsAt"; params } ->
           self#exceptions_at
             (Option.map Linol_jsonrpc.Jsonrpc.Structured.yojson_of_t params)
         | UnknownRequest { meth = "catala.rescanProjects"; params = _ } ->
           let* () = self#rescan_projects ~notify_back () in
           Lwt.return `Null
+        | UnknownRequest { meth = "catala.dependencyGraph"; params } ->
+          self#dependency_graph
+            (Option.map Linol_jsonrpc.Jsonrpc.Structured.yojson_of_t params)
         | UnknownRequest { meth; _ } ->
           Format.kasprintf Lwt.fail_with "Unknown LSP request received: %s" meth
         | _ -> super#on_request_unhandled ~notify_back ~id r

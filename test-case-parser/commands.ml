@@ -65,6 +65,7 @@ let get_scope_test
     test_inputs;
     description;
     title;
+    variables = [];
   }
 
 (* --- *)
@@ -76,10 +77,12 @@ let write_stdout f arg =
 
 let print_test test = write_stdout J.write_test test
 let print_tests test = write_stdout J.write_test_list test
+let default_build_dir = "_build"
 
-let read_program includes path_to_build options =
+let read_program ?(build_dir = default_build_dir) includes path_to_build options
+    =
   let stdlib =
-    Some (Global.raw_file File.(path_to_build / "_build" / "libcatala"))
+    Some (Global.raw_file File.(path_to_build / build_dir / "libcatala"))
   in
   let prg, ctx = Driver.Passes.desugared options ~stdlib ~includes in
   let prg = Desugared.Disambiguate.program prg in
@@ -216,7 +219,8 @@ let generate_test
     | Some p -> p
     | None ->
       let path_to_build, include_dirs =
-        if include_dirs = [] then lookup_include_dirs options
+        if include_dirs = [] then
+          lookup_include_dirs ~build_dir:default_build_dir options
         else ".", include_dirs
       in
       read_program include_dirs path_to_build options
@@ -481,7 +485,13 @@ let get_catala_test (prg, naming_ctx) testing_scope_name =
         var_str, { test_out with O.value })
       base_test.test_outputs
   in
-  { base_test with O.test_inputs; test_outputs; description; title }
+  let variables =
+    Pos.get_attrs info (function
+      | TraceAssert (path, expected) ->
+        Some (path, Option.map Model.translate_runtime_value expected)
+      | _ -> None)
+  in
+  { base_test with O.test_inputs; test_outputs; description; title; variables }
 
 let import_catala_tests (prg, naming_ctx) =
   List.map (get_catala_test (prg, naming_ctx)) (get_test_scopes prg)
@@ -495,7 +505,7 @@ let read_failure ~test_file ~misfit (errors : Message.lsp_error list) :
       (fun (e : Message.lsp_error) ->
         match e.kind with
         | Lexing | Parsing | Typing | Generic -> true
-        | Warning | AssertFailure -> false)
+        | TraceAssertFails | Warning | AssertFailure -> false)
       errors
   in
   let in_test (e : Message.lsp_error) =
@@ -519,9 +529,11 @@ let read_test_unguarded
     ~misfit
     include_dirs
     (options : Global.options)
-    buffer_path =
+    buffer_path
+    scope_filter =
   let path_to_build, include_dirs =
-    if include_dirs = [] then lookup_include_dirs ?buffer_path options
+    if include_dirs = [] then
+      lookup_include_dirs ~build_dir:default_build_dir ?buffer_path options
     else ".", include_dirs
   in
   let prg = read_program include_dirs path_to_build options in
@@ -530,6 +542,12 @@ let read_test_unguarded
     error_mixed_ownership (List.map ScopeName.to_string unowned)
   | _ -> ());
   let tests = import_catala_tests prg in
+  let tests =
+    match scope_filter with
+    | None -> tests
+    | Some scope ->
+      List.filter (fun (t : O.test) -> t.O.testing_scope = scope) tests
+  in
   match check_tests_fit tests with
   | Ok () -> write_stdout J.write_test_list tests
   | Error problems ->
@@ -566,7 +584,9 @@ let read_tests_of_file ~(lang : Global.backend_lang) (file : string) :
         Global.enforce_options ~input_src:(Global.FileName file)
           ~language:(Some lang) ()
       in
-      let path_to_build, include_dirs = lookup_include_dirs options in
+      let path_to_build, include_dirs =
+        lookup_include_dirs ~build_dir:default_build_dir options
+      in
       import_catala_tests (read_program include_dirs path_to_build options)
     with
     | tests -> Ok (Some tests)
@@ -577,10 +597,22 @@ let read_tests_of_file ~(lang : Global.backend_lang) (file : string) :
 let retrieve_assertions_values
     (dcalc_prg : typed Dcalc.Ast.program)
     (scope : ScopeName.t) : (StructField.t * (dcalc, typed) gexpr) list =
+  (* With the trace on, the compiler wraps sub-expressions in [Tag] operator
+     applications; they carry no value and have to be seen through. *)
+  let rec strip_tags (e : (dcalc, typed) gexpr) : (dcalc, typed) gexpr =
+    match Mark.remove e with
+    | EAppOp { op = Op.Tag _, _; args = [e]; _ } -> strip_tags e
+    | _ -> e
+  in
   let get_expected_value (assert_e : (dcalc, typed) gexpr) =
-    match Mark.remove assert_e with
-    | EAssert (EAppOp { args = [(EStructAccess { field; _ }, _); v]; _ }, _) ->
-      field, v
+    match Mark.remove (strip_tags assert_e) with
+    | EAssert equality -> (
+      match Mark.remove (strip_tags equality) with
+      | EAppOp { args = [lhs; v]; _ } -> (
+        match Mark.remove (strip_tags lhs) with
+        | EStructAccess { field; _ } -> field, strip_tags v
+        | _ -> assert false)
+      | _ -> assert false)
     | _ -> assert false
   in
   let code_items = dcalc_prg.code_items |> BoundList.to_seq |> List.of_seq in
@@ -601,12 +633,17 @@ let retrieve_assertions_values
           scope_lets)
     [] code_items
 
-let retrieve_program include_dirs options scope_name =
+let retrieve_program
+    ?(build_dir = default_build_dir)
+    include_dirs
+    options
+    scope_name =
   let path_to_build, include_dirs =
-    if include_dirs = [] then lookup_include_dirs options else ".", []
+    if include_dirs = [] then lookup_include_dirs ~build_dir options
+    else ".", []
   in
   let desugared_prg, naming_ctx =
-    read_program include_dirs path_to_build options
+    read_program ~build_dir include_dirs path_to_build options
   in
   let testing_scope_name =
     match
@@ -671,6 +708,7 @@ let interpret_program dcalc_prg scope_name build_term_to_interp =
     | { Message.kind = AssertFailure; _ } ->
       failed_asserts := e :: !failed_asserts;
       false (* absorb error *)
+    | { Message.kind = TraceAssertFails; _ } -> (* absorb trace error *) false
     | _ -> true (* propagate error and crash *)
   in
   let () =
@@ -681,11 +719,12 @@ let interpret_program dcalc_prg scope_name build_term_to_interp =
     |> Interpreter.evaluate_expr dcalc_prg.decl_ctx dcalc_prg.lang
   in
   let to_interp = build_term_to_interp program_fun in
-  let results =
-    Interpreter.evaluate_expr dcalc_prg.decl_ctx dcalc_prg.lang to_interp
+  let results, failed_trace_asserts =
+    Interpreter.evaluate_expr_with_trace dcalc_prg.decl_ctx dcalc_prg.lang
+      scope_name to_interp
   in
   Message.report_delayed_errors_if_any ();
-  results, !failed_asserts
+  results, !failed_asserts, failed_trace_asserts
 
 (* A run's results, as the test's outputs typed by the output struct. *)
 let test_outputs_of dcalc_prg out_struct actual_results =
@@ -739,13 +778,25 @@ let rec convert_to_json_input ({ value; _ } : O.runtime_value) : Yojson.Safe.t =
   in
   convert_runtime_raw value
 
+let translate_failed_assert failed_assert =
+  O.
+    {
+      name = failed_assert.Trace_assertion.name;
+      expected =
+        Trace_assertion.value_to_string failed_assert.Trace_assertion.expected;
+      current_value =
+        Option.map Trace_assertion.value_to_string
+          failed_assert.Trace_assertion.current_value;
+    }
+
 let run_with_inputs
+    ?build_dir
     include_dirs
     options
     tested_scope_name
     (scope_input : Yojson.Safe.t) =
   let desugared_prg, _naming_ctx, scope_name, dcalc_prg =
-    retrieve_program include_dirs options tested_scope_name
+    retrieve_program ?build_dir include_dirs options tested_scope_name
   in
   let test =
     get_scope_test desugared_prg "<abstract>" scope_name
@@ -799,7 +850,7 @@ let run_with_inputs
       (Expr.pos program_fun)
     |> Expr.unbox
   in
-  let result_struct, failed_asserts =
+  let result_struct, failed_asserts, failed_trace_assert =
     interpret_program dcalc_prg scope_name build_term
   in
   let (actual_results : (StructField.t * (dcalc, typed) gexpr) list), out_struct
@@ -814,11 +865,19 @@ let run_with_inputs
   let test_outputs = test_outputs_of dcalc_prg out_struct actual_results in
   let assert_failures = not (failed_asserts = []) in
   let test = O.{ test with test_outputs } in
-  write_stdout J.write_test_run O.{ test; assert_failures; diffs = [] }
+  write_stdout J.write_test_run
+    O.
+      {
+        test;
+        assert_failures;
+        diffs = [];
+        failed_trace_assert =
+          List.map translate_failed_assert failed_trace_assert;
+      }
 
-let run_test include_dirs options testing_scope =
+let run_test ?build_dir include_dirs options testing_scope =
   let desugared_prg, naming_ctx, testing_scope_name, dcalc_prg =
-    retrieve_program include_dirs options testing_scope
+    retrieve_program ?build_dir include_dirs options testing_scope
   in
   let test = get_catala_test (desugared_prg, naming_ctx) testing_scope_name in
   let build_term program_fun =
@@ -829,7 +888,7 @@ let run_test include_dirs options testing_scope =
     in
     program_expr
   in
-  let result_struct, failed_asserts =
+  let result_struct, failed_asserts, failed_trace_assert =
     interpret_program dcalc_prg testing_scope_name build_term
   in
   let (actual_results : (StructField.t * (dcalc, typed) gexpr) list), out_struct
@@ -854,7 +913,15 @@ let run_test include_dirs options testing_scope =
     |> List.map (proj_diff (get_value dcalc_prg.lang dcalc_prg.decl_ctx))
   in
   let assert_failures = not (failed_asserts = []) in
-  let test_run = { O.test; O.assert_failures; O.diffs } in
+  let test_run =
+    {
+      O.test;
+      O.assert_failures;
+      O.diffs;
+      O.failed_trace_assert =
+        List.map translate_failed_assert failed_trace_assert;
+    }
+  in
   write_stdout J.write_test_run test_run
 
 let clerk_exe () =
@@ -947,6 +1014,7 @@ let run_test_cmd
     options
     test_scope_name
     scope_input_opt
+    build_dir
     buffer_path =
   let options =
     match options.Global.input_src, buffer_path with
@@ -971,14 +1039,17 @@ let run_test_cmd
       options
   in
   match scope_input_opt with
-  | None -> run_test include_dirs options test_scope_name
-  | Some json -> run_with_inputs include_dirs options test_scope_name json
+  | None -> run_test ?build_dir include_dirs options test_scope_name
+  | Some json ->
+    run_with_inputs ?build_dir include_dirs options test_scope_name json
 
 let print_scopes scopes = write_stdout J.write_scope_def_list scopes
 
 let list_scopes include_dirs options =
   let path_to_build, include_dirs =
-    if include_dirs = [] then lookup_include_dirs options else ".", include_dirs
+    if include_dirs = [] then
+      lookup_include_dirs ~build_dir:default_build_dir options
+    else ".", include_dirs
   in
   let prg, _ = read_program include_dirs path_to_build options in
   let module_name =

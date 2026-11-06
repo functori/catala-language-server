@@ -4,7 +4,9 @@ import { assertUnreachable } from '../shared/util';
 
 import type {
   ParseResults,
+  TestList,
   TestRunResults,
+  TraceData,
   UpMessage,
 } from '../generated/catala_types';
 import {
@@ -24,14 +26,119 @@ import {
 } from '../test-case-editor/testCaseCompilerInterop';
 import { renameIfNeeded } from '../test-case-editor/testCaseUtils';
 import { CatalaTestCaseDocument } from '../shared/CatalaTestCaseDocument';
+import type { SettingsSource } from './settingsStore';
+import { resolveLanguage } from '../shared/settings';
+import type { ResultController } from './testAndCoverage';
+import { TestId } from './testAndCoverage';
+import type { CheckTraceAssert } from './lspRequests';
+import { getCwd } from '../shared/util_client';
+import { TraceEditorProvider } from './traceEditorProvider';
+import { runTrace } from '../trace-editor/traceRunner';
+import type { TraceElement } from '../trace-editor/traceUtils';
 
 export function parseContents(
   content: Uint8Array,
   uri: vscode.Uri,
   language: string
-): ParseResults {
+): Promise<ParseResults> {
   const documentText = new TextDecoder('utf-8').decode(content);
-  return parseTestFile(documentText, language, uri.fsPath);
+  return parseTestFile(documentText, uri.fsPath, language);
+}
+
+export async function testScopePicker(
+  document: CatalaTestCaseDocument
+): Promise<TestList> {
+  try {
+    const ws = vscode.workspace.getWorkspaceFolder(document.uri);
+    const wsPath = ws?.uri.fsPath;
+    const entries = (await vscode.commands.executeCommand(
+      'catala.listTestableScopes',
+      wsPath
+    )) as { path: string; scopes: string[] }[];
+
+    const browseItem: vscode.QuickPickItem = {
+      label: '$(folder-opened) Choose from file…',
+      alwaysShow: true,
+    };
+
+    const scopeItems: vscode.QuickPickItem[] = entries.flatMap((e) =>
+      e.scopes.map((scope) => ({
+        label: scope,
+        description: e.path,
+      }))
+    );
+
+    const picked = await vscode.window.showQuickPick(
+      [
+        browseItem,
+        {
+          label: 'Catala scopes',
+          kind: vscode.QuickPickItemKind.Separator,
+        },
+        ...scopeItems,
+      ],
+      {
+        matchOnDescription: true,
+        placeHolder: 'Select a scope to create a test',
+      }
+    );
+
+    if (!picked) return [];
+
+    let filename: string | undefined;
+    let scopeUnderTest: string | undefined;
+
+    if (picked === browseItem) {
+      const fileUri = await vscode.window.showOpenDialog({
+        filters: {
+          'Catala Files': ['catala_fr', 'catala_en', 'catala_pl'],
+        },
+      });
+      if (!fileUri?.[0]) return [];
+      filename = fileUri[0].fsPath;
+
+      const scopes = await getAvailableScopes(filename);
+      const pickedScope = await vscode.window.showQuickPick(
+        scopes.map((s) => ({ label: s.name })),
+        {
+          placeHolder: `Select a scope in ${path.basename(filename)}`,
+        }
+      );
+      if (!pickedScope) return [];
+      scopeUnderTest = pickedScope.label;
+    } else {
+      scopeUnderTest = picked.label;
+      filename = picked.description;
+    }
+
+    if (!filename || !scopeUnderTest) return [];
+
+    const results = generate(scopeUnderTest, filename, false, true);
+    if (results.kind === 'Results') {
+      const newTest = results.value;
+
+      const currentTests = document.parseResults;
+      if (currentTests.kind === 'Results') {
+        newTest[0] = renameIfNeeded(currentTests.value, newTest[0]);
+        const updatedTests = [...currentTests.value, newTest[0]];
+
+        document.scheduleChange(updatedTests, false);
+
+        return updatedTests;
+      }
+    } else {
+      vscode.window.showErrorMessage(
+        `Failed to generate test: ${results.value}`
+      );
+    }
+  } catch (err) {
+    logger.log(
+      `OpenTestScopePicker failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
+  }
+  return [];
 }
 
 // This class contains the 'backend' part of the test case editor that
@@ -48,8 +155,16 @@ export class TestCaseEditorProvider
   public readonly onDidChangeCustomDocument =
     this._onDidChangeCustomDocument.event;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  constructor(
+    private readonly context: vscode.ExtensionContext,
+    private resultController: ResultController,
+    /** dist-relative path to the emitted `codicon.css`. */
+    private readonly codiconsCssPath: string,
+    private readonly checkTraceAssert: CheckTraceAssert,
+    private readonly settings: SettingsSource
+  ) {
     this.testQueue = new PQueue({ concurrency: 1 });
+    this.resultController = resultController;
   }
 
   async saveCustomDocument(
@@ -121,8 +236,20 @@ export class TestCaseEditorProvider
     return document;
   }
 
-  public static register(context: vscode.ExtensionContext): vscode.Disposable {
-    const provider = new TestCaseEditorProvider(context);
+  public static register(
+    context: vscode.ExtensionContext,
+    resultController: ResultController,
+    codiconsCssPath: string,
+    checkTraceAssert: CheckTraceAssert,
+    settings: SettingsSource
+  ): vscode.Disposable {
+    const provider = new TestCaseEditorProvider(
+      context,
+      resultController,
+      codiconsCssPath,
+      checkTraceAssert,
+      settings
+    );
     logger.log(`Registering ${TestCaseEditorProvider.viewType}`);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
       TestCaseEditorProvider.viewType,
@@ -142,6 +269,10 @@ export class TestCaseEditorProvider
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    const checkTraceAssert = await this.checkTraceAssert(
+      getCwd(document.uri.fsPath) ?? path.dirname(document.uri.fsPath)
+    );
+    let following: vscode.Disposable = new vscode.Disposable(() => {});
     const config = vscode.workspace.getConfiguration('catala');
     const isCustomEditorEnabled = config.get<boolean>(
       'enableCustomTestCaseEditor'
@@ -161,14 +292,21 @@ export class TestCaseEditorProvider
       enableScripts: true,
     };
 
-    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
+    webviewPanel.webview.html = this.getHtmlForWebview(
+      webviewPanel.webview,
+      document.uri.fsPath
+    );
 
     // We want to restrict shell -> webview messages to instances
     // of DownMessage
     function postMessageToWebView(message: DownMessage): void {
       webviewPanel.webview.postMessage(writeDownMessage(message));
     }
-    TestCaseEditorProvider.registerWebview(document.uri, postMessageToWebView);
+    TestCaseEditorProvider.registerWebview(
+      document.uri,
+      postMessageToWebView,
+      webviewPanel
+    );
 
     function postUpdate(results: ParseResults = document.parseResults): void {
       postMessageToWebView({
@@ -183,9 +321,10 @@ export class TestCaseEditorProvider
 
     async function runTest(
       fileName: string,
-      scope: string
+      scope: string,
+      trace: boolean
     ): Promise<TestRunResults> {
-      return runTestScope(fileName, scope);
+      return runTestScope(fileName, scope, trace);
     }
 
     function applyGuiEdit(
@@ -199,15 +338,60 @@ export class TestCaseEditorProvider
       document.scheduleChange(typed_msg.value[0], typed_msg.value[1]);
     }
 
+    async function sendTrace(): Promise<void> {
+      const parsed = document.parseResults;
+      if (parsed.kind !== 'Results') {
+        return;
+      }
+      for (const test of parsed.value) {
+        const result = await runTrace(document.uri.fsPath, test.testing_scope);
+        if (!result.ok) {
+          logger.log(
+            `Could not compute trace for scope ${test.testing_scope}: ${result.error}`
+          );
+          continue;
+        }
+        webviewPanel.webview.postMessage({
+          kind: 'trace',
+          scope: test.testing_scope,
+          trace: result.trace,
+        });
+      }
+    }
+
     webviewPanel.webview.onDidReceiveMessage(async (message: unknown) => {
+      if (
+        message !== null &&
+        typeof message === 'object' &&
+        (message as { kind?: unknown }).kind === 'openTraceEditor'
+      ) {
+        const scope = (message as { scope?: unknown }).scope;
+        const scopeStr = typeof scope === 'string' ? scope : undefined;
+        const trace = (message as { trace?: TraceElement[] }).trace;
+        const parsed = document.parseResults;
+        const test =
+          scopeStr !== undefined && parsed.kind === 'Results'
+            ? parsed.value.find((t) => t.testing_scope === scopeStr)
+            : undefined;
+        await TraceEditorProvider.openWith(document.uri, {
+          scope: scopeStr,
+          test,
+          trace,
+        });
+        return;
+      }
       const typed_msg = readUpMessage(message);
       switch (typed_msg.kind) {
-        // listen for a 'ready' message from the web view, then send the initial
-        // document (in parsed form)
         case 'Ready': {
           logger.log(`Got ready message from webview, sending parsed document`);
+          following.dispose();
+          following = this.settings.follow(
+            webviewPanel.webview,
+            document.uri.fsPath
+          );
           postUpdate();
           TestCaseEditorProvider.markReady(document.uri);
+          void sendTrace();
           break;
         }
         case 'GuiEdit': {
@@ -255,7 +439,6 @@ export class TestCaseEditorProvider
                 },
               },
             });
-            // Reflect the cancellation in the Test Explorer
             void vscode.commands.executeCommand(
               'catala.testcase.reportResult',
               document.uri,
@@ -265,7 +448,7 @@ export class TestCaseEditorProvider
             return;
           }
 
-          const { scope, reset_outputs } = typed_msg.value;
+          const { scope, reset_outputs, has_trace_assert } = typed_msg.value;
           if (reset_outputs) {
             const confirmation = await vscode.window.showInformationMessage(
               vscode.l10n.t(
@@ -276,9 +459,6 @@ export class TestCaseEditorProvider
             );
 
             if (confirmation?.action !== 'Reset') {
-              // the user has requested an outputs reset but
-              // did not confirm -- we do not need to run the
-              // test at all.
               postMessageToWebView({
                 kind: 'TestRunResults',
                 value: {
@@ -287,7 +467,6 @@ export class TestCaseEditorProvider
                   results: { kind: 'Cancelled' },
                 },
               });
-              // Reflect the cancellation in the Test Explorer
               void vscode.commands.executeCommand(
                 'catala.testcase.reportResult',
                 document.uri,
@@ -297,15 +476,29 @@ export class TestCaseEditorProvider
               return;
             }
           }
-          const results = await this.testQueue.add(() =>
-            runTest(document.uri.fsPath, scope)
-          ); // assumes that the document is local (fsPath)
+
+          let results;
+          results = await this.testQueue.add(() =>
+            runTest(
+              document.uri.fsPath,
+              scope,
+              has_trace_assert && checkTraceAssert
+            )
+          );
+
+          // This run does not go through clerk, so nothing else would record
+          // it: without this the General Tests view would keep showing the
+          // outcome of the previous run for that scope.
+          this.resultController.record(
+            new TestId(document.uri, scope),
+            scope,
+            results
+          );
 
           postMessageToWebView({
             kind: 'TestRunResults',
             value: { scope, reset_outputs, results },
           });
-          // Report results back to the Test Explorer when initiated from the GUI
           void vscode.commands.executeCommand(
             'catala.testcase.reportResult',
             document.uri,
@@ -314,7 +507,6 @@ export class TestCaseEditorProvider
           );
 
           if (reset_outputs) {
-            // reset assertions in the document model, update UI
             if (results.kind === 'Ok') {
               document.resetTestOutputs(scope, results.value.test_outputs);
             }
@@ -420,95 +612,9 @@ export class TestCaseEditorProvider
           );
           break;
         case 'OpenTestScopePicker': {
-          try {
-            const ws = vscode.workspace.getWorkspaceFolder(document.uri);
-            const wsPath = ws?.uri.fsPath;
-            const entries = (await vscode.commands.executeCommand(
-              'catala.listTestableScopes',
-              wsPath
-            )) as { path: string; scopes: string[] }[];
-
-            const browseItem: vscode.QuickPickItem = {
-              label: '$(folder-opened) Choose from file…',
-              alwaysShow: true,
-            };
-
-            const scopeItems: vscode.QuickPickItem[] = entries.flatMap((e) =>
-              e.scopes.map((scope) => ({
-                label: scope,
-                description: e.path,
-              }))
-            );
-
-            const picked = await vscode.window.showQuickPick(
-              [
-                browseItem,
-                {
-                  label: 'Catala scopes',
-                  kind: vscode.QuickPickItemKind.Separator,
-                },
-                ...scopeItems,
-              ],
-              {
-                matchOnDescription: true,
-                placeHolder: 'Select a scope to create a test',
-              }
-            );
-
-            if (!picked) break;
-
-            let filename: string | undefined;
-            let scopeUnderTest: string | undefined;
-
-            if (picked === browseItem) {
-              const fileUri = await vscode.window.showOpenDialog({
-                filters: {
-                  'Catala Files': ['catala_fr', 'catala_en', 'catala_pl'],
-                },
-              });
-              if (!fileUri?.[0]) break;
-              filename = fileUri[0].fsPath;
-
-              const scopes = await getAvailableScopes(filename);
-              const pickedScope = await vscode.window.showQuickPick(
-                scopes.map((s) => ({ label: s.name })),
-                {
-                  placeHolder: `Select a scope in ${path.basename(filename)}`,
-                }
-              );
-              if (!pickedScope) break;
-              scopeUnderTest = pickedScope.label;
-            } else {
-              scopeUnderTest = picked.label;
-              filename = picked.description;
-            }
-
-            if (!filename || !scopeUnderTest) break;
-
-            const results = generate(scopeUnderTest, filename, false, true);
-            if (results.kind === 'Results') {
-              const newTest = results.value;
-
-              const currentTests = document.parseResults;
-              if (currentTests.kind === 'Results') {
-                newTest[0] = renameIfNeeded(currentTests.value, newTest[0]);
-                const updatedTests = [...currentTests.value, newTest[0]];
-
-                document.scheduleChange(updatedTests, false);
-
-                postUpdate({ kind: 'Results', value: updatedTests });
-              }
-            } else {
-              vscode.window.showErrorMessage(
-                `Failed to generate test: ${results.value}`
-              );
-            }
-          } catch (err) {
-            logger.log(
-              `OpenTestScopePicker failed: ${
-                err instanceof Error ? err.message : String(err)
-              }`
-            );
+          let result = await testScopePicker(document);
+          if (result.length > 0) {
+            postUpdate({ kind: 'Results', value: result });
           }
           break;
         }
@@ -620,6 +726,12 @@ export class TestCaseEditorProvider
           });
           break;
         }
+        case 'SpecificTestRequest':
+          throw new Error(`Unexpected SpecificTestRequest`);
+        case 'OpenInTestEditor':
+          throw new Error(`Unexpected OpenInTestEditor`);
+        case 'Reload':
+          throw new Error('Unexpected Reload');
         default:
           assertUnreachable(typed_msg);
       }
@@ -635,30 +747,41 @@ export class TestCaseEditorProvider
       // e.g. subscriptions to vs code 'system' events
       // (content change monitoring...)
       TestCaseEditorProvider.unregisterWebview(document.uri);
+      following.dispose();
       changeSubscription.dispose();
     });
   }
 
   public static readonly viewType = 'catala.testCaseEditor';
 
-  // Registry of open custom editor webviews to send messages to
+  // Registry of open custom editor webviews to send messages to. The panel is
+  // kept alongside `post` so an editor that is already open can be revealed --
+  // messages alone cannot bring it to the front.
   private static webviews = new Map<
     string,
-    { post: (msg: DownMessage) => void; ready: boolean; queue: DownMessage[] }
+    {
+      post: (msg: DownMessage) => void;
+      panel: vscode.WebviewPanel | undefined;
+      ready: boolean;
+      queue: DownMessage[];
+    }
   >();
 
   private static registerWebview(
     uri: vscode.Uri,
-    post: (m: DownMessage) => void
+    post: (m: DownMessage) => void,
+    panel: vscode.WebviewPanel
   ): void {
     const key = uri.toString();
     const existing = TestCaseEditorProvider.webviews.get(key);
     if (existing) {
       existing.post = post;
+      existing.panel = panel;
       TestCaseEditorProvider.webviews.set(key, existing);
     } else {
       TestCaseEditorProvider.webviews.set(key, {
         post,
+        panel,
         ready: false,
         queue: [],
       });
@@ -687,6 +810,7 @@ export class TestCaseEditorProvider
       // Create placeholder entry with the message queued; resolveCustomEditor will register later.
       TestCaseEditorProvider.webviews.set(key, {
         post: () => {},
+        panel: undefined,
         ready: false,
         queue: [msg],
       });
@@ -697,6 +821,49 @@ export class TestCaseEditorProvider
       return false;
     }
     entry.post(msg);
+    return true;
+  }
+
+  public static async focusDataInput(
+    uri: vscode.Uri,
+    input_field: [string, TraceData]
+  ): Promise<boolean> {
+    const panel = TestCaseEditorProvider.webviews.get(uri.toString())?.panel;
+    if (panel !== undefined) {
+      // The editor is already open: `vscode.openWith` would leave the focus
+      // where it is, and a webview that does not hold the focus cannot focus
+      // one of its fields. Revealing the panel takes the focus, and passing no
+      // column leaves the editor in the group the user put it in.
+      if (panel.viewColumn == vscode.ViewColumn.Beside) {
+        panel.reveal(vscode.ViewColumn.Beside, false);
+      } else {
+        panel.reveal(undefined, false);
+      }
+    } else {
+      try {
+        // Open the same file with the test case editor in a side-by-side
+        // group, leaving the trace editor visible next to it.
+        await vscode.commands.executeCommand(
+          'vscode.openWith',
+          uri,
+          TestCaseEditorProvider.viewType,
+          { viewColumn: vscode.ViewColumn.Beside }
+        );
+      } catch {
+        return false;
+      }
+    }
+
+    // Deliver immediately if ready, or queue until the webview signals Ready
+    const delivered = TestCaseEditorProvider.postOrQueue(uri, {
+      kind: 'FocusData',
+      value: input_field,
+    });
+    logger.log(
+      `Focus request for ${input_field[1].kind} ${input_field[1].value}: ` +
+        `${panel !== undefined ? 'revealed the open editor' : 'opened the editor'}, ` +
+        `${delivered ? 'message sent' : 'message queued'}`
+    );
     return true;
   }
 
@@ -749,12 +916,25 @@ export class TestCaseEditorProvider
     return true;
   }
 
-  private getHtmlForWebview(webview: vscode.Webview): string {
+  private getHtmlForWebview(webview: vscode.Webview, file: string): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'ui.js')
     );
+    // vscode-elements' components look up this stylesheet by id to load the
+    // Codicons font into their shadow DOM.
+    const codiconsUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(
+        this.context.extensionUri,
+        'dist',
+        this.codiconsCssPath
+      )
+    );
 
-    const language = vscode.env.language;
+    const language = resolveLanguage(
+      this.settings.get(),
+      file,
+      vscode.env.language
+    );
 
     return `
           <!DOCTYPE html>
@@ -763,6 +943,7 @@ export class TestCaseEditorProvider
               <meta charset="UTF-8">
               <meta name="viewport" content="width=device-width, initial-scale=1.0">
               <title>Test Case Editor</title>
+              <link href="${codiconsUri}" id="vscode-codicon-stylesheet" rel="stylesheet" />
               <style>
                   body {
                       padding: 10px;

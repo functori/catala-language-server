@@ -93,12 +93,15 @@ type attr_def = [
   | Uid of string
   | ArrayItemLabel of string
   | Description of string
+  | TestDate of string
   ] <ocaml repr="classic">
 
 type runtime_value = {
   value: runtime_value_raw;
   attrs: attr_def list;
 }
+
+type scope_real_var = { name: string; ?real_value: runtime_value option }
 
 (* Test data *)
 
@@ -120,15 +123,72 @@ type test = {
   tested_scope: scope_def;
   test_inputs: test_inputs;
   test_outputs: test_outputs;
+  variables: (string * runtime_value option) list <json repr="object"> <ts repr="map">;
   description: string;
   title: string;
+}
+
+(* A test as displayed in the 'debug all tests' panel: the test itself
+   (GUI or plain), along with the run metadata that is not intrinsic to
+   the test (which file it lives in and its last run result). *)
+type test_debugger = {
+  index: int;  
+  filename: string;
+  (* [filename] made relative to the workspace folder it belongs to, for
+     display: the panel shows where a test sits in the project, and only the
+     extension side can compute this. Absent when the file belongs to no
+     workspace folder, in which case there is nothing to be relative to. *)
+  ?relative_filename: string option;
+  test: test_entrypoint;
+  ?success: bool option;
+  ?date: string option;
 }
 
 type test_run = {
   test: test;
   assert_failures: bool;
   diffs: diff list;
+  failed_trace_assert: failed_trace_assert list;
 }
+
+type file_test = {
+  file: string;
+  tests: string;
+}
+
+type scope_test_result = {
+  scope_name: string;
+  success: bool;
+  errors: string list;
+  time: float;
+}
+
+type inline_test = {
+  cmd: string;
+  success: bool;
+}
+
+type file_tests = {
+  scopes: scope_test_result list;
+  inline_tests <json name="inline-tests"> : inline_test list;
+}
+
+type file_test_result = {
+  file: string;
+  tests: file_tests;
+}
+
+type coverage = {
+  scopes: string list;
+  locations: string list;
+}
+
+type test_result = {
+  test_results <json name="test-results"> : file_test_result list;
+  coverage: coverage;
+}
+
+type test_debugger_list = test_debugger list
 
 type test_list = test list
 
@@ -146,6 +206,16 @@ type diff = {
   path: path_segment list;
   expected: runtime_value;
   actual: runtime_value;
+}
+
+(* One auxiliary variable whose value in the trace does not match the one
+   declared by its [#[trace.assert]] attribute. Values are the rendered
+   strings the checker compares, not [runtime_value]s. [current_value] is
+   absent when the trace carries no value for the variable. *)
+type failed_trace_assert = {
+  name: string;
+  expected: string;
+  ?current_value: string option;
 }
 
 (* Message exchange within extension (shell <-> webview) *)
@@ -263,6 +333,7 @@ type test_run_output = { (* do we need that type at all when the difference with
   test_outputs: test_outputs;
   assert_failures: bool;
   diffs: diff list;
+  failed_trace_assert: failed_trace_assert list;
 }
 
 type test_run_results = [
@@ -281,6 +352,9 @@ type test_run_request = {
   reset_outputs: bool;
   in_shell: bool;
   debug: bool;
+  (* Whether the test declares trace assertions: only then is the run worth
+     instrumenting with "--trace". *)
+  has_trace_assert: bool;
 }
 
 type test_generate_request = {
@@ -327,9 +401,11 @@ type confirm_result = {
 
 type up_message = [
   | Ready
+  | Reload
   | GuiEdit of (test_list * bool) (* bool: 'edit may be batched' *)
-  | OpenInTextEditor
+  | OpenInTextEditor of string option (* filename *)
   | TestRunRequest of test_run_request
+  | SpecificTestRequest of int list
   | TestGenerateRequest of test_generate_request
   | OpenTestScopePicker
   | ConfirmRequest of confirm_request
@@ -338,6 +414,7 @@ type up_message = [
   | DiscardWorkingCopyRequest (* delete the working copy, start over *)
   | OpenWorkingCopyRequest (* repair the test from its working copy *)
   | RetryOpenRequest (* read the file again *)
+  | OpenInTestEditor of string (* filename *)
 ]
 
 type update = {
@@ -349,28 +426,51 @@ type update = {
   original_reads: bool;
 }
 
+type test_scope_result = {
+  entry: test_entrypoint;
+  scope_success: scope_success;
+  index: int;
+  order: bool
+}
+
+type trace_data = [
+   | Input of string
+   | Internal of string
+   | Result of string
+]
+
 type down_message = [
   | Update of update
   | TestRunResults of test_run_results_msg
+  | TestScopeResult of test_scope_result
   | ConfirmResult of confirm_result
+  | AllTests of test_debugger_list
+  | FocusData of (string * trace_data)
 ]
+
+type scope_success = {
+  success: bool;
+  date: string;
+}
 
 (* List entrypoints *)
 
 type gui_entrypoint = {
-   scope : string;
+   scope_tested : string;
+   scope: string;
    ?title: string option;
    ?description : string option;
-}
-
-type fonc_test_entrypoint = {
-   scope : string;
 }
 
 type test_entrypoint = [
   | GUI of gui_entrypoint
   | Test of fonc_test_entrypoint
 ]
+
+
+type fonc_test_entrypoint = {
+   scope : string;
+}
 
 type no_input_scope_entrypoint = {
   scope: string;
@@ -419,4 +519,41 @@ type entrypoints_params = {
   ?path : string option ;
   ?no_lambdas : bool option ;
   ?no_variables : bool option ;
+}
+
+(* Dependency graphs *)
+
+type dependency_pos = {
+  file : string;
+  start : vscode_position;
+  end_ <json name="end"> : vscode_position;
+}
+
+type dependency_edge = {
+  from_ <json name="from"> : int;
+  to_ <json name="to"> : int;
+  pos : dependency_pos;
+}
+
+type dependency_graph = {
+  nodes : (string * string) list <json repr="object"> <ts repr="map">;
+  edges : dependency_edge list;
+}
+
+type dependency_kind = [
+  | IntraScopes <json name="intra-scopes">
+  | InterScopes <json name="inter-scopes">
+  | Types <json name="types">
+]
+
+type dependency_graphs = {
+  ?intra_scopes : (string * dependency_graph) list <json repr="object"> <ts repr="map"> option;
+  ?inter_scopes : dependency_graph option;
+  ?types : dependency_graph option;
+}
+
+type dependency_graph_params = {
+  uri : string;
+  ?kinds : dependency_kind list option;
+  ?whole_program : bool option;
 }

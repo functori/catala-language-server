@@ -1,0 +1,42 @@
+import type { TraceData } from '../generated/catala_types';
+import type { JsonValue } from '../shared/util_client';
+import type { TraceElement } from './traceUtils';
+
+export type TracePos = { line: number; character: number };
+
+export type TraceUpMessage =
+  | { kind: 'ready' }
+  | { kind: 'run'; scope: string }
+  | { kind: 'loadFile'; path: string }
+  | { kind: 'openInTestEditor' }
+  | { kind: 'openLocation'; files: string[]; start: TracePos; end: TracePos }
+  | {
+      kind: 'requestExtract';
+      id: number;
+      files: string[];
+      line: number;
+    }
+  | { kind: 'updateData'; value: [string, TraceData] };
+
+export type TraceDownMessage =
+  | {
+      kind: 'init';
+      file: string;
+      cwd: string;
+      scopes: [string, JsonValue][];
+      scope?: string;
+      trace?: TraceElement[];
+      run?: boolean;
+    }
+  | { kind: 'scopes'; scopes: [string, JsonValue][] }
+  | { kind: 'tests'; scopes: [string, JsonValue][] }
+  | { kind: 'result'; ok: true; trace: TraceElement[] }
+  | { kind: 'result'; ok: false; error: string }
+  | { kind: 'extract'; id: number; text: string | null; file?: string }
+  | { kind: 'dependencies'; graphs: JsonValue }
+  | { kind: 'viewWithFilter' }
+  | { kind: 'addToFilter' };
+
+export type TraceResult =
+  | { ok: true; trace: TraceElement[] }
+  | { ok: false; error: string };

@@ -1,12 +1,17 @@
 import * as vscode from 'vscode';
 import type { LanguageClient } from 'vscode-languageclient/node';
+import { logger } from './logger';
 
 import type {
+  DependencyGraphs,
+  DependencyKind,
   Entrypoint,
   EntrypointParamKind,
   EntrypointsParams,
 } from '../generated/catala_types';
 import {
+  writeDependencyGraphParams,
+  readDependencyGraphs,
   writeEntrypointsParams,
   readEntrypoints,
 } from '../generated/catala_types';
@@ -48,6 +53,50 @@ export async function listEntrypoints(
     return cep;
   });
   return entrypoints;
+}
+
+export type CheckTraceAssert = (clerk_toml_dir: string) => Promise<boolean>;
+
+/**
+ * `getClient` is a thunk: the client is only assigned when an LSP binary was
+ * found, and the editor providers are registered either way.
+ *
+ * The server answers `null` whenever it has no clerk.toml to read the setting
+ * from, which is not an error: the check is simply off.
+ */
+export function checkTraceAssert(
+  getClient: () => LanguageClient | undefined
+): CheckTraceAssert {
+  return async (clerk_toml_dir: string): Promise<boolean> => {
+    const client = getClient();
+    if (client === undefined) return false;
+    try {
+      const answer = await client.sendRequest('catala.getTraceAssert', {
+        clerk_toml_dir,
+      });
+      return answer === true;
+    } catch (err) {
+      logger.log(`catala.getTraceAssert failed: ${String(err)}`);
+      return false;
+    }
+  };
+}
+
+export async function dependencyGraphs(
+  client: LanguageClient,
+  uri: vscode.Uri,
+  kinds?: DependencyKind[],
+  wholeProgram?: boolean
+): Promise<DependencyGraphs | null> {
+  const ret: JSON | null = await client.sendRequest(
+    'catala.dependencyGraph',
+    writeDependencyGraphParams({
+      uri: uri.toString(),
+      kinds,
+      whole_program: wholeProgram,
+    })
+  );
+  return ret === null ? null : readDependencyGraphs(ret);
 }
 
 export type ExceptionsArgs = {

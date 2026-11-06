@@ -1,7 +1,8 @@
-import { execFileSync, type SpawnSyncReturns } from 'child_process';
+import { execFile, execFileSync, type SpawnSyncReturns } from 'child_process';
 import type {
   ReadFailure,
   ScopeDefList,
+  ScopeTestResult,
   TestGenerateResults,
   TestInputs,
 } from '../generated/catala_types';
@@ -32,6 +33,59 @@ type ExecOptions = { input?: string; cwd?: string };
 type ExecResult =
   | { ok: true; output: string }
   | { ok: false; output: string; stderr: string };
+
+function execBinaryAsync(
+  bin: string,
+  args: string[],
+  opts: ExecOptions = {}
+): Promise<ExecResult> {
+  logger.log(`Running ${bin} ${args.join(' ')}`);
+  const useShell = process.platform === 'win32';
+  const { input, ...spawnOpts } = opts;
+  return new Promise((resolve) => {
+    const child = execFile(
+      bin,
+      useShell ? args.map(shellArg) : args,
+      {
+        encoding: 'utf8',
+        shell: useShell,
+        env: {
+          ...process.env,
+          ...(path.isAbsolute(clerkPath) && { CATALA_CLERK_PATH: clerkPath }),
+        },
+        ...spawnOpts,
+      },
+      (error, stdout, stderr) =>
+        resolve(
+          error
+            ? { ok: false, output: stdout, stderr: stderr || String(error) }
+            : { ok: true, output: stdout }
+        )
+    );
+    if (input !== undefined) {
+      child.stdin?.end(input);
+    }
+  });
+}
+
+const stdlibReady = new Map<string, Promise<void>>();
+
+function ensureStdlib(cwd: string | undefined): Promise<void> {
+  if (cwd === undefined) {
+    return Promise.resolve();
+  }
+  const pending = stdlibReady.get(cwd);
+  if (pending !== undefined) {
+    return pending;
+  }
+  const started = execBinaryAsync(clerkPath, ['start'], { cwd }).then((r) => {
+    if (!r.ok) {
+      logger.log(`clerk start failed in ${cwd}: ${r.stderr}`);
+    }
+  });
+  stdlibReady.set(cwd, started);
+  return started;
+}
 
 function execBinary(
   bin: string,
@@ -170,22 +224,36 @@ export function runRebuiltTest(
       test: { test_outputs },
       assert_failures,
       diffs,
+      failed_trace_assert,
     } = readTestRun(JSON.parse(output));
-    return { kind: 'Ok', value: { test_outputs, assert_failures, diffs } };
+    return {
+      kind: 'Ok',
+      value: { test_outputs, assert_failures, diffs, failed_trace_assert },
+    };
   } catch (error) {
     return runFailed(String(error));
   }
 }
 
-export function parseTestFile(
+export async function parseTestFile(
   content: string,
-  lang: string,
-  bufferPath: string
-): ParseResults {
+  bufferPath: string,
+  lang?: string,
+  scope?: string
+): Promise<ParseResults> {
   const cwd = getCwd(bufferPath);
-  const execResult = execBinary(
+  await ensureStdlib(cwd);
+  const execResult = await execBinaryAsync(
     catalaPath,
-    ['testcase', 'read', '-l', lang, '--buffer-path', bufferPath, '-'],
+    [
+      'testcase',
+      'read',
+      ...(lang ? ['-l', lang] : []),
+      '--buffer-path',
+      bufferPath,
+      ...(scope ? ['--scope', scope] : []),
+      '-',
+    ],
     { input: content, ...(cwd && { cwd }) }
   );
   return decideOpen({
@@ -240,9 +308,16 @@ export function atdToCatala(tests: TestList, lang: string): string {
   return result.output;
 }
 
+// Outcome of running a scope test: either a successful `ScopeTestResult`,
+// or a failure carrying an error message.
+export type ScopeRunResult =
+  | { kind: 'Success'; value: ScopeTestResult }
+  | { kind: 'Failed'; value: string };
+
 export function runTestScope(
   filename: string,
   testScope: string,
+  trace: boolean,
   inputs?: TestInputs
 ): TestRunResults {
   /*
@@ -260,6 +335,28 @@ export function runTestScope(
     ? JSON.stringify(writeTestInputs(inputs))
     : undefined;
   const inputArgs = inputs ? ['--input=-'] : [];
+  // Dependencies are built in a separate directory so that the instrumented
+  // artifacts do not evict the plain ones from the main build dir.
+  const TRACE_BUILD_DIR = '_build/_trace';
+  const clerkTraceArgs = trace
+    ? [
+        '--trace',
+        '--build-dir',
+        TRACE_BUILD_DIR,
+        '--ninja-output-file',
+        `${TRACE_BUILD_DIR}/clerk.ninja`,
+      ]
+    : [];
+  // The trace is produced by the clerk run below, not here: `testcase run`
+  // wraps every evaluation in a dummy scope call, so the trace it could emit
+  // carries only "<function>" as its root value. The build dir has to be
+  // repeated: this run loads the stdlib and the modules clerk just compiled
+  // there, and would otherwise look for them in the default `_build`.
+  // `--check-trace-assertion` has the `#[trace.assert]` attributes checked
+  // against the trace collected during the run, to fill `failed_trace_assert`.
+  const catalaTraceArgs = trace
+    ? ['--build-dir', TRACE_BUILD_DIR, '--check-trace-assertion']
+    : [];
   const args = [
     'testcase',
     'run',
@@ -267,10 +364,34 @@ export function runTestScope(
     testScope,
     filename,
     ...inputArgs,
+    ...catalaTraceArgs,
   ];
-  // Runtime plugins are prepared by the testcase backend itself
-  // (`prepare_runtime_plugins`); no clerk invocation is needed here.
   const cwd = getCwd(filename);
+  if (cwd) {
+    const relFilename = path.relative(cwd, filename);
+    // Two jobs at once: compile the dependencies the run below needs, and --
+    // when a trace was asked for -- produce it. `-c--no-fail-on-assert` matters
+    // in both cases: a test whose expectations do not match must still get its
+    // dependencies built and its trace written.
+    const clerkResult = execBinary(
+      clerkPath,
+      [
+        'run',
+        ...clerkTraceArgs,
+        '-c--no-fail-on-assert',
+        relFilename,
+        '--scope',
+        testScope,
+      ],
+      { cwd }
+    );
+    if (!clerkResult.ok) {
+      window.showErrorMessage(clerkResult.stderr);
+      return { kind: 'Error', value: clerkResult.stderr };
+    }
+  }
+  // Here we *do* want to fail on asserts, as we catch failures through
+  // the `register_lsp_error_notifier` hook.
   const execResult = execBinary(catalaPath, args, {
     ...(cwd && { cwd }),
     ...(inputJson !== undefined && { input: inputJson }),
@@ -293,6 +414,7 @@ export function runTestScope(
       test: { test_outputs },
       assert_failures,
       diffs,
+      failed_trace_assert,
     } = readTestRun(parsed);
     return {
       kind: 'Ok',
@@ -301,6 +423,7 @@ export function runTestScope(
         test_outputs,
         assert_failures,
         diffs,
+        failed_trace_assert,
       },
     };
   } catch (error) {
