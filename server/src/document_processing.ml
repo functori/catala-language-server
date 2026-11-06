@@ -355,6 +355,7 @@ let surface_to_scopelang
 
 let process
     ?module_candidates
+    ?(whole_program = false)
     ~(resolve_file_content : string -> string Global.input_src)
     ~(get_module_content : Surface.Parser_driver.module_loading)
     { document_id = doc_id; buffer_state; project; project_file; _ } :
@@ -383,7 +384,9 @@ let process
       FileName including_file.file_name, Some resolve_file_content
     end
   in
-  let options = Catala_utils.Global.enforce_options ~input_src () in
+  let options =
+    Catala_utils.Global.enforce_options ~input_src ~whole_program ()
+  in
   let l = ref [] in
   let get_errors () = !l in
   let on_error e =
@@ -415,12 +418,13 @@ let process
 
 let process
     ?module_candidates
+    ?whole_program
     ~resolve_file_content
     ~get_module_content
     document =
   let r =
     process ~resolve_file_content ~get_module_content ?module_candidates
-      document
+      ?whole_program document
   in
   let nb_diags diags =
     Doc_id.Map.fold
