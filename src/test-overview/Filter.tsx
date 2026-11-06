@@ -1,10 +1,11 @@
-import { type ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { FormattedMessage, useIntl } from 'react-intl';
 
 import { VscodeTextfield } from '@vscode-elements/react-elements';
 import { matchFilter, scopesFromTests } from './testUtils';
 import type { TestMacro } from './types';
 import { Loading } from './widgets';
+import { FilterPins, type Filter } from '../FilterPin';
 
 /**
  * Type to build the Filter component with filter on Scope, on description and
@@ -12,10 +13,10 @@ import { Loading } from './widgets';
  */
 type FilterArg = {
   tests: TestMacro[] | undefined;
-  filter: string;
+  filters: Filter[];
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
-  setFilter: React.Dispatch<React.SetStateAction<string>>;
+  setFilters: React.Dispatch<React.SetStateAction<Filter[]>>;
   filterGui: boolean;
   setFilterGui: React.Dispatch<React.SetStateAction<boolean>>;
 };
@@ -84,26 +85,42 @@ function ScopeFilter({
   );
 }
 
-export function Filter({
+export function FilterPanel({
   tests,
-  filter,
+  filters,
   filterScope,
   setFilterScope,
-  setFilter,
+  setFilters,
   filterGui,
   setFilterGui,
 }: FilterArg): ReactElement {
   const intl = useIntl();
+  const [filter, setFilter] = useState<string>('');
+
   // Restore the default state: GUI-only checkbox checked, no scope selected,
   // empty search bar.
   const resetFilters = (): void => {
     setFilterGui(true);
     setFilterScope([]);
-    setFilter('');
+    setFilters([]);
+  };
+
+  const addFilter = (filter: string): void => {
+    let filterToAdd = filter.trim();
+    setFilters((savedFilters) => {
+      if (
+        filterToAdd == '' ||
+        savedFilters.some((elt: Filter) => elt.filter == filterToAdd)
+      ) {
+        return savedFilters;
+      } else {
+        return [...savedFilters, { filter: filterToAdd, option: 'include' }];
+      }
+    });
   };
 
   const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filter, [], filterGui)
+    matchFilter(test, filters, [], filterGui)
   );
 
   return (
@@ -152,6 +169,7 @@ export function Filter({
             setFilterScope={setFilterScope}
           />
           <div style={{ marginLeft: 'auto' }}>
+            <FilterPins filters={filters} setFilters={setFilters} />
             <VscodeTextfield
               className="search-bar"
               value={filter}
@@ -159,11 +177,28 @@ export function Filter({
                 id: 'generalTests.searchPlaceholder',
                 defaultMessage: 'Rechercher un test…',
               })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addFilter(filter);
+                  setFilter('');
+                }
+              }}
               onInput={(e) => {
                 const value = (e.target as HTMLInputElement).value;
                 setFilter(value);
               }}
             >
+              <span
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  addFilter(filter);
+                  setFilter('');
+                }}
+                className="codicon codicon-save"
+                slot="content-after"
+              />
               <span className="codicon codicon-search" slot="content-before" />
             </VscodeTextfield>
           </div>

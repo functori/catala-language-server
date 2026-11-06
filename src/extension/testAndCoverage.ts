@@ -18,6 +18,7 @@ import type {
 } from '../generated/catala_types';
 import { logger } from './logger';
 
+
 type ClerkLocation = {
   file: string;
   range: vscode.Range;
@@ -636,7 +637,7 @@ function makeRunHandler(
       resultController.refresh(clerk_test_result);
       const { results, code, err_msg } = clerk_test_result;
       if (code != 0 && err_msg != '')
-        console.error(`Clerk exit code: ${code}, Output:\n{err_msg}`);
+        console.error(`Clerk exit code: ${code}, Output:\n${err_msg}`);
       let test_gui_threads: Array<Promise<void>> = [];
       results['test-results'].forEach(({ file, tests }) => {
         tests.scopes.forEach((scope_test_result) => {
