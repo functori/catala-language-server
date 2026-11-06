@@ -756,6 +756,77 @@ let print_catala_value_opt ~lang ppf (t_in : O.test_io) =
     Format.fprintf ppf "impossible"
   | Some { value; _ }, typ -> print_catala_value ~typ:(Some typ) ~lang ppf value
 
+let string_of_runtime_value ~lang (v : O.runtime_value) : string =
+  let strings = get_value_strings lang in
+  match v.O.value with
+  | O.Bool b -> if b then strings.true_str else strings.false_str
+  | O.Integer i -> string_of_int i
+  | O.Decimal f ->
+    let s = Printf.sprintf "%.12f" f in
+    let len = ref (String.length s) in
+    while !len > 1 && s.[!len - 1] = '0' do
+      decr len
+    done;
+    let s = String.sub s 0 !len in
+    let s = if s.[String.length s - 1] = '.' then s ^ "0" else s in
+    String.map (function '.' -> strings.decimal_sep | c -> c) s
+  | O.Money m ->
+    let major = abs m / 100 and minor = abs m mod 100 in
+    Format.asprintf "%s%a"
+      (if m < 0 then "-" else "")
+      (fun ppf () -> Format.fprintf ppf strings.money_fmt major minor)
+      ()
+  | O.Date { year; month; day } ->
+    Printf.sprintf "|%04d-%02d-%02d|" year month day
+  | O.Duration { years; months; days } ->
+    let u = strings.duration_units in
+    Printf.sprintf "%d %s + %d %s + %d %s" years u.year months u.month days
+      u.day
+  | O.Enum ({ enum_name; _ }, (ctor, _)) when enum_name = option_enum_name ->
+    if ctor = "Absent" then strings.absent else strings.present
+  | O.Enum (_, (ctor, _)) -> ctor
+  | _ -> ""
+
+let rec translate_runtime_value (v : Trace_assertion.value) : O.runtime_value =
+  let open Catala_runtime in
+  let raw : O.runtime_value_raw =
+    match v with
+    | Value.V (Bool, b) -> O.Bool b
+    | V (Integer, i) -> O.Integer (integer_to_int i)
+    | V (Money, m) -> O.Money (integer_to_int (money_to_cents m))
+    | V (Decimal, d) -> O.Decimal (decimal_to_float d)
+    | V (Date, d) ->
+      let year, month, day = date_to_years_months_days d in
+      O.Date { year; month; day }
+    | V (Duration, d) ->
+      let years, months, days = duration_to_years_months_days d in
+      O.Duration { years; months; days }
+    | V (Enum { name; constr }, x) ->
+      let _, ctor, payload = constr x in
+      let payload =
+        match payload with
+        | None | Some (V (Unit, ())) -> None
+        | Some p -> Some (translate_runtime_value p)
+      in
+      O.Enum
+        ( { O.enum_name = name; constructors = [ctor, None]; ctor_attrs = [] },
+          (ctor, payload) )
+    | V (Struct { name; fields }, x) ->
+      let fields = fields x in
+      O.Struct
+        ( {
+            O.struct_name = name;
+            fields = List.map (fun (f, _) -> f, O.TUnset) fields;
+          },
+          List.map (fun (f, v) -> f, translate_runtime_value v) fields )
+    | V (Array f, a) ->
+      O.Array (Array.map (fun x -> translate_runtime_value (f x)) a)
+    | V (Tuple f, x) ->
+      O.Array (Array.of_list (List.map translate_runtime_value (f x)))
+    | V ((Unit | Position | External _ | Function | Polymorphic), _) -> O.Unset
+  in
+  { O.value = raw; attrs = [] }
+
 let write_catala_test ppf t lang =
   let open Format in
   let open O in
@@ -771,6 +842,16 @@ let write_catala_test ppf t lang =
   fprintf ppf "#[testcase.test_description = %s]@\n"
     (String.quote t.description);
   fprintf ppf "#[testcase.test_title = %s]@\n" (String.quote t.title);
+  List.iter
+    (fun (var, value) ->
+      let payload =
+        match value with
+        | None -> var
+        | Some v ->
+          Printf.sprintf "(%s,%s)" var (string_of_runtime_value ~lang v)
+      in
+      fprintf ppf "#[trace.assert = %s]@\n" payload)
+    t.variables;
   fprintf ppf "@[<v 2>%s %s:@," strings.declaration_scope t.testing_scope;
   fprintf ppf "%s %s %s %s.%s@," strings.output_scope sscope_var strings.scope
     t.tested_scope.module_name t.tested_scope.name;
