@@ -4,11 +4,12 @@ import { FormattedMessage, useIntl } from 'react-intl';
 import { type WebviewApi } from 'vscode-webview';
 
 import { AddNewTest, RunAllTests } from './buttons';
-import { Filter } from './Filter';
+import type { Filter } from '../FilterPin';
 import { matchFilter, noFilter } from './testUtils';
 import { TestsGrid } from './TestsView';
 import { useTests } from './useTests';
 import { Loading } from './widgets';
+import { FilterPanel } from './Filter';
 
 type TestOverviewArg = {
   vscode: WebviewApi<unknown>;
@@ -18,14 +19,14 @@ export default function TestOverview({
   vscode,
 }: TestOverviewArg): ReactElement {
   const intl = useIntl();
-  const [filter, setFilter] = useState<string>('');
+  const [filters, setFilters] = useState<Filter[]>([]);
   const [filterScope, setFilterScope] = useState<string[]>([]);
   const [filterGui, setFilterGui] = useState<boolean>(true);
   const [grid, setGrid] = useState<boolean>(true);
   const { tests, reload, onRun, runTests, refresh } = useTests(vscode);
 
   const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filter, filterScope, filterGui)
+    matchFilter(test, filters, filterScope, filterGui)
   );
 
   return (
@@ -47,20 +48,22 @@ export default function TestOverview({
           <RunAllTests
             onRun={() =>
               runTests(
-                noFilter(filter, filterScope, filterGui) ? 'all' : filteredTests
+                noFilter(filters, filterScope, filterGui)
+                  ? 'all'
+                  : filteredTests
               )
             }
           />{' '}
         </div>
       </div>
-      <Filter
+      <FilterPanel
         tests={tests}
         setFilterScope={setFilterScope}
         filterScope={filterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
-        filter={filter}
-        setFilter={setFilter}
+        filters={filters}
+        setFilters={setFilters}
       />
       <div className="select-test-print">
         <FormattedMessage
@@ -132,6 +135,7 @@ export default function TestOverview({
           grid={grid}
           filterScope={filterScope}
           onRun={onRun}
+          filters={filters}
         />
       )}
     </div>

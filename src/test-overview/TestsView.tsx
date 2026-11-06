@@ -7,12 +7,14 @@ import { AddNewTest } from './buttons';
 import { CardGrid } from './CardView';
 import { TestList } from './ListView';
 import type { TestMacro } from './types';
+import type { Filter } from '../FilterPin';
 
 type TestGridArg = {
   vscode: WebviewApi<unknown>;
   filtered: TestMacro[];
   grid: boolean;
   filterScope: string[];
+  filters: Filter[];
   onRun: (id: number) => void;
 };
 
@@ -21,6 +23,7 @@ export function TestsGrid({
   filtered,
   grid,
   filterScope,
+  filters,
   onRun,
 }: TestGridArg): ReactElement {
   if (filtered == undefined || filtered.length == 0) {
@@ -49,6 +52,7 @@ export function TestsGrid({
       vscode={vscode}
       tests={filtered}
       onRun={onRun}
+      filters={filters}
     />
   ) : (
     <TestList
@@ -56,6 +60,7 @@ export function TestsGrid({
       vscode={vscode}
       tests={filtered}
       onRun={onRun}
+      filters={filters}
     />
   );
 }

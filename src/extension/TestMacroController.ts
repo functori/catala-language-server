@@ -23,6 +23,9 @@ import {
   TestMap,
 } from './testAndCoverage';
 import { getCwd } from '../shared/util_client';
+import type { SettingsSource } from '../extension/settingsStore';
+import { resolveLanguage } from '../shared/settings';
+
 
 // Path of a test file relative to the workspace folder it belongs to, which is
 // what the 'debug all tests' panel displays: an absolute path is both too long
@@ -49,6 +52,9 @@ export class TestMacroController {
   tests: TestDebugger[] = [];
   // Test items of the listed entrypoints, rebuilt on every 'Ready'.
   testMap: TestMap = new TestMap();
+  private following: vscode.Disposable = new vscode.Disposable(() => {});
+
+  constructor(private readonly settings: SettingsSource) {}
 
   private testQueue: PQueue = new PQueue({ concurrency: 1 });
 
@@ -135,6 +141,7 @@ export class TestMacroController {
     // reference so the next invocation creates a fresh one instead of
     // revealing (or posting to) a disposed webview.
     panel.onDidDispose(() => {
+      this.following.dispose();
       if (this.panel === panel) {
         this.panel = undefined;
         this.tests = [];
@@ -145,6 +152,8 @@ export class TestMacroController {
       const typed_msg = readTestsUpMessage(message);
       switch (typed_msg.kind) {
         case 'Ready': {
+          this.following.dispose();
+          this.following = this.settings.follow(panel.webview);
           this.tests = [];
           const entrypoints = await listEntrypoints(
             client,
@@ -354,7 +363,11 @@ export class TestMacroController {
       vscode.Uri.joinPath(context.extensionUri, 'dist', 'ui.js')
     );
 
-    const language = vscode.env.language;
+    const language = resolveLanguage(
+      this.settings.get(),
+      undefined,
+      vscode.env.language
+    );
 
     return `
             <!DOCTYPE html>

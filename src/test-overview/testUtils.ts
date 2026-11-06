@@ -1,3 +1,4 @@
+import type { Filter } from '../FilterPin';
 import type { TestDebugger } from '../generated/catala_types';
 import type { TestMacro, TestState } from './types';
 
@@ -48,30 +49,41 @@ export function testMacro(success?: boolean): TestState {
  */
 export function matchFilter(
   test: TestDebugger,
-  filterRaw: string,
+  filters: Filter[],
   filterScope: string[],
   filterGui: boolean
 ): boolean {
-  let filter = filterRaw.toLowerCase();
-  let searchBarFilter =
-    testTitle(test).toLowerCase().includes(filter) ||
-    testDescription(test).toLowerCase().includes(filter) ||
-    testingScope(test).toLowerCase().includes(filter) ||
-    (test.index + 1).toString().includes(filter);
+  let pinsMatch = true;
+  for (let filterPin of filters) {
+    if (filterPin.option != 'ignore') {
+      let filter = filterPin.filter.toLowerCase().trim();
+      let pinMatch =
+        test.filename.includes(filter) ||
+        testTitle(test).toLowerCase().includes(filter) ||
+        testDescription(test).toLowerCase().includes(filter) ||
+        testingScope(test).toLowerCase().includes(filter) ||
+        (test.index + 1).toString().includes(filter);
+      if (filterPin.option == 'include') {
+        pinsMatch = pinsMatch && pinMatch;
+      } else {
+        pinsMatch = pinsMatch && !pinMatch;
+      }
+    }
+  }
   let scopeFilter =
     filterScope.length == 0
       ? true
       : filterScope.some((value) => testingScope(test) == value);
   let guiFilter = filterGui ? isGui(test) : true;
-  return searchBarFilter && scopeFilter && guiFilter;
+  return pinsMatch && scopeFilter && guiFilter;
 }
 
 export function noFilter(
-  filter: string,
+  filters: Filter[],
   filterScope: string[],
   filterGui: boolean
 ): boolean {
-  return filter.trim() == '' && filterScope.length == 0 && filterGui == false;
+  return filters.length == 0 && filterScope.length == 0 && filterGui == false;
 }
 
 export function hasFailure(tests: TestMacro[]): boolean {

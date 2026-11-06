@@ -8,6 +8,7 @@ import {
 } from '../generated/catala_types';
 import { setVsCodeApi } from '../shared/webviewApi';
 import type { TestMacro } from './types';
+import { isSettingsMessage } from '../shared/settings';
 
 export type Tests = {
   // `undefined` until the host has sent the list of tests
@@ -36,6 +37,9 @@ export function useTests(vscode: WebviewApi<unknown>): Tests {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
+      if (isSettingsMessage(event.data)) {
+        return;
+      }
       const message = readTestsDownMessage(event.data);
       switch (message.kind) {
         case 'AllTests': {

@@ -570,7 +570,7 @@ export async function activate(
 
     await initTests(context, client, ctrl, resultController);
 
-    const macroTestsView = new TestMacroController();
+    const macroTestsView = new TestMacroController(settingsStore);
     context.subscriptions.push(
       vscode.commands.registerCommand(
         'catala.debugAllTests',
@@ -664,11 +664,11 @@ export async function activate(
     )
   );
 
-  logger.log(`Register "Catala Tests" data in th Tree data provider`);
-
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider('catala.settings', new tree_view([]))
   );
+
+  logger.log(`Register "Catala Tests" data in th Tree data provider`);
 
   context.subscriptions.push(
     // note: we need to provide the same name here as we added in the package.json file

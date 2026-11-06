@@ -1,6 +1,7 @@
 import { type WebviewApi } from 'vscode-webview';
 
 import type { TestDebugger } from '../generated/catala_types';
+import type { Filter } from '../FilterPin';
 
 export type TestState = 'Success' | 'Loading' | 'Failed' | 'Unknown';
 
@@ -12,6 +13,7 @@ export type TestMacro = TestDebugger & { loading?: boolean };
 export type TestItemArg = {
   vscode: WebviewApi<unknown>;
   test: TestMacro;
+  filters: Filter[];
   onRun: (id: number) => void;
 };
 
@@ -20,4 +22,5 @@ export type CardGridArg = {
   filteredScope: string[];
   tests: TestMacro[];
   onRun: (id: number) => void;
+  filters: Filter[];
 };

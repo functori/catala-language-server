@@ -21,6 +21,8 @@ import {
 } from './testUtils';
 import type { CardGridArg, TestItemArg, TestMacro } from './types';
 import { TestDate, TestStateIcon } from './widgets';
+import { HighlightText } from '../shared/Highlight';
+import type { Filter } from '../FilterPin';
 
 /**
  * This function tells if the rendered span overflows or not,
@@ -38,9 +40,11 @@ function isOverflowActive(event: HTMLSpanElement): boolean {
 function TestPath({
   vscode,
   test,
+  filters,
 }: {
   vscode: WebviewApi<unknown>;
   test: TestMacro;
+  filters: Filter[];
 }): ReactElement {
   const displayed = test.relative_filename ?? test.filename;
   // `+ 1` keeps the separator on the directory side, and yields 0 (hence an
@@ -69,9 +73,12 @@ function TestPath({
       }}
     >
       {directory == '' ? null : (
-        <span className="test-path-directory">{directory}</span>
+        <span className="test-path-directory">
+          {' '}
+          <HighlightText filters={filters} text={directory} />
+        </span>
       )}
-      {name}
+      <HighlightText filters={filters} text={name} />
     </a>
   );
 }
@@ -80,7 +87,7 @@ function TestPath({
  * The component to represent a Line in the table representation of the tests,
  * it has some logic due to the description that can overflow
  */
-function TestLine({ vscode, test, onRun }: TestItemArg): ReactElement {
+function TestLine({ vscode, test, filters, onRun }: TestItemArg): ReactElement {
   // This textRef is used on the description span, it will be set when
   // the span is rendered so that we can know if the span overflows or not
   const textRef = useRef<HTMLSpanElement>(null);
@@ -118,10 +125,15 @@ function TestLine({ vscode, test, onRun }: TestItemArg): ReactElement {
   return (
     <tr>
       <th className="path-column">
-        <TestPath vscode={vscode} test={test} />
+        <TestPath vscode={vscode} test={test} filters={filters} />
       </th>
-      <td>{testTitle(test)}</td>
-      <td>{testingScope(test)}</td>
+      <td>
+        <HighlightText filters={filters} text={testTitle(test)} />
+      </td>
+      <td>
+        {' '}
+        <HighlightText filters={filters} text={testingScope(test)} />
+      </td>
       <td
         className={overflowActive ? `descr-column` : ''}
         onClick={(event) => {
@@ -138,7 +150,7 @@ function TestLine({ vscode, test, onRun }: TestItemArg): ReactElement {
           ref={textRef}
           className={`test-descr ${expanded ? 'text' : 'test-descr-hidden'}`}
         >
-          {description}
+          <HighlightText filters={filters} text={description} />
         </span>
         {overflowActive && (
           <span
@@ -231,6 +243,7 @@ export function TestList({
   onRun,
   tests,
   filteredScope,
+  filters,
 }: CardGridArg): ReactElement {
   let map = new Map<string, TestMacro[]>();
   let not_gui: TestMacro[] = [];
@@ -279,6 +292,7 @@ export function TestList({
                     vscode={vscode}
                     test={test}
                     onRun={onRun}
+                    filters={filters}
                   />
                 ))}
               </tbody>
@@ -299,6 +313,7 @@ export function TestList({
                     vscode={vscode}
                     test={test}
                     onRun={onRun}
+                    filters={filters}
                   />
                 );
               })}

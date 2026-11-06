@@ -50,7 +50,7 @@
         {
           "id": "catala.openAllTests",
           "name": "%view.catala.openAllTests.title%",
-          "icon": "$(beaker)"
+          "icon": "$(menu)"
         },
         {
           "id": "catala.switches",
