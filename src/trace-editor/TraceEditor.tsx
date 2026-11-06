@@ -486,16 +486,46 @@ const clickOnPill =
   };
 
 // The pill is opened before its step is shown, so that the step shows what it
-// opens, and closed after it.
-function tutoPillStep(id: string, labelId: string): Step {
+// opens, and closed after it, unless [keepOpen]: a next step then points into
+// what it opened, and closes it.
+function tutoPillStep(id: string, labelId: string, keepOpen = false): Step {
   return tutoStep(id, () => treePill(labelId), {
     placement: 'top',
     // Above, even with too little room at first: Joyride would flip it below.
     floatingOptions: { flipOptions: false },
     before: clickOnPill(labelId, true),
-    after: clickOnPill(labelId, false),
+    after: keepOpen ? undefined : clickOnPill(labelId, false),
   });
 }
+
+// The list of the dependencies the dependencies pill step has opened: among the
+// contents its row opened, not in the rows below it.
+const dependencyList = (): HTMLElement | null =>
+  treePill('trace.dependencies')
+    ?.closest('li')
+    ?.querySelector<HTMLElement>(':scope > div > [data-dependencies]') ?? null;
+
+// The pill stays open from one step to the other, and is opened again when
+// coming back to one of them from the step after.
+const tutoDependencyListStep: Step = tutoStep(
+  'trace.tuto.dependency',
+  dependencyList,
+  {
+    placement: 'bottom',
+    before: clickOnPill('trace.dependencies', true),
+  }
+);
+
+// One of the dependencies, the first one: a click on it filters on it.
+const tutoDependencyFilterStep: Step = tutoStep(
+  'trace.tuto.dependencyFilter',
+  () => dependencyList()?.querySelector<HTMLElement>(':scope > span') ?? null,
+  {
+    placement: 'bottom',
+    before: clickOnPill('trace.dependencies', true),
+    after: clickOnPill('trace.dependencies', false),
+  }
+);
 
 // The slider, with the panes in the layout the step shows.
 const tutoLayoutStep = (id: string, layout: PaneLayout): Step =>
@@ -585,6 +615,9 @@ const tutoChapters = placeChapters(
         tutoSelectionStep,
         tutoPillStep('trace.tuto.pillValue', 'trace.value'),
         tutoPillStep('trace.tuto.pillCode', 'trace.code'),
+        tutoPillStep('trace.tuto.pillDependencies', 'trace.dependencies', true),
+        tutoDependencyListStep,
+        tutoDependencyFilterStep,
       ],
     },
   ] satisfies Chapter[],
