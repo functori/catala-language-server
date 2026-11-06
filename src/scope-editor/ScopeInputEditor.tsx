@@ -124,6 +124,12 @@ export default function ScopeInputEditor({
           resolveConfirmResult(message.value.id, message.value.confirmed);
           break;
         }
+        case 'AllTests': {
+          throw Error('Wrong AllTests message posted');
+        }
+        case 'TestScopeResult': {
+          throw Error(`This view can't trigger a TestScopeResult`);
+        }
         default:
           assertUnreachable(message);
       }
@@ -182,7 +188,9 @@ function ParsingErrorWarning({
       <button
         className="test-editor-open-text"
         onClick={() =>
-          vscode.postMessage(writeUpMessage({ kind: 'OpenInTextEditor' }))
+          vscode.postMessage(
+            writeUpMessage({ kind: 'OpenInTextEditor', value: null })
+          )
         }
       >
         <span className="codicon codicon-edit"></span>

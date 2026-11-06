@@ -48,6 +48,11 @@
     "views": {
       "catala": [
         {
+          "id": "catala.openAllTests",
+          "name": "%view.catala.openAllTests.title%",
+          "icon": "$(menu)"
+        },
+        {
           "id": "catala.switches",
           "name": "%view.catala.switches.title%",
           "icon": "$(info)"
@@ -60,7 +65,7 @@
         {
           "id": "catala.help",
           "name": "%view.catala.help.title%",
-          "icon": ""
+          "icon": "$(info)"
         }
       ],
       "catala-exceptions-panel": [
@@ -68,7 +73,7 @@
           "type": "webview",
           "id": "catala.exceptionsView",
           "name": "%view.catala.exceptionsView.name%",
-          "icon": ""
+          "icon": "$(graph-line)"
         }
       ]
     },
@@ -106,6 +111,11 @@
         "title": "%command.catala.openWithTestEditor.title%",
         "category": "%category.catala%",
         "icon": "$(open-preview)"
+      },
+      {
+        "command": "catala.debugAllTests",
+        "title": "%command.catala.debugAllTests.title%",
+        "category": "%category.catala%"
       },
       {
         "command": "catala.openInputEditor",

@@ -4,6 +4,7 @@ import ScopeInputEditor from './scope-editor/ScopeInputEditor';
 
 import { type WebviewApi } from 'vscode-webview';
 
+import GeneralTests from './GeneralTests';
 import { CatalaSettingsProvider } from './shared/useSettings';
 
 type Props = {
@@ -28,6 +29,14 @@ export function InputApp({ language, vscode, scopename }: Props): ReactElement {
         vscode={vscode}
         scopename={scopename ?? ''}
       />
+    </CatalaSettingsProvider>
+  );
+}
+
+export function GeneralTestsUi({ language, vscode }: Props): ReactElement {
+  return (
+    <CatalaSettingsProvider language={language}>
+      <GeneralTests vscode={vscode} />
     </CatalaSettingsProvider>
   );
 }
