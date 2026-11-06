@@ -484,6 +484,7 @@ let read_partial_test_one
         Option.value ~default:""
           (surface_attr_string ["test_title"]
              (Mark.get scope_decl.scope_decl_name));
+      variables = [];
     }
 
 (* Each test independently: one failure must not lose the others. *)
@@ -1013,7 +1014,7 @@ let rebuild_broken_test
            build. *)
         match
           let path_to_build, include_dirs =
-            lookup_include_dirs module_options
+            lookup_include_dirs ~build_dir:"_build" module_options
           in
           read_program include_dirs path_to_build module_options
         with
