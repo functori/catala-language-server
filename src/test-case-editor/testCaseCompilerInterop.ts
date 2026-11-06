@@ -170,8 +170,12 @@ export function runRebuiltTest(
       test: { test_outputs },
       assert_failures,
       diffs,
+      failed_trace_assert,
     } = readTestRun(JSON.parse(output));
-    return { kind: 'Ok', value: { test_outputs, assert_failures, diffs } };
+    return {
+      kind: 'Ok',
+      value: { test_outputs, assert_failures, diffs, failed_trace_assert },
+    };
   } catch (error) {
     return runFailed(String(error));
   }
@@ -293,6 +297,7 @@ export function runTestScope(
       test: { test_outputs },
       assert_failures,
       diffs,
+      failed_trace_assert,
     } = readTestRun(parsed);
     return {
       kind: 'Ok',
@@ -301,6 +306,7 @@ export function runTestScope(
         test_outputs,
         assert_failures,
         diffs,
+        failed_trace_assert,
       },
     };
   } catch (error) {
