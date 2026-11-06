@@ -277,6 +277,7 @@ export type TestRunRequest = {
   reset_outputs: boolean;
   in_shell: boolean;
   debug: boolean;
+  has_trace_assert: boolean;
 }
 
 export type TestGenerateRequest = {
@@ -335,8 +336,23 @@ export type Update = {
   original_reads: boolean;
 }
 
+export type TraceViewKinds = {
+  function_call: boolean;
+  branch_condition: boolean;
+  if_branching: boolean;
+  match_branching: boolean;
+  assertion_: boolean;
+  exception_: boolean;
+  error: boolean;
+}
+
+export type LanguageSettings =
+| { kind: 'File' /* JSON: "file" */ }
+| { kind: 'Vscode' /* JSON: "vscode" */ }
+
 export type WebviewSettings = {
-  locale: string;
+  language: LanguageSettings;
+  trace_view: TraceViewKinds;
 }
 
 export type TestScopeResult = {
@@ -346,11 +362,17 @@ export type TestScopeResult = {
   reorder: boolean;
 }
 
+export type TraceData =
+| { kind: 'Input'; value: string }
+| { kind: 'Internal'; value: string }
+| { kind: 'Result'; value: string }
+
 export type DownMessage =
 | { kind: 'Update'; value: Update }
 | { kind: 'TestRunResults'; value: TestRunResultsMsg }
 | { kind: 'ConfirmResult'; value: ConfirmResult }
 | { kind: 'Settings'; value: WebviewSettings }
+| { kind: 'FocusData'; value: [string, TraceData] }
 
 export type TestsUpMessage =
 | { kind: 'Ready' }
@@ -1393,6 +1415,7 @@ export function writeTestRunRequest(x: TestRunRequest, context: any = x): any {
     'reset_outputs': _atd_write_required_field('TestRunRequest', 'reset_outputs', _atd_write_bool, x.reset_outputs, x),
     'in_shell': _atd_write_required_field('TestRunRequest', 'in_shell', _atd_write_bool, x.in_shell, x),
     'debug': _atd_write_required_field('TestRunRequest', 'debug', _atd_write_bool, x.debug, x),
+    'has_trace_assert': _atd_write_required_field('TestRunRequest', 'has_trace_assert', _atd_write_bool, x.has_trace_assert, x),
   };
 }
 
@@ -1402,6 +1425,7 @@ export function readTestRunRequest(x: any, context: any = x): TestRunRequest {
     reset_outputs: _atd_read_required_field('TestRunRequest', 'reset_outputs', _atd_read_bool, x['reset_outputs'], x),
     in_shell: _atd_read_required_field('TestRunRequest', 'in_shell', _atd_read_bool, x['in_shell'], x),
     debug: _atd_read_required_field('TestRunRequest', 'debug', _atd_read_bool, x['debug'], x),
+    has_trace_assert: _atd_read_required_field('TestRunRequest', 'has_trace_assert', _atd_read_bool, x['has_trace_assert'], x),
   };
 }
 
@@ -1617,15 +1641,62 @@ export function readUpdate(x: any, context: any = x): Update {
   };
 }
 
+export function writeTraceViewKinds(x: TraceViewKinds, context: any = x): any {
+  return {
+    'function_call': _atd_write_field_with_default(_atd_write_bool, false, x.function_call, x),
+    'branch_condition': _atd_write_field_with_default(_atd_write_bool, false, x.branch_condition, x),
+    'if_branching': _atd_write_field_with_default(_atd_write_bool, false, x.if_branching, x),
+    'match_branching': _atd_write_field_with_default(_atd_write_bool, false, x.match_branching, x),
+    'assertion': _atd_write_field_with_default(_atd_write_bool, false, x.assertion_, x),
+    'exception': _atd_write_field_with_default(_atd_write_bool, false, x.exception_, x),
+    'error': _atd_write_field_with_default(_atd_write_bool, false, x.error, x),
+  };
+}
+
+export function readTraceViewKinds(x: any, context: any = x): TraceViewKinds {
+  return {
+    function_call: _atd_read_field_with_default(_atd_read_bool, false, x['function_call'], x),
+    branch_condition: _atd_read_field_with_default(_atd_read_bool, false, x['branch_condition'], x),
+    if_branching: _atd_read_field_with_default(_atd_read_bool, false, x['if_branching'], x),
+    match_branching: _atd_read_field_with_default(_atd_read_bool, false, x['match_branching'], x),
+    assertion_: _atd_read_field_with_default(_atd_read_bool, false, x['assertion'], x),
+    exception_: _atd_read_field_with_default(_atd_read_bool, false, x['exception'], x),
+    error: _atd_read_field_with_default(_atd_read_bool, false, x['error'], x),
+  };
+}
+
+export function writeLanguageSettings(x: LanguageSettings, context: any = x): any {
+  switch (x.kind) {
+    case 'File':
+      return 'file'
+    case 'Vscode':
+      return 'vscode'
+  }
+}
+
+export function readLanguageSettings(x: any, context: any = x): LanguageSettings {
+  switch (x) {
+    case 'file':
+      return { kind: 'File' }
+    case 'vscode':
+      return { kind: 'Vscode' }
+    default:
+      _atd_bad_json('LanguageSettings', x, context)
+      throw new Error('impossible')
+  }
+}
+
 export function writeWebviewSettings(x: WebviewSettings, context: any = x): any {
   return {
-    'locale': _atd_write_required_field('WebviewSettings', 'locale', _atd_write_string, x.locale, x),
+    'language': _atd_write_required_field('WebviewSettings', 'language', writeLanguageSettings, x.language, x),
+    'trace_view': _atd_write_required_field('WebviewSettings', 'trace_view', writeTraceViewKinds, x.trace_view, x),
   };
 }
 
 export function readWebviewSettings(x: any, context: any = x): WebviewSettings {
   return {
-    locale: _atd_read_required_field('WebviewSettings', 'locale', _atd_read_string, x['locale'], x),
+    language: _atd_read_required_field('WebviewSettings', 'language', readLanguageSettings, x['language'], x),
+    trace_view: _atd_read_required_field('WebviewSettings', 'trace_view', readTraceViewKinds, x['trace_view'], x),
   };
 }
 
@@ -1647,6 +1718,32 @@ export function readTestScopeResult(x: any, context: any = x): TestScopeResult {
   };
 }
 
+export function writeTraceData(x: TraceData, context: any = x): any {
+  switch (x.kind) {
+    case 'Input':
+      return ['Input', _atd_write_string(x.value, x)]
+    case 'Internal':
+      return ['Internal', _atd_write_string(x.value, x)]
+    case 'Result':
+      return ['Result', _atd_write_string(x.value, x)]
+  }
+}
+
+export function readTraceData(x: any, context: any = x): TraceData {
+  _atd_check_json_tuple(2, x, context)
+  switch (x[0]) {
+    case 'Input':
+      return { kind: 'Input', value: _atd_read_string(x[1], x) }
+    case 'Internal':
+      return { kind: 'Internal', value: _atd_read_string(x[1], x) }
+    case 'Result':
+      return { kind: 'Result', value: _atd_read_string(x[1], x) }
+    default:
+      _atd_bad_json('TraceData', x, context)
+      throw new Error('impossible')
+  }
+}
+
 export function writeDownMessage(x: DownMessage, context: any = x): any {
   switch (x.kind) {
     case 'Update':
@@ -1657,6 +1754,8 @@ export function writeDownMessage(x: DownMessage, context: any = x): any {
       return ['ConfirmResult', writeConfirmResult(x.value, x)]
     case 'Settings':
       return ['Settings', writeWebviewSettings(x.value, x)]
+    case 'FocusData':
+      return ['FocusData', ((x, context) => [_atd_write_string(x[0], x), writeTraceData(x[1], x)])(x.value, x)]
   }
 }
 
@@ -1671,6 +1770,8 @@ export function readDownMessage(x: any, context: any = x): DownMessage {
       return { kind: 'ConfirmResult', value: readConfirmResult(x[1], x) }
     case 'Settings':
       return { kind: 'Settings', value: readWebviewSettings(x[1], x) }
+    case 'FocusData':
+      return { kind: 'FocusData', value: ((x, context): [string, TraceData] => { _atd_check_json_tuple(2, x, context); return [_atd_read_string(x[0], x), readTraceData(x[1], x)] })(x[1], x) }
     default:
       _atd_bad_json('DownMessage', x, context)
       throw new Error('impossible')

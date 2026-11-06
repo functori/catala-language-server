@@ -75,7 +75,8 @@ type runtime_value_raw = [
   | Struct of (struct_declaration * (string * runtime_value) list <json repr="object"> <ts repr="map">)
   | Array of runtime_value list <ocaml repr="array">
   | Unset
-    (* Regular input (is_context = false): "not yet provided".
+    (* Regular input (is_contex
+};t = false): "not yet provided".
        Must be filled by the user before running a test. Printed as
        'impossible' in Catala output. The test runner rejects any
        remaining Unset on regular inputs. *)
@@ -314,6 +315,9 @@ type test_run_request = {
   reset_outputs: bool;
   in_shell: bool;
   debug: bool;
+  (* Whether the test declares trace assertions: only then is the run worth
+     instrumenting with "--trace". *)
+  has_trace_assert: bool;
 }
 
 type test_generate_request = {
@@ -382,8 +386,25 @@ type update = {
   original_reads: bool;
 }
 
+
+type trace_view_kinds = {
+  ~function_call <ocaml default="false"> <ts default="false">: bool;
+  ~branch_condition <ocaml default="false"> <ts default="false">: bool;
+  ~if_branching <ocaml default="false"> <ts default="false">: bool;
+  ~match_branching <ocaml default="false"> <ts default="false">: bool;
+  ~assertion_ <json name="assertion"> <ocaml default="false"> <ts default="false">: bool;
+  ~exception_ <json name="exception"> <ocaml default="false"> <ts default="false">: bool;
+  ~error <ocaml default="false"> <ts default="false">: bool;
+}
+
+type language_settings = [
+  | File <json name="file">
+  | Vscode <json name="vscode">
+] <ocaml repr="classic">
+
 type webview_settings = {
-  locale: string; (* resolved: en | fr | pl *)
+  language: language_settings;
+  trace_view: trace_view_kinds
 }
 
 type test_scope_result = {
@@ -393,11 +414,18 @@ type test_scope_result = {
   reorder: bool; (* failures first again, once this result is in *)
 }
 
+type trace_data = [
+   | Input of string
+   | Internal of string
+   | Result of string
+]
+
 type down_message = [
   | Update of update
   | TestRunResults of test_run_results_msg
   | ConfirmResult of confirm_result
   | Settings of webview_settings
+  | FocusData of (string * trace_data)
 ]
 
 (* Messages of the 'view catala tests' panel (TestMacroController) *)

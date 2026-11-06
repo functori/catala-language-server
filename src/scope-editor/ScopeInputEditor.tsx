@@ -85,6 +85,9 @@ export default function ScopeInputEditor({
           reset_outputs: false,
           in_shell: args.action == 'Terminal',
           debug: args.action == 'Debug',
+          // Running a scope against ad-hoc inputs is not a test: no expected
+          // variables to check against a trace.
+          has_trace_assert: false,
         },
       })
     );
@@ -130,6 +133,9 @@ export default function ScopeInputEditor({
         }
         case 'Settings':
           break;
+        case 'FocusData': {
+          throw Error(`This view has no data panel to focus`);
+        }
         default:
           assertUnreachable(message);
       }

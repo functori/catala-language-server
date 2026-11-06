@@ -1,17 +1,40 @@
 import * as vscode from 'vscode';
-import { writeDownMessage } from '../generated/catala_types';
-import type { CatalaSettings } from '../shared/settings';
-import { readSettings, resolveLanguage } from '../shared/settings';
+import {
+  readLanguageSettings,
+  readTraceViewKinds,
+  type WebviewSettings,
+  writeDownMessage,
+} from '../generated/catala_types';
+import { defaultSettings } from '../shared/settings';
+import { logger } from './logger';
 
 const SECTION = 'catala';
 
+// An invalid setting (e.g. a value from an older version of the extension)
+// falls back to its default instead of failing every webview
+function readOr<T>(
+  name: string,
+  read: (x: unknown) => T,
+  raw: unknown,
+  fallback: T
+): T {
+  try {
+    return read(raw);
+  } catch (e) {
+    logger.log(
+      `Could not read setting ${SECTION}.${name} = ${JSON.stringify(raw)} (${String(e)}): using ${JSON.stringify(fallback)} instead.`
+    );
+    return fallback;
+  }
+}
+
 export type SettingsSource = {
-  get(): CatalaSettings;
-  follow(webview: vscode.Webview, file?: string): vscode.Disposable;
+  get(): WebviewSettings;
+  follow(webview: vscode.Webview): vscode.Disposable;
 };
 
 export class SettingsStore implements SettingsSource {
-  private readonly webviews = new Map<vscode.Webview, string | undefined>();
+  private readonly webviews = new Set<vscode.Webview>();
 
   constructor(context: vscode.ExtensionContext) {
     context.subscriptions.push(
@@ -19,36 +42,42 @@ export class SettingsStore implements SettingsSource {
         if (!event.affectsConfiguration(SECTION)) {
           return;
         }
-        for (const [webview, file] of this.webviews) {
-          void this.post(webview, file);
+        for (const webview of this.webviews) {
+          void this.post(webview);
         }
       })
     );
   }
 
-  public get(): CatalaSettings {
+  public get(): WebviewSettings {
     const configuration = vscode.workspace.getConfiguration(SECTION);
-    return readSettings({
-      language: configuration.get('language'),
-    });
+    return {
+      language: readOr(
+        'language',
+        readLanguageSettings,
+        configuration.get('language'),
+        defaultSettings.language
+      ),
+      trace_view: readOr(
+        'traceView',
+        readTraceViewKinds,
+        configuration.get('traceView'),
+        defaultSettings.trace_view
+      ),
+    };
   }
 
-  public follow(webview: vscode.Webview, file?: string): vscode.Disposable {
-    this.webviews.set(webview, file);
-    void this.post(webview, file);
+  public follow(webview: vscode.Webview): vscode.Disposable {
+    this.webviews.add(webview);
+    void this.post(webview);
     return new vscode.Disposable(() => this.webviews.delete(webview));
   }
 
-  private async post(
-    webview: vscode.Webview,
-    file: string | undefined
-  ): Promise<void> {
+  private async post(webview: vscode.Webview): Promise<void> {
     await webview.postMessage(
       writeDownMessage({
         kind: 'Settings',
-        value: {
-          locale: resolveLanguage(this.get(), file, vscode.env.language),
-        },
+        value: this.get(),
       })
     );
   }

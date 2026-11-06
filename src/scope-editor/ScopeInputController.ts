@@ -10,6 +10,7 @@ import {
   type DownMessage,
   readUpMessage,
   writeDownMessage,
+  writeWebviewSettings,
 } from '../generated/catala_types';
 import {
   runTestScope,
@@ -17,7 +18,7 @@ import {
   serializeInputs,
 } from '../test-case-editor/testCaseCompilerInterop';
 import type { SettingsSource } from '../extension/settingsStore';
-import { resolveLanguage } from '../shared/settings';
+import { fileLanguage } from '../shared/settings';
 
 // This class contains the 'backend' part of the test case editor that
 // sets up the UI, provide initial data and exchanges messages with the
@@ -62,7 +63,7 @@ export class ScopeInputController {
       switch (typed_msg.kind) {
         case 'Ready': {
           this.following.dispose();
-          this.following = this.settings.follow(this.panel.webview, file);
+          this.following = this.settings.follow(this.panel.webview);
           const generatedTest: TestGenerateResults = generate(
             scope,
             file,
@@ -119,6 +120,7 @@ export class ScopeInputController {
             const results: TestRunResults = runTestScope(
               file,
               scope,
+              false,
               this.test.test_inputs
             );
             this.postMessageToWebView({
@@ -173,12 +175,6 @@ export class ScopeInputController {
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'ui.js')
     );
 
-    const language = resolveLanguage(
-      this.settings.get(),
-      file,
-      vscode.env.language
-    );
-
     return `
             <!DOCTYPE html>
             <html lang="en">
@@ -197,7 +193,12 @@ export class ScopeInputController {
             </body>
             <script src="${scriptUri}"></script>
             <script>
-              window.Ui.renderInputScopeUi("${language}", "${this.scope}");
+              window.Ui.renderInputScopeUi(
+                ${JSON.stringify(writeWebviewSettings(this.settings.get()))},
+                ${JSON.stringify(vscode.env.language)},
+                ${JSON.stringify(fileLanguage(file)) ?? 'undefined'},
+                "${this.scope}"
+              );
             </script>
             </html>
         `;

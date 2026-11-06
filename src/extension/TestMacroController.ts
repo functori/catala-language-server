@@ -4,6 +4,7 @@ import {
   readTestsUpMessage,
   writeTestsDownMessage,
   type TestsDownMessage,
+  writeWebviewSettings,
 } from '../generated/catala_types';
 import type { CatalaEntrypoint } from './lspRequests';
 import { logger } from './logger';
@@ -16,7 +17,6 @@ import type { ResultController, TestCatalog } from './testAndCoverage';
 import { fileExists, runTestVscode, TestId } from './testAndCoverage';
 import { getCwd } from '../shared/util_client';
 import type { SettingsSource } from '../extension/settingsStore';
-import { resolveLanguage } from '../shared/settings';
 
 // Path of a test file relative to the workspace folder it belongs to, which is
 // what the 'View Catala tests' panel displays: an absolute path is both too long
@@ -68,7 +68,11 @@ export class TestMacroController {
       value: {
         entry: test.test,
         scope_success: res
-          ? { success: res.success, date: res.date }
+          ? {
+              success:
+                res.success && (res.failed_trace_assert ?? []).length === 0,
+              date: res.date,
+            }
           : { success: false, date: new Date().toISOString() },
         test_id: test.test_id,
         reorder,
@@ -94,7 +98,11 @@ export class TestMacroController {
           filename: filename,
           relative_filename: relativeFilename(filename),
           test: e.entrypoint.value,
-          last_run: res && { success: res.success, date: res.date },
+          last_run: res && {
+            success:
+              res.success && (res.failed_trace_assert ?? []).length === 0,
+            date: res.date,
+          },
         });
       } else {
         throw new Error(`Unexpected test from ${filename}`);
@@ -315,12 +323,6 @@ export class TestMacroController {
       vscode.Uri.joinPath(context.extensionUri, 'dist', 'ui.js')
     );
 
-    const language = resolveLanguage(
-      this.settings.get(),
-      undefined,
-      vscode.env.language
-    );
-
     return `
             <!DOCTYPE html>
             <html lang="en">
@@ -339,7 +341,10 @@ export class TestMacroController {
             </body>
             <script src="${scriptUri}"></script>
             <script>
-              window.Ui.renderMacroTestsUi("${language}");
+              window.Ui.renderMacroTestsUi(
+                ${JSON.stringify(writeWebviewSettings(this.settings.get()))},
+                ${JSON.stringify(vscode.env.language)}
+              );
             </script>
             </html>
         `;
