@@ -494,6 +494,7 @@ function ScopePicker({
 }
 
 function TestPanes({
+  testing_scope,
   authored,
   rebuilt,
   onChange,
@@ -508,6 +509,7 @@ function TestPanes({
   onSplit,
   picker,
 }: {
+  testing_scope: string;
   authored: Test | undefined;
   rebuilt: Test | undefined;
   onChange: (next: Test) => void;
@@ -606,6 +608,7 @@ function TestPanes({
                   pane, so the two sides stay comparable. */}
               <LinkedViewsContext.Provider value={linkedInputs}>
                 <TestInputsEditor
+                  testing_scope={testing_scope}
                   test_inputs={authored.test_inputs}
                   tested_scope={authored.tested_scope}
                   onTestInputsChange={(): void => {}}
@@ -621,6 +624,7 @@ function TestPanes({
                   </h5>
                   <LinkedViewsContext.Provider value={linkedOutputs}>
                     <TestOutputsEditor
+                      testing_scope={testing_scope}
                       test={authored}
                       onTestChange={(): void => {}}
                       readOnly
@@ -662,6 +666,7 @@ function TestPanes({
                   )}
                 <LinkedViewsContext.Provider value={linkedInputs}>
                   <TestInputsEditor
+                    testing_scope={testing_scope}
                     test_inputs={rebuilt.test_inputs}
                     tested_scope={rebuilt.tested_scope}
                     onTestInputsChange={(inputs): void =>
@@ -678,6 +683,7 @@ function TestPanes({
                     </h5>
                     <LinkedViewsContext.Provider value={linkedOutputs}>
                       <TestOutputsEditor
+                        testing_scope={testing_scope}
                         test={rebuilt}
                         onTestChange={onChange}
                         diffs={runDiffs}
@@ -839,6 +845,7 @@ export default function BrokenTestView({
         const live = rebuilt.find((t) => t.testing_scope === scope);
         return (
           <TestPanes
+            testing_scope={scope}
             key={scope + String(i)}
             authored={authored}
             rebuilt={live}

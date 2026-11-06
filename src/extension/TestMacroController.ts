@@ -74,7 +74,8 @@ export class TestMacroController {
             filename: filename,
             relative_filename: relativeFilename(filename),
             test: e.entrypoint.value,
-            success: res.success,
+            success:
+              res.success && (res.failed_trace_assert ?? []).length === 0,
             date: res.date,
           };
           this.tests.push(testEntrypoint);
@@ -202,7 +203,9 @@ export class TestMacroController {
                   value: {
                     entry: testElt.test,
                     scope_success: {
-                      success: res.success,
+                      success:
+                        res.success &&
+                        (res.failed_trace_assert ?? []).length === 0,
                       date: res.date,
                     },
                     index,
@@ -250,7 +253,9 @@ export class TestMacroController {
                     value: {
                       entry: test.test,
                       scope_success: {
-                        success: res.success,
+                        success:
+                          res.success &&
+                          (res.failed_trace_assert ?? []).length === 0,
                         date: res.date,
                       },
                       index,

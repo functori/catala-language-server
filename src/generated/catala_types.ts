@@ -321,6 +321,7 @@ export type TestRunRequest = {
   reset_outputs: boolean;
   in_shell: boolean;
   debug: boolean;
+  has_trace_assert: boolean;
 }
 
 export type TestGenerateRequest = {
@@ -389,12 +390,18 @@ export type TestScopeResult = {
   order: boolean;
 }
 
+export type TraceData =
+| { kind: 'Input'; value: string }
+| { kind: 'Internal'; value: string }
+| { kind: 'Result'; value: string }
+
 export type DownMessage =
 | { kind: 'Update'; value: Update }
 | { kind: 'TestRunResults'; value: TestRunResultsMsg }
 | { kind: 'TestScopeResult'; value: TestScopeResult }
 | { kind: 'ConfirmResult'; value: ConfirmResult }
 | { kind: 'AllTests'; value: TestDebuggerList }
+| { kind: 'FocusData'; value: [string, TraceData] }
 
 export type ScopeSuccess = {
   success: boolean;
@@ -1548,6 +1555,7 @@ export function writeTestRunRequest(x: TestRunRequest, context: any = x): any {
     'reset_outputs': _atd_write_required_field('TestRunRequest', 'reset_outputs', _atd_write_bool, x.reset_outputs, x),
     'in_shell': _atd_write_required_field('TestRunRequest', 'in_shell', _atd_write_bool, x.in_shell, x),
     'debug': _atd_write_required_field('TestRunRequest', 'debug', _atd_write_bool, x.debug, x),
+    'has_trace_assert': _atd_write_required_field('TestRunRequest', 'has_trace_assert', _atd_write_bool, x.has_trace_assert, x),
   };
 }
 
@@ -1557,6 +1565,7 @@ export function readTestRunRequest(x: any, context: any = x): TestRunRequest {
     reset_outputs: _atd_read_required_field('TestRunRequest', 'reset_outputs', _atd_read_bool, x['reset_outputs'], x),
     in_shell: _atd_read_required_field('TestRunRequest', 'in_shell', _atd_read_bool, x['in_shell'], x),
     debug: _atd_read_required_field('TestRunRequest', 'debug', _atd_read_bool, x['debug'], x),
+    has_trace_assert: _atd_read_required_field('TestRunRequest', 'has_trace_assert', _atd_read_bool, x['has_trace_assert'], x),
   };
 }
 
@@ -1802,6 +1811,32 @@ export function readTestScopeResult(x: any, context: any = x): TestScopeResult {
   };
 }
 
+export function writeTraceData(x: TraceData, context: any = x): any {
+  switch (x.kind) {
+    case 'Input':
+      return ['Input', _atd_write_string(x.value, x)]
+    case 'Internal':
+      return ['Internal', _atd_write_string(x.value, x)]
+    case 'Result':
+      return ['Result', _atd_write_string(x.value, x)]
+  }
+}
+
+export function readTraceData(x: any, context: any = x): TraceData {
+  _atd_check_json_tuple(2, x, context)
+  switch (x[0]) {
+    case 'Input':
+      return { kind: 'Input', value: _atd_read_string(x[1], x) }
+    case 'Internal':
+      return { kind: 'Internal', value: _atd_read_string(x[1], x) }
+    case 'Result':
+      return { kind: 'Result', value: _atd_read_string(x[1], x) }
+    default:
+      _atd_bad_json('TraceData', x, context)
+      throw new Error('impossible')
+  }
+}
+
 export function writeDownMessage(x: DownMessage, context: any = x): any {
   switch (x.kind) {
     case 'Update':
@@ -1814,6 +1849,8 @@ export function writeDownMessage(x: DownMessage, context: any = x): any {
       return ['ConfirmResult', writeConfirmResult(x.value, x)]
     case 'AllTests':
       return ['AllTests', writeTestDebuggerList(x.value, x)]
+    case 'FocusData':
+      return ['FocusData', ((x, context) => [_atd_write_string(x[0], x), writeTraceData(x[1], x)])(x.value, x)]
   }
 }
 
@@ -1830,6 +1867,8 @@ export function readDownMessage(x: any, context: any = x): DownMessage {
       return { kind: 'ConfirmResult', value: readConfirmResult(x[1], x) }
     case 'AllTests':
       return { kind: 'AllTests', value: readTestDebuggerList(x[1], x) }
+    case 'FocusData':
+      return { kind: 'FocusData', value: ((x, context): [string, TraceData] => { _atd_check_json_tuple(2, x, context); return [_atd_read_string(x[0], x), readTraceData(x[1], x)] })(x[1], x) }
     default:
       _atd_bad_json('DownMessage', x, context)
       throw new Error('impossible')

@@ -29,6 +29,7 @@ export class SettingsStore implements SettingsSource {
     const configuration = vscode.workspace.getConfiguration(SECTION);
     return readSettings({
       language: configuration.get('language'),
+      traceView: configuration.get('traceView'),
     });
   }
 

@@ -86,6 +86,9 @@ export default function ScopeInputEditor({
           reset_outputs: false,
           in_shell: args.action == 'Terminal',
           debug: args.action == 'Debug',
+          // Running a scope against ad-hoc inputs is not a test: no expected
+          // variables to check against a trace.
+          has_trace_assert: false,
         },
       })
     );
@@ -114,10 +117,18 @@ export default function ScopeInputEditor({
           setState(parseResultsToUiState(message.value.results));
           break;
         case 'TestRunResults': {
-          setTestRunState((_prev) => {
-            const next: TestRunState = _resultsToState(message.value.results);
-            return next;
-          });
+          const results = message.value.results;
+          setTestRunState((_prev) => _resultsToState(results));
+          if (results.kind !== 'Cancelled') {
+            // Record the run outcome on the test (and reflect it back to the
+            // controller through a GuiEdit, like any other test edit).
+            setState((prev) => {
+              if (prev.state !== 'success') {
+                return prev;
+              }
+              return { state: 'success', test: prev.test };
+            });
+          }
           break;
         }
         case 'ConfirmResult': {
@@ -129,6 +140,9 @@ export default function ScopeInputEditor({
         }
         case 'TestScopeResult': {
           throw Error(`This view can't trigger a TestScopeResult`);
+        }
+        case 'FocusData': {
+          throw Error(`This view has no data panel to focus`);
         }
         default:
           assertUnreachable(message);
