@@ -336,7 +336,8 @@ export default function TraceNode({
       )}
       {showDependencies && dependencies.length > 0 && (
         <div style={openContentStyle}>
-          <div style={dependencyListStyle}>
+          {/* Pointed at by the tutorial. */}
+          <div data-dependencies style={dependencyListStyle}>
             {dependencies.map((d) => {
               const shown =
                 d.value === undefined
