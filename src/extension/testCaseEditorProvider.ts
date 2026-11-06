@@ -27,6 +27,8 @@ import { renameIfNeeded } from '../test-case-editor/testCaseUtils';
 import { CatalaTestCaseDocument } from '../shared/CatalaTestCaseDocument';
 import type { ResultController } from './testAndCoverage';
 import { TestId } from './testAndCoverage';
+import type { SettingsSource } from './settingsStore';
+import { resolveLanguage } from '../shared/settings';
 
 export function parseContents(
   content: Uint8Array,
@@ -149,7 +151,8 @@ export class TestCaseEditorProvider
 
   constructor(
     private readonly context: vscode.ExtensionContext,
-    private resultController: ResultController
+    private resultController: ResultController,
+    private readonly settings: SettingsSource
   ) {
     this.testQueue = new PQueue({ concurrency: 1 });
     this.resultController = resultController;
@@ -226,9 +229,14 @@ export class TestCaseEditorProvider
 
   public static register(
     context: vscode.ExtensionContext,
-    resultController: ResultController
+    resultController: ResultController,
+    settings: SettingsSource
   ): vscode.Disposable {
-    const provider = new TestCaseEditorProvider(context, resultController);
+    const provider = new TestCaseEditorProvider(
+      context,
+      resultController,
+      settings
+    );
     logger.log(`Registering ${TestCaseEditorProvider.viewType}`);
     const providerRegistration = vscode.window.registerCustomEditorProvider(
       TestCaseEditorProvider.viewType,
@@ -248,6 +256,7 @@ export class TestCaseEditorProvider
     webviewPanel: vscode.WebviewPanel,
     _token: vscode.CancellationToken
   ): Promise<void> {
+    let following: vscode.Disposable = new vscode.Disposable(() => {});
     const config = vscode.workspace.getConfiguration('catala');
     const isCustomEditorEnabled = config.get<boolean>(
       'enableCustomTestCaseEditor'
@@ -267,7 +276,10 @@ export class TestCaseEditorProvider
       enableScripts: true,
     };
 
-    webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
+    webviewPanel.webview.html = this.getHtmlForWebview(
+      webviewPanel.webview,
+      document.uri.fsPath
+    );
 
     // We want to restrict shell -> webview messages to instances
     // of DownMessage
@@ -308,10 +320,13 @@ export class TestCaseEditorProvider
     webviewPanel.webview.onDidReceiveMessage(async (message: unknown) => {
       const typed_msg = readUpMessage(message);
       switch (typed_msg.kind) {
-        // listen for a 'ready' message from the web view, then send the initial
-        // document (in parsed form)
         case 'Ready': {
           logger.log(`Got ready message from webview, sending parsed document`);
+          following.dispose();
+          following = this.settings.follow(
+            webviewPanel.webview,
+            document.uri.fsPath
+          );
           postUpdate();
           TestCaseEditorProvider.markReady(document.uri);
           break;
@@ -665,6 +680,7 @@ export class TestCaseEditorProvider
       // e.g. subscriptions to vs code 'system' events
       // (content change monitoring...)
       TestCaseEditorProvider.unregisterWebview(document.uri);
+      following.dispose();
       changeSubscription.dispose();
     });
   }
@@ -779,12 +795,16 @@ export class TestCaseEditorProvider
     return true;
   }
 
-  private getHtmlForWebview(webview: vscode.Webview): string {
+  private getHtmlForWebview(webview: vscode.Webview, file: string): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'ui.js')
     );
 
-    const language = vscode.env.language;
+    const language = resolveLanguage(
+      this.settings.get(),
+      file,
+      vscode.env.language
+    );
 
     return `
           <!DOCTYPE html>

@@ -1,22 +1,11 @@
 import { type ReactElement } from 'react';
-import { IntlProvider } from 'react-intl';
 import TestFileEditor from './test-case-editor/TestFileEditor';
 import ScopeInputEditor from './scope-editor/ScopeInputEditor';
 
 import { type WebviewApi } from 'vscode-webview';
+import { CatalaSettingsProvider } from './shared/useSettings';
 
-import frMessages from './locales/fr.json';
-import enMessages from './locales/en.json';
-import plMessages from './locales/pl.json';
 import TestOverview from './test-overview/TestOverview';
-
-type Messages = Record<string, string>;
-
-const allMessages: Record<string, Messages> = {
-  fr: frMessages,
-  en: enMessages,
-  pl: plMessages,
-};
 
 type Props = {
   language: string;
@@ -25,35 +14,29 @@ type Props = {
 };
 
 export default function App({ language, vscode }: Props): ReactElement {
-  const messages = allMessages[language] || enMessages;
-
   return (
-    <IntlProvider locale={language} messages={messages} defaultLocale="en">
+    <CatalaSettingsProvider language={language}>
       <TestFileEditor contents={{ state: 'initializing' }} vscode={vscode} />
-    </IntlProvider>
+    </CatalaSettingsProvider>
   );
 }
 
 export function InputApp({ language, vscode, scopename }: Props): ReactElement {
-  const messages = allMessages[language] || enMessages;
-
   return (
-    <IntlProvider locale={language} messages={messages} defaultLocale="en">
+    <CatalaSettingsProvider language={language}>
       <ScopeInputEditor
         contents={{ state: 'initializing' }}
         vscode={vscode}
         scopename={scopename ?? ''}
       />
-    </IntlProvider>
+    </CatalaSettingsProvider>
   );
 }
 
 export function GeneralTestsUi({ language, vscode }: Props): ReactElement {
-  const messages = allMessages[language] || enMessages;
-
   return (
-    <IntlProvider locale={language} messages={messages} defaultLocale="en">
+    <CatalaSettingsProvider language={language}>
       <TestOverview vscode={vscode} />
-    </IntlProvider>
+    </CatalaSettingsProvider>
   );
 }
