@@ -1,4 +1,5 @@
 import type { ListedTest } from '../generated/catala_types';
+import type { Filter } from '../FilterPin';
 import type { TestMacro, TestState } from './types';
 
 // The `gui` flag is now carried by the `test` union's constructor: a GUI
@@ -51,30 +52,42 @@ export function testMacro(success?: boolean): TestState {
  */
 export function matchFilter(
   test: ListedTest,
-  filterRaw: string,
+  filters: Filter[],
   filterScope: string[],
   filterGui: boolean
 ): boolean {
-  let filter = filterRaw.toLowerCase();
-  let searchBarFilter =
-    testTitle(test).toLowerCase().includes(filter) ||
-    testDescription(test).toLowerCase().includes(filter) ||
-    testingScope(test).toLowerCase().includes(filter) ||
-    (test.relative_filename ?? test.filename).toLowerCase().includes(filter);
+  let pinsMatch = true;
+  for (let filterPin of filters) {
+    if (filterPin.option != 'ignore') {
+      let filter = filterPin.filter.toLowerCase().trim();
+      let pinMatch =
+        testTitle(test).toLowerCase().includes(filter) ||
+        testDescription(test).toLowerCase().includes(filter) ||
+        testingScope(test).toLowerCase().includes(filter) ||
+        (test.relative_filename ?? test.filename)
+          .toLowerCase()
+          .includes(filter);
+      if (filterPin.option == 'include') {
+        pinsMatch = pinsMatch && pinMatch;
+      } else {
+        pinsMatch = pinsMatch && !pinMatch;
+      }
+    }
+  }
   let scopeFilter =
     filterScope.length == 0
       ? true
       : filterScope.some((value) => testingScope(test) == value);
   let guiFilter = filterGui ? isGui(test) : true;
-  return searchBarFilter && scopeFilter && guiFilter;
+  return pinsMatch && scopeFilter && guiFilter;
 }
 
 export function noFilter(
-  filter: string,
+  filters: Filter[],
   filterScope: string[],
   filterGui: boolean
 ): boolean {
-  return filter.trim() == '' && filterScope.length == 0 && filterGui == false;
+  return filters.length == 0 && filterScope.length == 0 && filterGui == false;
 }
 
 // Explicitly `false`: a test that was never run has no `last_run` and does

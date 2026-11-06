@@ -11,6 +11,7 @@ import {
 } from './testUtils';
 import type { CardGridArg, TestItemArg, TestMacro } from './types';
 import { SeparationLine, TestDate, TestStateIcon } from './widgets';
+import { HighlightText } from '../shared/Highlight';
 
 /**
  * This is the component used in the Grid representation of the list of tests.
@@ -18,7 +19,7 @@ import { SeparationLine, TestDate, TestStateIcon } from './widgets';
  * mostly items with css to render them poperly
  *
  */
-function TestItem({ vscode, test, onRun }: TestItemArg): ReactElement {
+function TestItem({ vscode, test, filters, onRun }: TestItemArg): ReactElement {
   const intl = useIntl();
   return (
     <div className="test-item">
@@ -30,7 +31,7 @@ function TestItem({ vscode, test, onRun }: TestItemArg): ReactElement {
             defaultMessage: 'Titre',
           })}
         >
-          {testTitle(test)}
+          <HighlightText filters={filters} text={testTitle(test)} />
         </b>
         <span className="test-file" title={test.filename}>
           {testFileName(test)}
@@ -43,7 +44,7 @@ function TestItem({ vscode, test, onRun }: TestItemArg): ReactElement {
           defaultMessage: 'Description',
         })}
       >
-        {testDescription(test)}
+        <HighlightText filters={filters} text={testDescription(test)} />
       </span>
       <SeparationLine />
       <div className="footer">
@@ -86,6 +87,7 @@ export function CardGrid({
   tests,
   filteredScope,
   onRun,
+  filters,
 }: CardGridArg): ReactElement {
   let gridTests = new Map<string, TestMacro[]>();
   if (filteredScope.length != 0) {
@@ -113,7 +115,12 @@ export function CardGrid({
             <div className="card-grid scoped">
               {tests.map((elt) => (
                 <div key={elt.test_id} className="card-cell">
-                  <TestItem vscode={vscode} test={elt} onRun={onRun} />
+                  <TestItem
+                    vscode={vscode}
+                    test={elt}
+                    onRun={onRun}
+                    filters={filters}
+                  />
                 </div>
               ))}
             </div>
@@ -126,7 +133,12 @@ export function CardGrid({
       <div className="card-grid">
         {tests.map((elt) => (
           <div key={elt.test_id} className="card-cell">
-            <TestItem vscode={vscode} test={elt} onRun={onRun} />
+            <TestItem
+              vscode={vscode}
+              test={elt}
+              onRun={onRun}
+              filters={filters}
+            />
           </div>
         ))}
       </div>

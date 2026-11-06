@@ -432,6 +432,15 @@ export class TestCaseEditorProvider
             results
           );
 
+          // This run does not go through clerk, so nothing else would record
+          // it: without this the General Tests view would keep showing the
+          // outcome of the previous run for that scope.
+          this.resultController.record(
+            new TestId(document.uri, scope),
+            scope,
+            results
+          );
+
           postMessageToWebView({
             kind: 'TestRunResults',
             value: { scope, reset_outputs, results },
