@@ -6,7 +6,7 @@ import {
   useState,
   type ReactElement,
 } from 'react';
-import { FormattedMessage, useIntl } from 'react-intl';
+import { FormattedMessage, type IntlShape, useIntl } from 'react-intl';
 
 import { type WebviewApi } from 'vscode-webview';
 
@@ -20,6 +20,8 @@ import { setVsCodeApi } from './shared/webviewApi';
 import type { Filter } from './FilterPin';
 import { FilterPins } from './FilterPin';
 import { HighlightText } from './shared/Highlight';
+import type { Controls, Options, State, Step } from 'react-joyride';
+import { useJoyride } from 'react-joyride';
 
 type TestGridArg = {
   vscode: WebviewApi<unknown>;
@@ -53,7 +55,9 @@ type TestItemArg = {
  * wether the test is a Catala Test Case editor generated test
  */
 type FilterArg = {
-  tests: TestMacro[] | undefined;
+  // The tests whose scopes are offered as scope filters: already filtered by
+  // everything but the scope, so that only the scopes still reachable show.
+  scopeTests: TestMacro[] | undefined;
   filters: Filter[];
   filterScope: string[];
   setFilterScope: React.Dispatch<React.SetStateAction<string[]>>;
@@ -73,13 +77,15 @@ type ScopeFilterArg = {
  * so that we can choose the function to give
  */
 function RunAllTests({
+  id,
   onRun,
 }: {
-  className?: string | undefined;
+  id?: string;
   onRun: () => void;
 }): ReactElement {
   return (
     <span
+      id={id}
       onClick={(event) => {
         event.preventDefault();
         onRun();
@@ -98,9 +104,16 @@ function RunAllTests({
  * Component that open a new window to create a catala file and generates a test
  * in it.
  */
-function AddNewTest({ vscode }: { vscode: WebviewApi<unknown> }): ReactElement {
+function AddNewTest({
+  vscode,
+  id,
+}: {
+  id?: string;
+  vscode: WebviewApi<unknown>;
+}): ReactElement {
   return (
     <span
+      id={id}
       className="vscode-button"
       onClick={(event) => {
         event.preventDefault();
@@ -317,6 +330,7 @@ function TestItem({ vscode, test, filters, onRun }: TestItemArg): ReactElement {
       <div className="footer">
         <TestStateIcon success={test} />
         <span
+          className="test-date"
           title={intl.formatMessage({
             id: 'generalTests.header.lastTestDate',
             defaultMessage: 'Date du dernier test',
@@ -874,7 +888,7 @@ function ScopeFilter({
   const intl = useIntl();
   let filteredScope = scopesFromTests(tests ?? []);
   return (
-    <div className="pins">
+    <div id="scopePins" className="pins">
       <Box
         sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, textAlign: 'center' }}
       >
@@ -920,7 +934,7 @@ function ScopeFilter({
 }
 
 function FilterPanel({
-  tests,
+  scopeTests,
   filters,
   filterScope,
   setFilterScope,
@@ -937,10 +951,6 @@ function FilterPanel({
     setFilterScope([]);
     setFilters([]);
   };
-
-  const filteredTests = tests?.filter((test) =>
-    matchFilter(test, filters, [], filterGui)
-  );
 
   const addFilter = (filter: string): void => {
     let filterToAdd = filter.trim();
@@ -979,12 +989,13 @@ function FilterPanel({
           />
         </span>
       </div>
-      {tests === undefined ? (
+      {scopeTests === undefined ? (
         <Loading size="small" />
       ) : (
         <>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <FormControlLabel
+              id="filter-gui"
               control={
                 <Checkbox
                   checked={filterGui}
@@ -1005,43 +1016,51 @@ function FilterPanel({
             />
           </div>
           <ScopeFilter
-            tests={filteredTests}
+            tests={scopeTests}
             filterScope={filterScope}
             setFilterScope={setFilterScope}
           />
-          <div style={{ marginLeft: 'auto' }}>
+          <div id="filterPins" style={{ marginLeft: 'auto' }}>
             <FilterPins filters={filters} setFilters={setFilters} />
-            <VscodeTextfield
-              className="search-bar"
-              value={filter}
-              placeholder={intl.formatMessage({
-                id: 'generalTests.searchPlaceholder',
-                defaultMessage: 'Rechercher un test…',
-              })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  addFilter(filter);
-                  setFilter('');
-                }
-              }}
-              onInput={(e) => {
-                const value = (e.target as HTMLInputElement).value;
-                setFilter(value);
-              }}
-            >
-              <span
-                style={{ cursor: 'pointer' }}
-                onClick={(e) => {
-                  e.preventDefault();
-                  addFilter(filter);
-                  setFilter('');
+            {/* The tutorial targets this wrapper rather than the field: the
+                field is zoomed, which throws off the measures the spotlight
+                is drawn from. */}
+            <div style={{ display: 'inline-flex' }}>
+              <VscodeTextfield
+                className="search-bar"
+                value={filter}
+                placeholder={intl.formatMessage({
+                  id: 'generalTests.searchPlaceholder',
+                  defaultMessage: 'Rechercher un test…',
+                })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addFilter(filter);
+                    setFilter('');
+                  }
                 }}
-                className="codicon codicon-save"
-                slot="content-after"
-              />
-              <span className="codicon codicon-search" slot="content-before" />
-            </VscodeTextfield>
+                onInput={(e) => {
+                  const value = (e.target as HTMLInputElement).value;
+                  setFilter(value);
+                }}
+              >
+                <span
+                  style={{ cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    addFilter(filter);
+                    setFilter('');
+                  }}
+                  className="codicon codicon-save"
+                  slot="content-after"
+                />
+                <span
+                  className="codicon codicon-search"
+                  slot="content-before"
+                />
+              </VscodeTextfield>
+            </div>
           </div>
         </>
       )}
@@ -1074,6 +1093,397 @@ function Loading({
   );
 }
 
+const stepsWelcome = [
+  {
+    id: 'welcome',
+    content: <FormattedMessage id="generalTests.tuto.welcome" />,
+    target: '.tuto-menu',
+    // The message invites to open the menu: the click must go through.
+    blockTargetInteraction: false,
+  },
+];
+
+// Like the welcome step, the closing one is not a chapter of the menu.
+const stepsEnd: Step[] = [
+  {
+    id: 'end',
+    content: <FormattedMessage id="generalTests.tuto.end" />,
+    target: 'body',
+    placement: 'center',
+  },
+];
+
+const stepsButton: Step[] = [
+  {
+    id: 'test_add',
+    content: <FormattedMessage id="generalTests.tuto.addTest" />,
+    target: '#addTest',
+    // No way back to the welcome step: the default buttons, without 'back'.
+    buttons: ['close', 'primary'],
+  },
+  {
+    id: 'tests_run',
+    content: <FormattedMessage id="generalTests.tuto.runAllTests" />,
+    target: '#runAllTests',
+  },
+];
+
+function stepsFilter(intl: IntlShape): Step[] {
+  const filterIncludeId = `#include-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  const filterExcludeId = `#exclude-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  const filterIgnoreId = `#ignore-${intl.formatMessage({ id: 'generalTests.tuto.pinSample' })}`;
+  return [
+    {
+      id: 'filter_box',
+      content: <FormattedMessage id="generalTests.tuto.filterBox" />,
+      target: '.box-filter',
+    },
+    {
+      id: 'filter_reset',
+      content: <FormattedMessage id="generalTests.tuto.filterReset" />,
+      target: '.reset-filters',
+    },
+    {
+      id: 'filter_gui',
+      content: <FormattedMessage id="generalTests.tuto.filterGUI" />,
+      target: '#filter-gui',
+    },
+    {
+      id: 'filter_scope',
+      content: <FormattedMessage id="generalTests.tuto.filterScope" />,
+      target: '#scopePins',
+    },
+    {
+      id: 'filter_search',
+      content: <FormattedMessage id="generalTests.tuto.filterSearch" />,
+      target: '#filterPins',
+    },
+    {
+      id: 'filter_pin_include',
+      content: <PinStep option="include" />,
+      target: filterIncludeId,
+    },
+    {
+      id: 'filter_pin_exclude',
+      content: <PinStep option="exclude" />,
+      target: filterExcludeId,
+    },
+    {
+      id: 'filter_pin_ignore',
+      content: <PinStep option="ignore" />,
+      target: filterIgnoreId,
+    },
+  ];
+}
+
+const stepsTests: Step[] = [
+  {
+    id: 'tests_display',
+    content: <FormattedMessage id="generalTests.tuto.displayMode" />,
+    target: '#displayMode',
+    placement: 'top',
+  },
+];
+
+const stepsCard: Step[] = [
+  {
+    id: 'tests_display_card',
+    content: <FormattedMessage id="generalTests.tuto.displayCard" />,
+    target: '#displayCard',
+    placement: 'top',
+  },
+  // The fields of a card, shown on the sample test.
+  {
+    id: 'tests_card_title',
+    content: <FormattedMessage id="generalTests.tuto.card.title" />,
+    target: '.test-item .test-title',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_number',
+    content: <FormattedMessage id="generalTests.tuto.card.number" />,
+    target: '.test-item .test-number',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_description',
+    content: <FormattedMessage id="generalTests.tuto.card.description" />,
+    target: '.test-item .test-descr',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_state',
+    content: <SampleStates />,
+    target: '.test-item .check-icon',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_date',
+    content: <FormattedMessage id="generalTests.tuto.card.date" />,
+    target: '.test-item .test-date',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_open',
+    content: <FormattedMessage id="generalTests.tuto.card.open" />,
+    target: '.test-item .open-gui',
+    placement: 'top',
+  },
+  {
+    id: 'tests_card_run',
+    content: <FormattedMessage id="generalTests.tuto.card.run" />,
+    target: '.test-item .run-icon',
+    placement: 'top',
+  },
+];
+
+const stepsList: Step[] = [
+  {
+    id: 'tests_display_list',
+    content: <FormattedMessage id="generalTests.tuto.displayList" />,
+    target: '#displayList',
+    placement: 'top',
+  },
+  // The columns of the list, shown on the sample test. The texts shared with
+  // the card are reused.
+  {
+    id: 'tests_list_file',
+    content: <FormattedMessage id="generalTests.tuto.list.file" />,
+    target: '.test-list tbody tr .path-column',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_title',
+    content: <FormattedMessage id="generalTests.tuto.card.title" />,
+    target: '.test-list tbody tr td:nth-child(2)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_scope',
+    content: <FormattedMessage id="generalTests.tuto.list.scope" />,
+    target: '.test-list tbody tr td:nth-child(3)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_description',
+    content: <FormattedMessage id="generalTests.tuto.card.description" />,
+    target: '.test-list tbody tr td:nth-child(4)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_date',
+    content: <FormattedMessage id="generalTests.tuto.card.date" />,
+    target: '.test-list tbody tr td:nth-child(5)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_state',
+    content: <SampleStates />,
+    target: '.test-list tbody tr td:nth-child(6)',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_run',
+    content: <FormattedMessage id="generalTests.tuto.card.run" />,
+    target: '.test-list tbody tr .run-icon',
+    placement: 'top',
+  },
+  {
+    id: 'tests_list_open',
+    content: <FormattedMessage id="generalTests.tuto.card.open" />,
+    target: '.test-list tbody tr .open-gui',
+    placement: 'top',
+  },
+];
+
+// One line per state, each with its own icon: written as a sentence, the
+// states read as a single one.
+function SampleStates(): ReactElement {
+  // The ids are written out in full so that the i18n check finds them.
+  const states: [TestState['state'], string][] = [
+    ['Success', 'generalTests.tuto.card.stateSuccess'],
+    ['Failed', 'generalTests.tuto.card.stateFailed'],
+    ['Loading', 'generalTests.tuto.card.stateLoading'],
+    ['Unknown', 'generalTests.tuto.card.stateUnknown'],
+  ];
+  return (
+    <div style={{ textAlign: 'left' }}>
+      <FormattedMessage id="generalTests.tuto.card.state" />
+      <ul style={{ listStyle: 'none', paddingLeft: 0 }}>
+        {states.map(([state, id]) => (
+          <li
+            key={state}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.5em' }}
+          >
+            <TestStateIcon success={{ state }} />
+            <FormattedMessage id={id} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function sampleTest(intl: IntlShape): TestMacro {
+  return testMacro({
+    index: 0,
+    filename: 'tests/test_1.catala_en',
+    relative_filename: 'tests/test_1.catala_en',
+    test: {
+      kind: 'GUI',
+      value: {
+        scope: 'Test1',
+        scope_tested: intl.formatMessage({
+          id: 'generalTests.tuto.sampleScope',
+        }),
+        title: intl.formatMessage(
+          { id: 'generalTests.tuto.sampleTitle' },
+          { num: 1 }
+        ),
+        description: intl.formatMessage({
+          id: 'generalTests.tuto.sampleDescription',
+        }),
+      },
+    },
+    success: true,
+    date: '13/10/2026',
+  });
+}
+
+function samplePins(intl: IntlShape): Filter[] {
+  const includeExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'include',
+  };
+  const excludeExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'exclude',
+  };
+
+  const ignoreExemple: Filter = {
+    filter: intl.formatMessage({ id: 'generalTests.tuto.pinSample' }),
+    option: 'ignore',
+  };
+  return [includeExemple, excludeExemple, ignoreExemple];
+}
+
+// Tutorial step showing a sample pin, drawn by the real `FilterPins` so that
+// it looks exactly like the ones of the search bar. The setter is a no-op:
+// the sample pin is only there to be seen.
+function PinStep({ option }: { option: Filter['option'] }): ReactElement {
+  const intl = useIntl();
+  const pins = samplePins(intl);
+  const messageId = {
+    include: 'generalTests.tuto.filterPinInclude',
+    exclude: 'generalTests.tuto.filterPinExclude',
+    ignore: 'generalTests.tuto.filterPinIgnore',
+  }[option];
+  const pin = (
+    <FilterPins
+      filters={pins.filter((pin) => pin.option == option)}
+      setFilters={() => {}}
+    />
+  );
+  return <FormattedMessage id={messageId} values={{ pin }} />;
+}
+
+function chapters(
+  intl: IntlShape
+): { title: string; steps: Step[]; start: number }[] {
+  // The welcome steps come first in the tour but are not a chapter of the
+  // menu, so the chapters start after them.
+  return [
+    { title: 'generalTests.tuto.chapter.buttons', steps: stepsButton },
+    { title: 'generalTests.tuto.chapter.filters', steps: stepsFilter(intl) },
+    { title: 'generalTests.tuto.chapter.tests', steps: stepsTests },
+    { title: 'generalTests.tuto.chapter.card', steps: stepsCard },
+    { title: 'generalTests.tuto.chapter.list', steps: stepsList },
+  ].map((chapter, index, all) => ({
+    ...chapter,
+    start: all
+      .slice(0, index)
+      .reduce((n, { steps }) => n + steps.length, stepsWelcome.length),
+  }));
+}
+
+// Pinned to the top left corner and drawn over Joyride's overlay (which sits
+// at 100), so that it stays reachable and moves nothing on the page.
+// The menu never grows past this height (in pixels, from the top of the view),
+// so that Joyride can scroll the targets below it without measuring it.
+const TUTO_MENU_TOP = 12;
+const TUTO_MENU_MAX_HEIGHT = 120;
+
+function TutoMenu({
+  state,
+  controls,
+}: {
+  state: State;
+  controls: Controls;
+}): ReactElement {
+  const intl = useIntl();
+  // The tour, cut into chapters: the menu shown during the tour jumps to the
+  // first step of each of them.
+  // Folded, only the icon is left, so that the menu does not hide the element
+  // a step points at. The tour starts folded: the menu is there for those who
+  // look for it.
+  const [folded, setFolded] = useState<boolean>(true);
+  // The whole of the folded menu is the button, border included; unfolded, the
+  // title row is, so that clicking a chapter does not fold it.
+  const toggle = {
+    role: 'button',
+    title: intl.formatMessage({
+      id: folded
+        ? 'generalTests.tooltip.unfoldTutoMenu'
+        : 'generalTests.tooltip.foldTutoMenu',
+    }),
+    onClick: (event: React.MouseEvent): void => {
+      event.preventDefault();
+      setFolded((previous) => !previous);
+    },
+  };
+  return (
+    <div
+      className={`tuto-menu ${folded ? 'folded' : ''}`}
+      style={{ top: TUTO_MENU_TOP, maxHeight: TUTO_MENU_MAX_HEIGHT }}
+      {...(folded ? toggle : {})}
+    >
+      <div className="tuto-menu-title" {...(folded ? {} : toggle)}>
+        <span className="codicon codicon-menu tuto-menu-toggle" />
+        {!folded && <FormattedMessage id="generalTests.tuto.menu" />}
+      </div>
+      {!folded && (
+        <div className="tuto-menu-items">
+          {chapters(intl).map(({ title, steps, start }) => (
+            <button
+              key={title}
+              className={
+                state.index >= start && state.index < start + steps.length
+                  ? 'selected'
+                  : ''
+              }
+              onClick={(event) => {
+                event.preventDefault();
+                controls.go(start);
+              }}
+            >
+              <FormattedMessage id={title} />
+            </button>
+          ))}
+          <button
+            onClick={(event) => {
+              event.preventDefault();
+              controls.skip();
+            }}
+          >
+            <span className="codicon codicon-close" />
+            <FormattedMessage id="generalTests.tuto.quit" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function noFilter(
   filters: Filter[],
   filterScope: string[],
@@ -1085,7 +1495,45 @@ function noFilter(
 export default function GeneralTests({
   vscode,
 }: GeneralTestsArg): ReactElement {
+  const [tuto, setTuto] = useState<boolean>(false);
   const intl = useIntl();
+  // Joyride scrolls a target this far from the top of the view: below the
+  // unfolded tutorial menu, plus Joyride's own default margin of 20px.
+  const options: Partial<Options> = {
+    skipBeacon: true,
+    blockTargetInteraction: true,
+    scrollOffset: TUTO_MENU_TOP + TUTO_MENU_MAX_HEIGHT + 20,
+  };
+  const steps = [
+    ...stepsWelcome,
+    ...chapters(intl).flatMap((chapter) => chapter.steps),
+    ...stepsEnd,
+  ];
+  const { controls, on, state, Tour } = useJoyride({
+    continuous: true,
+    steps,
+    options,
+    locale: {
+      back: intl.formatMessage({ id: 'generalTests.tuto.button.back' }),
+      close: intl.formatMessage({ id: 'generalTests.tuto.button.close' }),
+      last: intl.formatMessage({ id: 'generalTests.tuto.button.last' }),
+      next: intl.formatMessage({ id: 'generalTests.tuto.button.next' }),
+      skip: intl.formatMessage({ id: 'generalTests.tuto.button.skip' }),
+    },
+  });
+
+  useEffect(() => {
+    on('tour:end', () => {
+      setTuto(false);
+    });
+    on('error', () => {
+      setTuto(false);
+    });
+    on('tour:start', () => {
+      setTuto(true);
+    });
+  }, [on]);
+
   const [filters, setFilters] = useState<Filter[]>([]);
   const [filterScope, setFilterScope] = useState<string[]>([]);
   const [filterGui, setFilterGui] = useState<boolean>(true);
@@ -1094,12 +1542,25 @@ export default function GeneralTests({
   // back off by a single run, so that the list does not reshuffle under the
   // pointer when only one test changed.
   const [grid, setGrid] = useState<boolean>(true);
+  // The display mode of the tutorial, kept apart from the user's one so that
+  // the tutorial never changes it: once the tutorial is over, the page is back
+  // in the mode it was in before.
+  const [tutoGrid, setTutoGrid] = useState<boolean>(true);
+  const shownGrid = tuto ? tutoGrid : grid;
   const [tests, setTests] = useState<TestMacro[] | undefined>(undefined);
   const [reload, setReload] = useState<boolean>(false);
 
   useEffect(() => {
     setVsCodeApi(vscode);
   }, [vscode]);
+
+  const listIndex = steps.findIndex(({ id }) => id === 'tests_display_list');
+  const listEndIndex = steps.findIndex(({ id }) => id === 'tests_list_open');
+
+  // The list is shown on its own steps only, the cards everywhere else.
+  useEffect(() => {
+    setTutoGrid(!(state.index >= listIndex && state.index <= listEndIndex));
+  }, [state.index, listIndex, listEndIndex]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent): void => {
@@ -1203,8 +1664,19 @@ export default function GeneralTests({
     matchFilter(test, filters, filterScope, filterGui)
   );
 
+  const filteredTestsForScope = tuto
+    ? [sampleTest(intl)]
+    : tests?.filter((test) => matchFilter(test, filters, [], filterGui));
+  // The user's scope selection is set aside during the tutorial, so that the
+  // sample looks the same for everyone.
+  const shownFilterScope = tuto ? [] : filterScope;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+      {Tour}
+      {state.status === 'running' && (
+        <TutoMenu state={state} controls={controls} />
+      )}
       <div
         style={{
           display: 'flex',
@@ -1218,8 +1690,9 @@ export default function GeneralTests({
           children={(msg) => <h1>{msg}</h1>}
         />
         <div className="tests-button">
-          <AddNewTest vscode={vscode} />
+          <AddNewTest id="addTest" vscode={vscode} />
           <RunAllTests
+            id="runAllTests"
             onRun={() => {
               if (tests) {
                 if (noFilter(filters, filterScope, filterGui)) {
@@ -1252,12 +1725,12 @@ export default function GeneralTests({
         </div>
       </div>
       <FilterPanel
-        tests={tests}
+        scopeTests={filteredTestsForScope}
         setFilterScope={setFilterScope}
-        filterScope={filterScope}
+        filterScope={shownFilterScope}
         filterGui={filterGui}
         setFilterGui={setFilterGui}
-        filters={filters}
+        filters={tuto ? samplePins(intl) : filters}
         setFilters={setFilters}
       />
       <div className="select-test-print">
@@ -1267,36 +1740,43 @@ export default function GeneralTests({
           children={(msg) => <h3>{msg}</h3>}
         />
         <div
-          className={`pp-button ${grid ? 'selected' : ''}`}
-          title={intl.formatMessage({
-            id: 'generalTests.tooltip.displayCard',
-            defaultMessage: 'Afficher les tests sous forme de cartes',
-          })}
-          onClick={(event) => {
-            event.preventDefault();
-            setGrid((_) => true);
-          }}
+          id="displayMode"
+          style={{ display: 'flex', alignItems: 'center', gap: '2em' }}
         >
-          <span className="codicon codicon-layout" />
-          <span>
-            <FormattedMessage id="generalTests.card" defaultMessage="Carte" />
-          </span>
-        </div>
-        <div
-          className={`pp-button ${grid ? '' : 'selected'}`}
-          title={intl.formatMessage({
-            id: 'generalTests.tooltip.displayList',
-            defaultMessage: 'Afficher les tests sous forme de liste',
-          })}
-          onClick={(event) => {
-            event.preventDefault();
-            setGrid((_) => false);
-          }}
-        >
-          <span className="codicon codicon-list-unordered" />
-          <span>
-            <FormattedMessage id="generalTests.list" defaultMessage="Liste" />
-          </span>
+          <div
+            id="displayCard"
+            className={`pp-button ${shownGrid ? 'selected' : ''}`}
+            title={intl.formatMessage({
+              id: 'generalTests.tooltip.displayCard',
+              defaultMessage: 'Afficher les tests sous forme de cartes',
+            })}
+            onClick={(event) => {
+              event.preventDefault();
+              setGrid((_) => true);
+            }}
+          >
+            <span className="codicon codicon-layout" />
+            <span>
+              <FormattedMessage id="generalTests.card" defaultMessage="Carte" />
+            </span>
+          </div>
+          <div
+            id="displayList"
+            className={`pp-button ${shownGrid ? '' : 'selected'}`}
+            title={intl.formatMessage({
+              id: 'generalTests.tooltip.displayList',
+              defaultMessage: 'Afficher les tests sous forme de liste',
+            })}
+            onClick={(event) => {
+              event.preventDefault();
+              setGrid((_) => false);
+            }}
+          >
+            <span className="codicon codicon-list-unordered" />
+            <span>
+              <FormattedMessage id="generalTests.list" defaultMessage="Liste" />
+            </span>
+          </div>
         </div>
         <div
           className="refresh-box"
@@ -1327,13 +1807,29 @@ export default function GeneralTests({
       ) : (
         <TestsGrid
           vscode={vscode}
-          filtered={filteredTests}
-          grid={grid}
-          filterScope={filterScope}
+          filtered={tuto ? [sampleTest(intl)] : filteredTests}
+          grid={shownGrid}
+          filterScope={shownFilterScope}
           onRun={onRun}
           filters={filters}
         />
       )}
+      <button
+        className="help-button"
+        title={intl.formatMessage({
+          id: 'generalTests.tooltip.help',
+          defaultMessage: "Afficher l'aide",
+        })}
+        onClick={(e) => {
+          e.preventDefault();
+          controls.start();
+        }}
+      >
+        <span className="codicon codicon-question" />
+        <span>
+          <FormattedMessage id="generalTests.help" defaultMessage="Aide" />
+        </span>
+      </button>
     </div>
   );
 }
