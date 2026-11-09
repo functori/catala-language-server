@@ -23,6 +23,17 @@ import type { TraceElement, TraceTest } from './traceUtils';
 import { fieldValue, PANEL_HEIGHT_VAR, readTraceTest } from './traceUtils';
 import { DataPanel } from './TraceData';
 import TracePanel, { preStyle, type FilterCommand } from './TracePanel';
+import type { Step } from 'react-joyride';
+import { useJoyride } from 'react-joyride';
+import {
+  type Chapter,
+  HelpButton,
+  placeChapters,
+  TutoLoader,
+  TutoMenu,
+  tutoLocale,
+  tutoOptions,
+} from '../shared/Tutorial';
 
 type RunState =
   | { status: 'idle' }
@@ -78,6 +89,51 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
     if (copiedTimer.current !== null) clearTimeout(copiedTimer.current);
     copiedTimer.current = setTimeout(() => setCopied(false), 1500);
   };
+
+  const {
+    controls,
+    state: tutoState,
+    Tour,
+  } = useJoyride({
+    continuous: true,
+    steps: tutoSteps,
+    options: tutoOptions,
+    locale: tutoLocale(intl),
+    loaderComponent: TutoLoader,
+  });
+
+  // The tour starts in three renders: the panes are laid out for it, then the
+  // steps are cut to what this layout shows, then Joyride is started on them.
+  const [tutoPhase, setTutoPhase] = useState<'idle' | 'layout' | 'start'>(
+    'idle'
+  );
+  // The layout of the tutorial, kept apart from the user's one so that the
+  // tutorial never changes it: once it is over, the panes are back as they
+  // were, slider position and dragged width included.
+  const [tuto, setTuto] = useState(false);
+  // Both panes, but on the steps that show the other layouts.
+  const shownLayout: PaneLayout = tuto
+    ? (tutoSteps[tutoState.index]?.data?.layout ?? 'both')
+    : layout;
+
+  const startTuto = (): void => {
+    setTuto(true);
+    setTutoPhase('layout');
+  };
+  useEffect(() => {
+    if (tutoPhase === 'layout') {
+      setTutoPhase('start');
+    } else if (tutoPhase === 'start') {
+      // Joyride has been handed the steps just computed.
+      setTutoPhase('idle');
+      controls.start();
+    }
+  }, [tutoPhase, controls]);
+  useEffect(() => {
+    if (tutoState.status === 'finished' || tutoState.status === 'skipped') {
+      setTuto(false);
+    }
+  }, [tutoState.status]);
 
   const requestFilter = (filter: string): void =>
     setFilterRequest((prev) => ({ filter, nonce: (prev?.nonce ?? 0) + 1 }));
@@ -237,6 +293,17 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   return (
     <DependenciesContext.Provider value={dependencies}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {Tour}
+        <HelpButton onStart={startTuto} />
+        {tutoState.status === 'running' && (
+          <TutoMenu
+            state={tutoState}
+            controls={controls}
+            chapters={tutoChapters}
+            corner="bottom"
+          />
+        )}
+
         <div style={titleRowStyle}>
           <h2 style={{ margin: 0 }}>
             <FormattedMessage id="trace.viewer.title" />
@@ -244,10 +311,16 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
               scope.scopeName &&
               `  —  ${scope.scopeName}`}
           </h2>
-          <VscodeButton icon="play" disabled={running} onClick={onRunScope}>
+          <VscodeButton
+            id="traceRun"
+            icon="play"
+            disabled={running}
+            onClick={onRunScope}
+          >
             <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
           </VscodeButton>
           <VscodeButton
+            id="traceOpenGui"
             icon="tools"
             onClick={(event) => {
               event.preventDefault();
@@ -276,8 +349,24 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
             </VscodeButton>
           )}
           {scope.test !== undefined && (
-            <LayoutSlider layout={layout} onLayout={setLayout} />
+            <LayoutSlider layout={shownLayout} onLayout={setLayout} />
           )}
+
+          <VscodeButton
+            icon="question"
+            secondary
+            // The slider, when there is one, already pushes it to the right.
+            style={
+              scope.test === undefined ? { marginLeft: 'auto' } : undefined
+            }
+            title={intl.formatMessage({ id: 'generalTests.tooltip.help' })}
+            onClick={(event) => {
+              event.preventDefault();
+              controls.start();
+            }}
+          >
+            <FormattedMessage id="generalTests.help" />
+          </VscodeButton>
         </div>
 
         {!scopePreset && scopes.size !== 1 && (
@@ -322,7 +411,8 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
         >
           {scope.test !== undefined ? (
             <SplitPane
-              layout={layout}
+              tuto={tuto}
+              layout={shownLayout}
               left={
                 <DataPanel
                   testing_scope={scope.test.testing_scope}
@@ -357,6 +447,191 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
   );
 }
 
+// -- Tutorial -----------------------------------------------------------------
+// Most targets only exist once a trace has run, or for a scope that has a test:
+// Joyride skips the steps whose target is missing.
+
+const tutoStep = (
+  id: string,
+  target: Step['target'],
+  extra?: Partial<Step>
+): Step => ({
+  id,
+  content: <FormattedMessage id={id} />,
+  target,
+  ...extra,
+});
+
+// The first pill of this kind in the tree: a pill only exists for the rows it
+// applies to (a compound value, a position in the code), so looking for the
+// pill itself finds one whenever the trace has any. One of an internal
+// variable first, which usually sits in the middle of the trace, then one of
+// any row, for the traces without internal variables. With none, there is
+// nothing to explain and Joyride skips the step.
+const treePill = (labelId: string): HTMLElement | null =>
+  document.querySelector<HTMLElement>(
+    `.trace-tree .internal [data-pill="${labelId}"]`
+  ) ??
+  document.querySelector<HTMLElement>(`.trace-tree [data-pill="${labelId}"]`);
+
+// Opens or closes the pill, as a click on it would.
+const clickOnPill =
+  (labelId: string, wantActive: boolean) => async (): Promise<void> => {
+    const pill = treePill(labelId);
+    if (pill !== null && pill.dataset.active !== `${wantActive}`) {
+      pill.click();
+      // Lets React render what the pill opens before the step is placed.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+  };
+
+// The pill is opened before its step is shown, so that the step shows what it
+// opens, and closed after it, unless [keepOpen]: a next step then points into
+// what it opened, and closes it.
+function tutoPillStep(id: string, labelId: string, keepOpen = false): Step {
+  return tutoStep(id, () => treePill(labelId), {
+    placement: 'top',
+    // Above, even with too little room at first: Joyride would flip it below.
+    floatingOptions: { flipOptions: false },
+    before: clickOnPill(labelId, true),
+    after: keepOpen ? undefined : clickOnPill(labelId, false),
+  });
+}
+
+// The list of the dependencies the dependencies pill step has opened: among the
+// contents its row opened, not in the rows below it.
+const dependencyList = (): HTMLElement | null =>
+  treePill('trace.dependencies')
+    ?.closest('li')
+    ?.querySelector<HTMLElement>(':scope > div > [data-dependencies]') ?? null;
+
+// The pill stays open from one step to the other, and is opened again when
+// coming back to one of them from the step after.
+const tutoDependencyListStep: Step = tutoStep(
+  'trace.tuto.dependency',
+  dependencyList,
+  {
+    placement: 'bottom',
+    before: clickOnPill('trace.dependencies', true),
+  }
+);
+
+// One of the dependencies, the first one: a click on it filters on it.
+const tutoDependencyFilterStep: Step = tutoStep(
+  'trace.tuto.dependencyFilter',
+  () => dependencyList()?.querySelector<HTMLElement>(':scope > span') ?? null,
+  {
+    placement: 'bottom',
+    before: clickOnPill('trace.dependencies', true),
+    after: clickOnPill('trace.dependencies', false),
+  }
+);
+
+// The slider, with the panes in the layout the step shows.
+const tutoLayoutStep = (id: string, layout: PaneLayout): Step =>
+  tutoStep(id, '.trace-layout-slider', { data: { layout } });
+
+// The name of an internal variable, a likely text to filter on, is selected
+// for the user to right-click it: the menu is the one of VS Code, outside of
+// the page, which the tutorial can neither open nor point at.
+const treeLabel = '.trace-tree .internal .trace-node-label';
+
+const tutoSelectionStep: Step = tutoStep('trace.tuto.selection', treeLabel, {
+  placement: 'left',
+  // The right click must go through.
+  blockTargetInteraction: false,
+  before: async () => {
+    const label = document.querySelector(treeLabel);
+    if (label !== null) {
+      window.getSelection()?.selectAllChildren(label);
+    }
+  },
+  after: async () => {
+    window.getSelection()?.removeAllRanges();
+  },
+});
+
+const tutoWelcome: Step[] = [
+  // The message invites to open the menu: the click must go through.
+  tutoStep('trace.tuto.welcome', '.tuto-menu', {
+    blockTargetInteraction: false,
+  }),
+];
+
+const tutoChapters = placeChapters(
+  [
+    {
+      title: 'trace.tuto.chapter.toolbar',
+      steps: [
+        // No way back to the welcome step: the default buttons, without 'back'.
+        tutoStep('trace.tuto.run', '#traceRun', {
+          buttons: ['close', 'primary'],
+        }),
+        tutoStep('trace.tuto.openGui', '#traceOpenGui'),
+        tutoStep('trace.tuto.copyJson', '#traceCopyJson'),
+        tutoStep('trace.tuto.scope', '.trace-scope-select'),
+        tutoLayoutStep('trace.tuto.layout.data', 'data'),
+        tutoLayoutStep('trace.tuto.layout.trace', 'trace'),
+        tutoLayoutStep('trace.tuto.layout.both', 'both'),
+      ],
+    },
+    {
+      title: 'trace.tuto.chapter.data',
+      steps: [
+        tutoStep('trace.tuto.data', '.trace-data-panel', {
+          placement: 'right',
+        }),
+        tutoStep('trace.tuto.sections', '.trace-section-header'),
+        tutoStep('trace.tuto.expected', '.trace-data-expected'),
+        tutoStep('trace.tuto.value', '.trace-data-value'),
+        tutoStep('trace.tuto.edit', '.trace-data-edit'),
+      ],
+    },
+    {
+      title: 'trace.tuto.chapter.trace',
+      steps: [
+        tutoStep('trace.tuto.filter', '.trace-filter'),
+        tutoStep('trace.tuto.expand', '.trace-expand-coll'),
+        // On the left, over the data panel: the tree reaches down to the bottom
+        // of the view, which leaves no room for the tooltip above or below it.
+        tutoStep('trace.tuto.tree', '.trace-tree', { placement: 'left' }),
+        // The kinds of the variables of a scope, on the first row of each.
+        tutoStep('trace.tuto.varInput', '.trace-tree .input', {
+          placement: 'left',
+        }),
+        tutoStep('trace.tuto.varInternal', '.trace-tree .internal', {
+          placement: 'left',
+        }),
+        tutoStep('trace.tuto.varOutput', '.trace-tree .expanded .output', {
+          placement: 'left',
+        }),
+        // The rows whose value the test checks, on the first of each outcome.
+        tutoStep('trace.tuto.successMatch', '.trace-tree .successMatch', {
+          placement: 'left',
+        }),
+        tutoStep('trace.tuto.failedMatch', '.trace-tree .failedMatch', {
+          placement: 'left',
+        }),
+        tutoSelectionStep,
+        tutoPillStep('trace.tuto.pillValue', 'trace.value'),
+        tutoPillStep('trace.tuto.pillCode', 'trace.code'),
+        tutoPillStep('trace.tuto.pillDependencies', 'trace.dependencies', true),
+        tutoDependencyListStep,
+        tutoDependencyFilterStep,
+      ],
+    },
+  ] satisfies Chapter[],
+  tutoWelcome.length
+);
+
+const tutoSteps: Step[] = [
+  ...tutoWelcome,
+  ...tutoChapters.flatMap((chapter) => chapter.steps),
+  // The settings are outside of the page: nothing to point at.
+  tutoStep('trace.tuto.sidebar', 'body', { placement: 'center' }),
+  tutoStep('trace.tuto.end', 'body', { placement: 'center' }),
+];
+
 function LayoutSlider({
   layout,
   onLayout,
@@ -374,7 +649,7 @@ function LayoutSlider({
     }
   };
   return (
-    <span style={layoutSliderStyle}>
+    <span className="trace-layout-slider" style={layoutSliderStyle}>
       <span className="trace-layout-label">
         <FormattedMessage id="trace.layout.data" />
       </span>
@@ -449,17 +724,32 @@ function post(vscode: WebviewApi<unknown>, message: TraceUpMessage): void {
   vscode.postMessage(message);
 }
 
+// Width of the data pane during the tutorial, whatever the user dragged it to,
+// as fractions of the split: the default one, widened as much as the data
+// overflows it, but never past the maximum, which leaves the trace room for
+// its steps.
+const TUTO_BASE_WIDTH = 0.25;
+const TUTO_MAX_WIDTH = 0.6;
+
 function SplitPane({
   left,
   right,
   layout,
+  tuto,
 }: {
   left: ReactElement;
   right: ReactElement;
   layout: PaneLayout;
+  /** During the tutorial, the width the user dragged is set aside, kept for
+   *  afterwards, and the panes can no longer be resized. */
+  tuto?: boolean;
 }): ReactElement {
   const intl = useIntl();
   const [leftWidth, setLeftWidth] = useState<number | null>(null);
+  const leftRef = useRef<HTMLDivElement>(null);
+  // Null until measured: the pane is first laid out at the base width, then
+  // widened by what overflows it at that width.
+  const [tutoWidth, setTutoWidth] = useState<number | null>(null);
   const draggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -493,6 +783,34 @@ function SplitPane({
   }, []);
 
   const split = layout === 'both';
+  const tutoSplit = tuto === true && split;
+
+  useLayoutEffect(() => {
+    const pane = leftRef.current;
+    const container = containerRef.current;
+    if (!tutoSplit) {
+      setTutoWidth(null);
+      return;
+    }
+    if (tutoWidth !== null || pane === null || container === null) {
+      return;
+    }
+    // The overflow may be the pane's own or that of the panel it holds, which
+    // scrolls by itself.
+    const overflow = Math.max(
+      ...[pane, pane.firstElementChild]
+        .filter((e) => e !== null)
+        .map((e) => e.scrollWidth - e.clientWidth)
+    );
+    const total = container.getBoundingClientRect().width;
+    setTutoWidth(
+      Math.min(total * TUTO_BASE_WIDTH + overflow, total * TUTO_MAX_WIDTH)
+    );
+  }, [tutoSplit, tutoWidth]);
+
+  const shownWidth = tutoSplit
+    ? (tutoWidth ?? `${TUTO_BASE_WIDTH * 100}%`)
+    : (leftWidth ?? '25%');
 
   // The inactive pane is hidden rather than dropped: changing the shape of the
   // tree would remount the panels and wipe their filters, view mode and
@@ -503,8 +821,9 @@ function SplitPane({
       style={{ display: 'flex', alignItems: 'stretch', width: '100%' }}
     >
       <div
+        ref={leftRef}
         style={{
-          width: split ? (leftWidth ?? '25%') : '100%',
+          width: split ? shownWidth : '100%',
           flex: split ? '0 0 auto' : '1 1 auto',
           minWidth: 0,
           overflow: 'auto',
@@ -515,7 +834,7 @@ function SplitPane({
       </div>
       <div
         onMouseDown={() => {
-          draggingRef.current = true;
+          draggingRef.current = tuto !== true;
         }}
         title={intl.formatMessage({ id: 'trace.dragToResize' })}
         style={{

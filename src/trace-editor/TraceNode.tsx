@@ -128,6 +128,9 @@ function Pill({
 }): ReactElement {
   return (
     <span
+      // Found and opened by the tutorial, which shows what each pill does.
+      data-pill={labelId}
+      data-active={active}
       onClick={(e) => {
         e.stopPropagation();
         onToggle();
@@ -213,7 +216,7 @@ export default function TraceNode({
   const [childFilters] = filtering
     ? filterMatches(te, filters, intl, filterKind)
     : [[]];
-  let matchBackground: string | undefined;
+  let matchClass: string | undefined;
   if (
     expected &&
     tested_scope === undefined &&
@@ -223,13 +226,13 @@ export default function TraceNode({
   ) {
     const state = nodeMatchState(expected, step.prefix, te.value);
     if (state !== undefined) {
-      matchBackground =
-        state === 'mismatch'
-          ? 'var(--vscode-diffEditor-removedTextBackground, rgba(255, 50, 50, 0.2))'
-          : 'var(--vscode-diffEditor-insertedTextBackground, rgba(35, 200, 60, 0.2))';
+      matchClass = state === 'mismatch' ? 'failedMatch' : 'successMatch';
     }
   }
   const described: Described = describeKind(te.element, intl);
+  // The kind of a scope variable: the targets of steps of the tutorial.
+  const kind =
+    te.element.kind === 'scope_var' ? described.className : undefined;
   const snippetPos = described.showsCode
     ? (te.codeSpan ?? elementCodeSpan(te))
     : undefined;
@@ -261,10 +264,10 @@ export default function TraceNode({
   return (
     <li style={liStyle}>
       <div
+        className={[kind, matchClass].filter(Boolean).join(' ') || undefined}
         style={{
           ...rowStyle,
           cursor: expandable ? 'pointer' : 'default',
-          background: matchBackground,
         }}
         onClick={() =>
           expandable && !isSelectingText() && setExpanded((e) => !e)
@@ -285,7 +288,7 @@ export default function TraceNode({
           <HighlightText filters={filters} text={described.label} />
         </span>
         {described.detail && (
-          <span style={detailStyle}>
+          <span className="trace-node-label" style={detailStyle}>
             <HighlightText filters={filters} text={described.detail} />
           </span>
         )}
@@ -333,7 +336,8 @@ export default function TraceNode({
       )}
       {showDependencies && dependencies.length > 0 && (
         <div style={openContentStyle}>
-          <div style={dependencyListStyle}>
+          {/* Pointed at by the tutorial. */}
+          <div data-dependencies style={dependencyListStyle}>
             {dependencies.map((d) => {
               const shown =
                 d.value === undefined
@@ -382,7 +386,7 @@ export default function TraceNode({
         </div>
       )}
       {open && expandable && (
-        <div style={openContentStyle}>
+        <div className="expanded" style={openContentStyle}>
           {related.length > 0 && (
             <div style={relatedStyle}>
               <span style={{ color: 'var(--vscode-descriptionForeground)' }}>

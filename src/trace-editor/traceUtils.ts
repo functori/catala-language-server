@@ -1013,6 +1013,7 @@ export type Described = {
   symbol: string;
   label: string;
   detail?: string;
+  className?: string;
   tone: Tone;
   showsValue: boolean;
   showsCode: boolean;
@@ -1035,19 +1036,20 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
         showsCode: false,
       };
     case 'scope_var': {
-      const [label, tone]: [string, Tone] =
+      const [label, tone, className]: [string, Tone, string] =
         kind.input === 'reentrant'
-          ? [t('trace.kind.scopeContextVariable'), 'context']
+          ? [t('trace.kind.scopeContextVariable'), 'context', 'context']
           : kind.input === 'only_input'
-            ? [t('trace.kind.scopeInputVariable'), 'input']
+            ? [t('trace.kind.scopeInputVariable'), 'input', 'input']
             : kind.output === true
-              ? [t('trace.kind.scopeOutputVariable'), 'output']
-              : [t('trace.kind.scopeVariable'), 'plain'];
+              ? [t('trace.kind.scopeOutputVariable'), 'output', 'output']
+              : [t('trace.kind.scopeVariable'), 'plain', 'internal'];
       return {
         symbol: '≔',
         label,
         detail: detail(kind.name),
         tone,
+        className,
         showsValue: true,
         showsCode: true,
       };
