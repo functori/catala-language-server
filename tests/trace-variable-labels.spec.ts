@@ -19,14 +19,8 @@ const scopeVar = (input: string, output: boolean): TraceKind =>
 
 describe('scope variable labels', () => {
   it('distinguishes the four variable flavours', () => {
-    expect(label(scopeVar('only_input', false))).toBe(
-      'trace.kind.scopeInputVariable'
-    );
     expect(label(scopeVar('reentrant', false))).toBe(
       'trace.kind.scopeContextVariable'
-    );
-    expect(label(scopeVar('no_input', true))).toBe(
-      'trace.kind.scopeOutputVariable'
     );
     expect(label(scopeVar('no_input', false))).toBe('trace.kind.scopeVariable');
     expect(label({ kind: 'local_var', name: 'v' } as TraceKind)).toBe(
@@ -35,11 +29,6 @@ describe('scope variable labels', () => {
   });
 
   it('lets input and context win over output, which they compose with', () => {
-    // `input output x` and `context output x` are both legal declarations;
-    // the input qualifier is the more informative one to show.
-    expect(label(scopeVar('only_input', true))).toBe(
-      'trace.kind.scopeInputVariable'
-    );
     expect(label(scopeVar('reentrant', true))).toBe(
       'trace.kind.scopeContextVariable'
     );

@@ -16,13 +16,14 @@ import type {
   CodeLocation,
   DependencyFrame,
   Described,
+  ScopeVarRole,
   TraceElement,
   TraceKind,
   Tone,
 } from './traceUtils';
 import {
   dependencyValues,
-  describeKind,
+  describeNode,
   filterMatches,
   elementCodeSpan,
   formatTraceValue,
@@ -30,6 +31,7 @@ import {
   stepPath,
   nodeMatchState,
   posText,
+  scopeVarRole,
   subtreeHasMismatch,
   subtreeMatches,
 } from './traceUtils';
@@ -139,6 +141,39 @@ function Pill({
   );
 }
 
+function PillsToggle({
+  open,
+  onToggle,
+}: {
+  open: boolean;
+  onToggle: () => void;
+}): ReactElement {
+  const intl = useIntl();
+  const [hover, setHover] = useState(false);
+  return (
+    <span
+      // Found and opened by the tutorial before it shows a pill.
+      data-pills-toggle
+      data-active={open}
+      className={`codicon codicon-${open ? 'remove' : 'ellipsis'}`}
+      title={intl.formatMessage({
+        id: open ? 'trace.hidePills' : 'trace.showPills',
+      })}
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={
+        hover
+          ? { ...pillsToggleStyle, ...pillsToggleHoverStyle }
+          : pillsToggleStyle
+      }
+    />
+  );
+}
+
 function asCodeLocation(v: JsonValue | undefined): CodeLocation | undefined {
   if (
     v !== null &&
@@ -174,6 +209,7 @@ export default function TraceNode({
   const [showCode, setShowCode] = useState(false);
   const [showConsequence, setShowConsequence] = useState(false);
   const [showDependencies, setShowDependencies] = useState(false);
+  const [showPills, setShowPills] = useState(false);
   const graphs = useContext(DependenciesContext);
   const cwd = useContext(CwdContext);
 
@@ -229,7 +265,7 @@ export default function TraceNode({
           : 'var(--vscode-diffEditor-insertedTextBackground, rgba(35, 200, 60, 0.2))';
     }
   }
-  const described: Described = describeKind(te.element, intl);
+  const described: Described = describeNode(te, intl);
   const snippetPos = described.showsCode
     ? (te.codeSpan ?? elementCodeSpan(te))
     : undefined;
@@ -295,34 +331,50 @@ export default function TraceNode({
           dependencies.length > 0 ||
           consPos) && (
           <span style={pillsStyle}>
-            {containerValue !== undefined && (
-              <Pill
-                labelId="trace.value"
-                active={showValue}
-                onToggle={() => setShowValue((v) => !v)}
-              />
-            )}
-            {snippetPos && (
-              <Pill
-                labelId="trace.code"
-                active={showCode}
-                onToggle={() => setShowCode((v) => !v)}
-              />
-            )}
-            {dependencies.length > 0 && (
-              <Pill
-                labelId="trace.dependencies"
-                active={showDependencies}
-                onToggle={() => setShowDependencies((v) => !v)}
-              />
-            )}
-            {consPos && (
-              <Pill
-                labelId="trace.consequence"
-                active={showConsequence}
-                onToggle={() => setShowConsequence((v) => !v)}
-              />
-            )}
+            <PillsToggle
+              open={showPills}
+              onToggle={() => {
+                // Folding the pills closes what they had opened.
+                if (showPills) {
+                  setShowValue(false);
+                  setShowCode(false);
+                  setShowDependencies(false);
+                  setShowConsequence(false);
+                }
+                setShowPills(!showPills);
+              }}
+            />
+            {/* Kept in the page when folded, for the tutorial to find them. */}
+            <span style={showPills ? pillListStyle : hiddenStyle}>
+              {containerValue !== undefined && (
+                <Pill
+                  labelId="trace.value"
+                  active={showValue}
+                  onToggle={() => setShowValue((v) => !v)}
+                />
+              )}
+              {snippetPos && (
+                <Pill
+                  labelId="trace.code"
+                  active={showCode}
+                  onToggle={() => setShowCode((v) => !v)}
+                />
+              )}
+              {dependencies.length > 0 && (
+                <Pill
+                  labelId="trace.dependencies"
+                  active={showDependencies}
+                  onToggle={() => setShowDependencies((v) => !v)}
+                />
+              )}
+              {consPos && (
+                <Pill
+                  labelId="trace.consequence"
+                  active={showConsequence}
+                  onToggle={() => setShowConsequence((v) => !v)}
+                />
+              )}
+            </span>
           </span>
         )}
       </div>
@@ -395,20 +447,178 @@ export default function TraceNode({
           )}
           {hasChildren && (
             <ul style={childListStyle}>
-              {children.map((c, i) => (
-                <TraceNode
-                  key={i}
-                  te={c}
-                  depth={depth + 1}
-                  filters={childFilters}
-                  prefix={childPrefix}
-                  tested_scope={testedScope}
-                  frames={[{ nodes: children, before: i }, ...frames]}
-                  addFilter={addFilter}
-                />
-              ))}
+              {childEntries(te, children).map((entry) => {
+                // Each child keeps its index in the trace: dependency lookups
+                // rely on it.
+                const renderChild = (
+                  c: TraceElement,
+                  i: number
+                ): ReactElement => (
+                  <TraceNode
+                    key={i}
+                    te={c}
+                    depth={depth + 1}
+                    filters={childFilters}
+                    prefix={childPrefix}
+                    tested_scope={testedScope}
+                    frames={[{ nodes: children, before: i }, ...frames]}
+                    addFilter={addFilter}
+                  />
+                );
+                return entry.kind === 'group' ? (
+                  <ScopeVarGroup
+                    key={`group-${entry.role}`}
+                    role={entry.role}
+                    members={entry.members}
+                    filters={childFilters}
+                    prefix={childPrefix}
+                    tested_scope={testedScope}
+                    renderMember={renderChild}
+                  />
+                ) : (
+                  renderChild(entry.te, entry.index)
+                );
+              })}
             </ul>
           )}
+        </div>
+      )}
+    </li>
+  );
+}
+
+// The order in which the scope variables of a scope call are shown.
+const scopeVarOrder: ScopeVarRole[] = [
+  'input',
+  'context',
+  'internal',
+  'output',
+];
+
+type ChildEntry =
+  | { kind: 'node'; te: TraceElement; index: number }
+  | { kind: 'group'; role: ScopeVarRole; members: [TraceElement, number][] };
+
+// The children of a node as they are shown. Under a scope call, the scope
+// variables are gathered into one group per role, in the order above, where
+// the first of them stands in the trace; each group keeps the trace order, and
+// so do the other children. Each child comes with its index in the trace.
+function childEntries(
+  te: TraceElement,
+  children: TraceElement[]
+): ChildEntry[] {
+  if (te.element.kind !== 'scope_call') {
+    return children.map((c, index) => ({ kind: 'node', te: c, index }));
+  }
+  const byRole = new Map<ScopeVarRole, [TraceElement, number][]>();
+  const entries: ChildEntry[] = [];
+  let groupsAt: number | undefined;
+  children.forEach((c, index) => {
+    if (c.element.kind !== 'scope_var') {
+      entries.push({ kind: 'node', te: c, index });
+      return;
+    }
+    groupsAt ??= entries.length;
+    const role = scopeVarRole(c.element);
+    byRole.set(role, [...(byRole.get(role) ?? []), [c, index]]);
+  });
+  if (groupsAt === undefined) return entries;
+  const groups = scopeVarOrder.flatMap((role): ChildEntry[] => {
+    const members = byRole.get(role);
+    return members ? [{ kind: 'group', role, members }] : [];
+  });
+  entries.splice(groupsAt, 0, ...groups);
+  return entries;
+}
+
+const scopeVarGroupLabel: Record<ScopeVarRole, string> = {
+  input: 'trace.group.inputs',
+  context: 'trace.group.context',
+  internal: 'trace.group.internals',
+  output: 'trace.group.outputs',
+};
+
+// The scope variables of one role under a scope call: the results show as
+// soon as the scope call is opened, the other groups are folded.
+function ScopeVarGroup({
+  role,
+  members,
+  filters,
+  prefix,
+  tested_scope,
+  renderMember,
+}: {
+  role: ScopeVarRole;
+  members: [TraceElement, number][];
+  filters: Filter[];
+  prefix: string;
+  tested_scope?: string;
+  renderMember: (te: TraceElement, index: number) => ReactElement;
+}): ReactElement | null {
+  const intl = useIntl();
+  const expected = useContext(ExpectedContext);
+  const stepIndices = useContext(IndexContext);
+  const filterKind = useContext(FilterKindContext);
+  const expandCmd = useContext(ExpandContext);
+  const filterKey = filters.map((f) => `${f.option}:${f.filter}`).join('\n');
+  const defaultExpanded = role === 'output';
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  // Opened like a node is: by an include filter, by the expand-all command,
+  // and when one of its variables does not match the expected value.
+  useEffect(() => {
+    setExpanded(
+      filters.some((f) => f.option == 'include') ? true : defaultExpanded
+    );
+  }, [filterKey, filterKind, defaultExpanded]);
+  useEffect(() => {
+    if (expandCmd != null) {
+      setExpanded(expandCmd.open);
+    }
+  }, [expandCmd]);
+  const hasMismatch =
+    expected !== null &&
+    members.some(([c]) =>
+      subtreeHasMismatch(
+        c,
+        stepPath(c, { prefix, testedScope: tested_scope }, stepIndices),
+        expected,
+        stepIndices
+      )
+    );
+  useEffect(() => {
+    if (hasMismatch) {
+      setExpanded(true);
+    }
+  }, [hasMismatch]);
+  // The variables the filters keep: they alone are counted and listed.
+  const shown =
+    filters.length > 0
+      ? members.filter(([c]) => subtreeMatches(c, filters, intl, filterKind))
+      : members;
+  if (shown.length === 0) {
+    return null;
+  }
+  const color = toneColor(role === 'internal' ? 'plain' : role);
+  return (
+    <li style={liStyle}>
+      <div
+        style={{ ...rowStyle, cursor: 'pointer' }}
+        onClick={() => !isSelectingText() && setExpanded((e) => !e)}
+      >
+        <span
+          className={`codicon codicon-chevron-${expanded ? 'down' : 'right'}`}
+          style={chevronStyle}
+        />
+        <span style={{ ...labelStyle, color }}>
+          <FormattedMessage id={scopeVarGroupLabel[role]} />
+        </span>
+        <span style={detailStyle}>({shown.length})</span>
+      </div>
+      {expanded && (
+        <div className="expanded" style={openContentStyle}>
+          <ul style={childListStyle}>
+            {shown.map(([c, i]) => renderMember(c, i))}
+          </ul>
         </div>
       )}
     </li>
@@ -498,6 +708,31 @@ const pillsStyle: CSSProperties = {
   display: 'inline-flex',
   gap: 4,
   marginLeft: 16,
+};
+
+const pillListStyle: CSSProperties = {
+  display: 'inline-flex',
+  gap: 4,
+};
+
+const hiddenStyle: CSSProperties = {
+  display: 'none',
+};
+
+// A small framed button, so that it reads as one, darkened on hover.
+const pillsToggleStyle: CSSProperties = {
+  cursor: 'pointer',
+  userSelect: 'none',
+  alignSelf: 'center',
+  padding: '0 2px',
+  borderRadius: 4,
+  border: '1px solid var(--vscode-widget-border, currentColor)',
+  color: 'var(--vscode-descriptionForeground)',
+};
+
+const pillsToggleHoverStyle: CSSProperties = {
+  background: 'var(--vscode-toolbar-hoverBackground)',
+  color: 'var(--vscode-foreground)',
 };
 
 const pillStyle: CSSProperties = {

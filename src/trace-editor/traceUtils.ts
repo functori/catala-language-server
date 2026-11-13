@@ -1001,6 +1001,7 @@ export function readTraceTest(x: JsonValue): TraceTest {
 
 export type Tone =
   | 'scope'
+  // The result of a sub-scope, shown as the call it is.
   | 'input'
   | 'context'
   | 'output'
@@ -1022,6 +1023,43 @@ function detail(x: JsonValue): string {
   return typeof x === 'string' ? x : '';
 }
 
+export type ScopeVarRole = 'input' | 'context' | 'internal' | 'output';
+
+// The role of a scope variable in its scope. An input or context variable
+// that is also an output keeps its input role.
+export function scopeVarRole(kind: TraceKind): ScopeVarRole {
+  if (kind.input === 'reentrant') return 'context';
+  if (kind.input === 'only_input') return 'input';
+  if (kind.output === true) return 'output';
+  return 'internal';
+}
+
+// The scope call among the children of an output or internal scope variable,
+// if any: the variable is then the result of that sub-scope. A plain variable
+// only traces its own computation (exceptions, conditions…).
+// TODO: still a guess. To be replaced by a field the Catala compiler would put
+// on the trace's scope variables, telling a sub-scope apart (ideally with the
+// name of the scope called, for the label).
+function subScopeCall(te: TraceElement): TraceElement | undefined {
+  if (te.element.kind !== 'scope_var') return undefined;
+  const role = scopeVarRole(te.element);
+  if (role !== 'output' && role !== 'internal') return undefined;
+  return te.trace?.find((c) => c.element.kind === 'scope_call');
+}
+
+// How a node is shown: as its kind is, except for the result of a sub-scope,
+// shown as the call it is, under the name of the scope called.
+export function describeNode(te: TraceElement, intl: IntlShape): Described {
+  const described = describeKind(te.element, intl);
+  const call = subScopeCall(te);
+  if (call === undefined) return described;
+  return {
+    ...described,
+    label: intl.formatMessage({ id: 'trace.kind.subScopeCall' }),
+    tone: 'scope',
+  };
+}
+
 export function describeKind(kind: TraceKind, intl: IntlShape): Described {
   const t = (id: string): string => intl.formatMessage({ id });
   switch (kind.kind) {
@@ -1035,13 +1073,14 @@ export function describeKind(kind: TraceKind, intl: IntlShape): Described {
         showsCode: false,
       };
     case 'scope_var': {
+      const role = scopeVarRole(kind);
       const [label, tone]: [string, Tone] =
-        kind.input === 'reentrant'
+        role === 'context'
           ? [t('trace.kind.scopeContextVariable'), 'context']
-          : kind.input === 'only_input'
-            ? [t('trace.kind.scopeInputVariable'), 'input']
-            : kind.output === true
-              ? [t('trace.kind.scopeOutputVariable'), 'output']
+          : role === 'input'
+            ? ['', 'input']
+            : role === 'output'
+              ? ['', 'output']
               : [t('trace.kind.scopeVariable'), 'plain'];
       return {
         symbol: '≔',
@@ -1216,7 +1255,7 @@ export function filterMatches(
   intl: IntlShape,
   kind: FilterKind
 ): [Filter[], boolean] {
-  const { label, detail } = describeKind(el.element, intl);
+  const { label, detail } = describeNode(el, intl);
   const value =
     el.value !== undefined ? formatTraceValue(el.value, intl) : undefined;
   const text = [
