@@ -37,6 +37,20 @@ const clickOnPill =
     }
   };
 
+const treeDetail = (): HTMLElement | null =>
+  document.querySelector<HTMLElement>(`.trace-tree .internal .pillDetails`) ??
+  document.querySelector<HTMLElement>(`.trace-tree .pillDetails`);
+
+// Opens or closes the pill, as a click on it would.
+const clickOnDetail = (wantActive: boolean) => async (): Promise<void> => {
+  const pillDetails = treeDetail();
+  if (pillDetails !== null && pillDetails.dataset.active !== `${wantActive}`) {
+    pillDetails.click();
+    // Lets React render what the pill opens before the step is placed.
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+  }
+};
+
 // The pill is opened before its step is shown, so that the step shows what it
 // opens, and closed after it, unless [keepOpen]: a next step then points into
 // what it opened, and closes it.
@@ -47,6 +61,19 @@ function tutoPillStep(id: string, labelId: string, keepOpen = false): Step {
     floatingOptions: { flipOptions: false },
     before: clickOnPill(labelId, true),
     after: keepOpen ? undefined : clickOnPill(labelId, false),
+  });
+}
+
+// The pill is opened before its step is shown, so that the step shows what it
+// opens, and closed after it, unless [keepOpen]: a next step then points into
+// what it opened, and closes it.
+function tutoPillDetails(id: string): Step {
+  return tutoStep(id, () => treeDetail(), {
+    placement: 'top',
+    // Above, even with too little room at first: Joyride would flip it below.
+    floatingOptions: { flipOptions: false },
+    before: undefined,
+    after: clickOnDetail(true),
   });
 }
 
@@ -165,6 +192,7 @@ export const tutoChapters = placeChapters(
           placement: 'left',
         }),
         tutoSelectionStep,
+        tutoPillDetails('trace.tuto.pillDetails'),
         tutoPillStep('trace.tuto.pillValue', 'trace.value'),
         tutoPillStep('trace.tuto.pillCode', 'trace.code'),
         tutoPillStep('trace.tuto.pillDependencies', 'trace.dependencies', true),

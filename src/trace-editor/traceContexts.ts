@@ -24,3 +24,6 @@ export const FilterKindContext = createContext<FilterKind>('and');
 
 /** Dependency graphs of the program, or `null` until the server answers. */
 export const DependenciesContext = createContext<DependencyGraphs | null>(null);
+
+/** Boolean to know if the tutorial is activated. */
+export const TutoContext = createContext<boolean>(false);

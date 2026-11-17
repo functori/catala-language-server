@@ -17,7 +17,7 @@ import {
 import { setVsCodeApi } from '../shared/webviewApi';
 import type { DependencyGraphs } from '../generated/catala_types';
 import { readDependencyGraphs } from '../generated/catala_types';
-import { DependenciesContext } from './traceContexts';
+import { DependenciesContext, TutoContext } from './traceContexts';
 import type { TraceDownMessage, TraceUpMessage } from './messages';
 import type { TraceElement, TraceTest } from './traceUtils';
 import { fieldValue, PANEL_HEIGHT_VAR, readTraceTest } from './traceUtils';
@@ -284,157 +284,159 @@ export default function TraceEditor({ vscode }: Props): ReactElement {
 
   return (
     <DependenciesContext.Provider value={dependencies}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {Tour}
-        <HelpButton onStart={startTuto} />
-        {tutoState.status === 'running' && (
-          <TutoMenu
-            state={tutoState}
-            controls={controls}
-            chapters={tutoChapters}
-            corner="bottom"
-          />
-        )}
+      <TutoContext.Provider value={tuto}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {Tour}
+          <HelpButton onStart={startTuto} />
+          {tutoState.status === 'running' && (
+            <TutoMenu
+              state={tutoState}
+              controls={controls}
+              chapters={tutoChapters}
+              corner="bottom"
+            />
+          )}
 
-        <div style={titleRowStyle}>
-          <h2 style={{ margin: 0 }}>
-            <FormattedMessage id="trace.viewer.title" />
-            {(scopePreset || scopes.size === 1) &&
-              scope.scopeName &&
-              `  —  ${scope.scopeName}`}
-          </h2>
-          <VscodeButton
-            id="traceRun"
-            icon="play"
-            disabled={running}
-            onClick={onRunScope}
-          >
-            <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
-          </VscodeButton>
-          <VscodeButton
-            id="traceOpenGui"
-            icon="tools"
-            onClick={(event) => {
-              event.preventDefault();
-              post(vscode, { kind: 'openInTestEditor' });
-            }}
-          >
-            <FormattedMessage id={'tooltip.openGui'} />
-          </VscodeButton>
-          {runState.status === 'success' && (
+          <div style={titleRowStyle}>
+            <h2 style={{ margin: 0 }}>
+              <FormattedMessage id="trace.viewer.title" />
+              {(scopePreset || scopes.size === 1) &&
+                scope.scopeName &&
+                `  —  ${scope.scopeName}`}
+            </h2>
             <VscodeButton
-              icon={copied ? 'check' : 'copy'}
-              secondary
-              title={intl.formatMessage({
-                id: copied ? 'trace.copiedJson' : 'trace.copyJson',
-              })}
-              onClick={() => {
-                void navigator.clipboard.writeText(
-                  JSON.stringify(runState.trace, null, 2)
-                );
-                markCopied();
+              id="traceRun"
+              icon="play"
+              disabled={running}
+              onClick={onRunScope}
+            >
+              <FormattedMessage id={running ? 'trace.running' : 'trace.run'} />
+            </VscodeButton>
+            <VscodeButton
+              id="traceOpenGui"
+              icon="tools"
+              onClick={(event) => {
+                event.preventDefault();
+                post(vscode, { kind: 'openInTestEditor' });
               }}
             >
-              <FormattedMessage
-                id={copied ? 'trace.copiedJson' : 'trace.copyJson'}
-              />
+              <FormattedMessage id={'tooltip.openGui'} />
             </VscodeButton>
-          )}
-          {scope.test !== undefined && (
-            <LayoutSlider layout={shownLayout} onLayout={setLayout} />
-          )}
-
-          <VscodeButton
-            icon="question"
-            secondary
-            // The slider, when there is one, already pushes it to the right.
-            style={
-              scope.test === undefined ? { marginLeft: 'auto' } : undefined
-            }
-            title={intl.formatMessage({ id: 'generalTests.tooltip.help' })}
-            onClick={(event) => {
-              event.preventDefault();
-              controls.start();
-            }}
-          >
-            <FormattedMessage id="generalTests.help" />
-          </VscodeButton>
-        </div>
-
-        {!scopePreset && scopes.size !== 1 && (
-          <label style={fieldStyle}>
-            <span style={{ fontWeight: 600 }}>
-              <FormattedMessage id="trace.scope" />
-            </span>
-            {scopes.size > 0 ? (
-              <VscodeSingleSelect
-                value={scope.scopeName}
-                onChange={(e) => {
-                  const s = fieldValue(e);
-                  setScope({ scopeName: s, test: scopes.get(s) });
-                }}
-                style={{ width: '100%' }}
-              >
-                {[...scopes.keys()].map((s) => (
-                  <VscodeOption key={s} value={s}>
-                    {s}
-                  </VscodeOption>
-                ))}
-              </VscodeSingleSelect>
-            ) : (
-              <VscodeTextfield
-                value={scope.scopeName}
-                placeholder={intl.formatMessage({
-                  id: 'trace.scopePlaceholder',
+            {runState.status === 'success' && (
+              <VscodeButton
+                icon={copied ? 'check' : 'copy'}
+                secondary
+                title={intl.formatMessage({
+                  id: copied ? 'trace.copiedJson' : 'trace.copyJson',
                 })}
-                onInput={(e) => {
-                  const s = fieldValue(e);
-                  setScope({ scopeName: s, test: scopes.get(s) });
+                onClick={() => {
+                  void navigator.clipboard.writeText(
+                    JSON.stringify(runState.trace, null, 2)
+                  );
+                  markCopied();
                 }}
-                style={{ width: '100%' }}
+              >
+                <FormattedMessage
+                  id={copied ? 'trace.copiedJson' : 'trace.copyJson'}
+                />
+              </VscodeButton>
+            )}
+            {scope.test !== undefined && (
+              <LayoutSlider layout={shownLayout} onLayout={setLayout} />
+            )}
+
+            <VscodeButton
+              icon="question"
+              secondary
+              // The slider, when there is one, already pushes it to the right.
+              style={
+                scope.test === undefined ? { marginLeft: 'auto' } : undefined
+              }
+              title={intl.formatMessage({ id: 'generalTests.tooltip.help' })}
+              onClick={(event) => {
+                event.preventDefault();
+                controls.start();
+              }}
+            >
+              <FormattedMessage id="generalTests.help" />
+            </VscodeButton>
+          </div>
+
+          {!scopePreset && scopes.size !== 1 && (
+            <label style={fieldStyle}>
+              <span style={{ fontWeight: 600 }}>
+                <FormattedMessage id="trace.scope" />
+              </span>
+              {scopes.size > 0 ? (
+                <VscodeSingleSelect
+                  value={scope.scopeName}
+                  onChange={(e) => {
+                    const s = fieldValue(e);
+                    setScope({ scopeName: s, test: scopes.get(s) });
+                  }}
+                  style={{ width: '100%' }}
+                >
+                  {[...scopes.keys()].map((s) => (
+                    <VscodeOption key={s} value={s}>
+                      {s}
+                    </VscodeOption>
+                  ))}
+                </VscodeSingleSelect>
+              ) : (
+                <VscodeTextfield
+                  value={scope.scopeName}
+                  placeholder={intl.formatMessage({
+                    id: 'trace.scopePlaceholder',
+                  })}
+                  onInput={(e) => {
+                    const s = fieldValue(e);
+                    setScope({ scopeName: s, test: scopes.get(s) });
+                  }}
+                  style={{ width: '100%' }}
+                />
+              )}
+            </label>
+          )}
+
+          <div
+            ref={resultsRef}
+            style={{ [PANEL_HEIGHT_VAR]: panelHeight } as React.CSSProperties}
+          >
+            {scope.test !== undefined ? (
+              <SplitPane
+                tuto={tuto}
+                layout={shownLayout}
+                left={
+                  <DataPanel
+                    testing_scope={scope.test.testing_scope}
+                    vscode={vscode}
+                    addFilter={requestFilter}
+                    test={scope.test}
+                    trace={
+                      runState.status === 'success' ? runState.trace : undefined
+                    }
+                    intl={intl}
+                  />
+                }
+                right={
+                  <TraceResult
+                    filterRequest={filterRequest}
+                    runState={runState}
+                    cwd={cwd}
+                    test={scope.test}
+                  />
+                }
+              />
+            ) : (
+              <TraceResult
+                filterRequest={filterRequest}
+                runState={runState}
+                cwd={cwd}
               />
             )}
-          </label>
-        )}
-
-        <div
-          ref={resultsRef}
-          style={{ [PANEL_HEIGHT_VAR]: panelHeight } as React.CSSProperties}
-        >
-          {scope.test !== undefined ? (
-            <SplitPane
-              tuto={tuto}
-              layout={shownLayout}
-              left={
-                <DataPanel
-                  testing_scope={scope.test.testing_scope}
-                  vscode={vscode}
-                  addFilter={requestFilter}
-                  test={scope.test}
-                  trace={
-                    runState.status === 'success' ? runState.trace : undefined
-                  }
-                  intl={intl}
-                />
-              }
-              right={
-                <TraceResult
-                  filterRequest={filterRequest}
-                  runState={runState}
-                  cwd={cwd}
-                  test={scope.test}
-                />
-              }
-            />
-          ) : (
-            <TraceResult
-              filterRequest={filterRequest}
-              runState={runState}
-              cwd={cwd}
-            />
-          )}
+          </div>
         </div>
-      </div>
+      </TutoContext.Provider>
     </DependenciesContext.Provider>
   );
 }

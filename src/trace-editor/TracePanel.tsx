@@ -168,7 +168,7 @@ function TraceTreeView({
     rootPrefix = closest.prefix;
     testedScope = closest.testedScope;
   }
-
+  console.log(`Root prefix: ${rootPrefix}`);
   return (
     <CwdContext.Provider value={cwd ?? ''}>
       <ExpandContext.Provider value={expand ?? null}>

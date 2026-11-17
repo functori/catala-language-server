@@ -42,6 +42,7 @@ import {
   ExpectedContext,
   FilterKindContext,
   IndexContext,
+  TutoContext,
 } from './traceContexts';
 import { FormattedMessage, useIntl } from 'react-intl';
 import type { Filter } from '../FilterPin';
@@ -158,7 +159,7 @@ function PillsToggle({
       // Found and opened by the tutorial before it shows a pill.
       data-pills-toggle
       data-active={open}
-      className={`codicon codicon-${open ? 'remove' : 'ellipsis'}`}
+      className={`pillDetails codicon codicon-${open ? 'remove' : 'ellipsis'}`}
       title={intl.formatMessage({
         id: open ? 'trace.hidePills' : 'trace.showPills',
       })}
@@ -478,6 +479,7 @@ export default function TraceNode({
                     prefix={childPrefix}
                     tested_scope={testedScope}
                     renderMember={renderChild}
+                    depth={depth}
                   />
                 ) : (
                   renderChild(entry.te, entry.index)
@@ -551,12 +553,14 @@ function ScopeVarGroup({
   prefix,
   tested_scope,
   renderMember,
+  depth,
 }: {
   role: ScopeVarRole;
   members: [TraceElement, number][];
   filters: Filter[];
   prefix: string;
   tested_scope?: string;
+  depth: number;
   renderMember: (te: TraceElement, index: number) => ReactElement;
 }): ReactElement | null {
   const intl = useIntl();
@@ -564,8 +568,9 @@ function ScopeVarGroup({
   const stepIndices = useContext(IndexContext);
   const filterKind = useContext(FilterKindContext);
   const expandCmd = useContext(ExpandContext);
+  const tuto = useContext(TutoContext);
   const filterKey = filters.map((f) => `${f.option}:${f.filter}`).join('\n');
-  const defaultExpanded = role === 'output';
+  const defaultExpanded = (tuto && depth < 2) || role === 'output';
   const [expanded, setExpanded] = useState(defaultExpanded);
   // Opened like a node is: by an include filter, by the expand-all command,
   // and when one of its variables does not match the expected value.
